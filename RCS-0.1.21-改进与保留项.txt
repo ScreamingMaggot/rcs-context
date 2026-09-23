@@ -1,0 +1,112 @@
+RCS 0.1.21 改进与保留项
+================================================================================
+插件版本：CONTEXTinjector v1.10.26
+打包基线：v1.10.25（计量修复 + 经济性口径）
+本包含并：0.1.20 的全部改动（其说明随包分发）
+回退点：rcs-0.1.20 → rcs-0.1.19 → rcs-0.1.18 → … → rcs-0.1.8
+
+本版主题：**DSH 0.1.1-rc.2 → 0.1.5-rc.2 的 API 兼容性修复**
+
+--------------------------------------------------------------------------------
+一、本版为什么重要：一次"卸载→升级→装回"的中断，暴露出三处 API 断裂
+--------------------------------------------------------------------------------
+2026-09-16 在实验环境执行"卸载 RCS → 升级 DSH 到最新版 → 装回 RCS"以测兼容性，
+操作做了一半中断，随后 web 端每次发消息都失败：
+
+    本轮运行失败  DeepSeek request extension preparation failed   (REQUEST_EXTENSION)
+
+排查要点（**重要教训**）：最初误判为"会话格式迁移损坏"。实测发现 `session.v3.jsonl.zstd`
+解压后仅 279B 看似空壳，实为**多帧 zstd**（单文件含 3065 个 zstd 帧），用只解首帧的
+`zstdDecompressSync` 检测必然误报。改用逐帧扫描后确认：v3 文件 **1282 事件、seq 0..1281、
+零缺口**，迁移本身完全成功。**诊断口径错误会直接导致错误的修复方向**——本次先删了三个
+"空壳"v3 文件（已备份），实际与故障无关。
+
+真正的根因经**在 `prepareExtensions` 调用点注入堆栈打印**才暴露（三处，全部为 DSH 0.1.5
+收紧/重构的 API）：
+
+1. **`session.events[seq]` 已移除**
+   0.1.5 的 `dsh-session` 不再暴露 `events` 公开数组，改为方法 `eventAt(seq)`。
+   旧写法在 `resume-seed` 与折叠时抛
+   `Cannot read properties of undefined (reading '<seq>')`（如 `reading '1276'`）。
+   影响：`seedFoldState` 与主折叠路径共 2 处。
+2. **`surfaceOp` replace 字段改名**
+   0.1.5 的校验为**三键定长**且要求 `{op,startSeq,endSeq}`：
+       Object.keys(op).length === 3 && hasOwn(op,"startSeq") && hasOwn(op,"endSeq")
+   0.1.1 用的是 `{op,start,end}` ⇒ 报
+   `session event "user/message" carries an invalid replace surfaceOp`。
+   ⚠ 注意**不能同时携带两套字段名**——定长校验会因 4 键而失败。
+   影响：head 段提交、主转录提交共 2 处。
+3. **system prompt 头部保护（0.1.5 新增规则）**
+   0.1.5 拒绝任何**首个节点即 seq 0 的 system prompt** 的 replace 区间：
+       surface replace: node 0 holds the system prompt and may be replaced
+       only by a system/message over exactly that node
+   RCS 的遮蔽区间原本自 seq 0 起算 ⇒ 首轮折叠即被拒，且触发
+   "segments 提交失败 ⇒ 已清空会话状态，下次折叠重新 seed" 的状态反复清空。
+   影响：遮蔽集合构造 1 处（排除 `role === 'system'` 节点，使其留在表面）。
+
+三处修复均**保留旧版回退路径**（`evAt` 优先 `eventAt` 并回退 `events`；`replaceOp`
+统一出新字段名），因此**同一份 contextinjector.mjs 可同时跑 0.1.1-rc.2 与 0.1.5-rc.2**。
+
+--------------------------------------------------------------------------------
+二、0.1.21 新增（v1.10.26）
+--------------------------------------------------------------------------------
+1. **`evAt(session, seq)` 兼容取事件**
+   优先 `session.eventAt(seq)`，无该方法时回退 `session.events?.[seq]`。
+   替换 2 处 `session.deriveEventMessage(session.events[seq])`。
+2. **`replaceOp(startSeq, endSeq)` 兼容构造 replace 操作**
+   统一产出 `{ op:'replace', startSeq, endSeq }`（0.1.5 定长校验要求的唯一合法形状）。
+   替换 2 处内联 `{ op:'replace', start, end }`。
+3. **`isSystemNode(m)` 头部保护避让**
+   遮蔽集合构造改为
+       entries.slice(0, end + 1).filter((e) => e.msg !== null && !isSystemNode(e.msg))
+   使折叠区间不再从 seq 0 起算，system prompt 始终留在表面。
+   语义代价：system prompt 不再进入转录（它本就由 DSH 每轮原样携带，无需转录）。
+
+**验证结果（0.1.5-rc.2 实测）**：
+- 启动日志：`fold-rejected` 0 次、`Cannot read` 0 次、`resume-seed failed` 0 次
+- `resume-seed seq=1418 round=25 segments=33 foldBytes=152926`（重启后正常恢复）
+- `fold trigger=turn-stopping @step0` 连续成功（round 22→26）
+- 请求准备阶段异常 0 次（诊断打印已移除）
+
+--------------------------------------------------------------------------------
+三、环境侧附带修复（非插件代码，但同因）
+--------------------------------------------------------------------------------
+DSH 0.1.5 新增 `plugin-package-inventory-deepseek`，要求 profile 的 `package.json`
+**必须同时声明非空 `name` 与 `version`**，否则请求准备阶段直接抛错：
+
+    plugin-package-inventory-deepseek: <...>\profiles\web\package.json
+    must declare non-empty name and version
+
+RCS 安装时由 DSH 初始化的 profile manifest 只有 `name`、无 `version` ⇒ 必须补
+`"version": "0.0.0"`。本次已修三处：
+    .dsh\profiles\web\package.json
+    .dsh-extreason\profiles\web\package.json
+    .dsh-extreason\profiles\headless\package.json
+
+**兼容性测试结论**：RCS 0.1.20 在 DSH 0.1.5-rc.2 上不可用（上述四处硬失败点）；
+经本版修复后 0.1.21 可正常运行于 0.1.5-rc.2，并保留 0.1.1-rc.2 回退兼容。
+
+--------------------------------------------------------------------------------
+四、回退与备份
+--------------------------------------------------------------------------------
+- 本包内 `contextinjector.mjs` 为 0.1.5 兼容版；如需回退，用 0.1.20 包同名文件覆盖即可
+  （0.1.21 保留了全部旧版回退分支，正常情况下无需回退）。
+- 排查过程中产生的备份（可删）：
+    RCS-0.1.20\contextinjector.mjs.bak-before-dsh015compat
+    .dsh\session-migration-backup-20260916-183513\   （3 个 v3 文件，实测与故障无关）
+    .dsh-extreason\profiles\web\package.json.bak-addversion
+    .dsh-extreason\profiles\headless\package.json.bak-addversion
+
+--------------------------------------------------------------------------------
+五、保留项（本版未改动，待后续）
+--------------------------------------------------------------------------------
+1. `contextinjector-webui` 的依赖符号链接在 DSH 升级后会断裂
+   （`profiles/node_modules` 下 react / react-dom / zustand / clsx / immer /
+   scheduler / use-sync-external-store / loose-envify 共 8 个指向旧的 DSH 自带依赖，
+   0.1.5 已不再在顶层提供）⇒ WebUI 面板可能无法渲染。**本版未修**：核心折叠链路
+   不依赖这些前端库，web 主界面正常；如需面板功能，需为 webui 包独立声明依赖并安装。
+2. 升级时的 npm `allow-scripts` 拦截：`dsh-subprocess-local`(postinstall)、`koffi`、
+   `node-pty` 等安装脚本未执行。与本次故障无关，但若用到 Web 终端类功能可能报错，
+   届时 `npm approve-scripts --allow-scripts-pending` 放行后重装。
+3. 旧会话（0.1.1 时代）的 v0 日志存在 seq 缺口（实测 ffab17e9：2756 事件 / seq 0..96428），
+   迁移到 v3 后缺口被规范化（1282 事件 / 连续），当前功能正常；历史数据完整性未逐会话核验。
