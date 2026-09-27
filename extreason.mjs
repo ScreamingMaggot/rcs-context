@@ -94,6 +94,15 @@ const PERSONA = [
   'Write in the language of the user\'s message. Do not call the report tool — it is disabled for this sub-session.',
 ].join('\n')
 
+// v1.10.27 (DSH rc.3+/0.1.7 compat): `session.events` public array removed; enumerate via
+// ownEvents()/snapshotEvents() when present. `?? []` alone was a silent-degrade trap.
+function allEvents(session) {
+  if (typeof session?.ownEvents === 'function') return session.ownEvents()
+  const snap = session?.snapshotEvents
+  if (typeof snap === 'function') { try { return snap.call(session) } catch { return [] } }
+  return session?.events ?? []
+}
+
 function textOf(m) {
   return (Array.isArray(m?.content) ? m.content : [])
     .map((b) => {
@@ -234,7 +243,7 @@ export default {
   apply(ctx) {
     // 【修 1】关闭时**什么都不做**：不建目录、不打横幅、不注册任何钩子（旧版先打横幅再 return）
     if (!ENABLED) return
-    console.log(`[EXTREASON] armed (v0.2 M1; enabled=${ENABLED}; force=${FORCE}; stateDir=${STATE_DIR}; briefDir=${DEBUG_BRIEF ? BRIEF_DIR : '(debug off)'})`)
+    console.log(`[EXTREASON] armed (v0.3 M2 (v4 source kind + sendMessage seam); enabled=${ENABLED}; force=${FORCE}; stateDir=${STATE_DIR}; briefDir=${DEBUG_BRIEF ? BRIEF_DIR : '(debug off)'})`)
 
     // —— 关掉 DSH 原生 subagent 的 report 机制（仅针对本插件的推理器子会话）——
     //   dsh-tool-subagent-report 通过 continuable-setup 给**每个持久子会话**装：
@@ -247,7 +256,7 @@ export default {
     try {
       ctx.subagents.registerContinuableSetup((childCtx) => {
         try {
-          const evs = childCtx?.agent?.session?.events ?? []
+          const evs = allEvents(childCtx?.agent?.session)
           const descriptor = evs.find((e) => e?.type === 'subagent/descriptor')
           const label = descriptor?.data?.label
           if (label !== CHILD_LABEL) return () => { /* 不是我们的推理器：什么都不做 */ }
@@ -396,7 +405,7 @@ export default {
                     id: randomUUID(),
                     role: 'user',
                     content: [{ type: 'text', text: 'Wrap up now: write what you already know as `[R] ` lines; no need to open more files.' }],
-                    source: { kind: 'plugin', plugin: 'EXTREASON' },
+                    source: { kind: 'plugin:EXTREASON' },
                   })
                   log({ tag: 'steer', sid, n, at: STEER_AT })
                 } catch (e) { log({ tag: 'steer-failed', sid, err: String(e?.message ?? e) }) }
@@ -548,7 +557,7 @@ export default {
         id: randomUUID(),
         role: 'user',
         content: [{ type: 'text', text }],
-        source: { kind: 'plugin', plugin: 'EXTREASON' },
+        source: { kind: 'plugin:EXTREASON' },
       }
       return { ...decision, messages: [...decision.messages, msg] }
     }
@@ -709,17 +718,32 @@ export default {
       let childBaseline = 0   // 发 prompt 前的子会话完成计数（见 waitChildTurn 的竞态说明）
       try {
         if (childMode === 'oneshot') {
-          const res = await ctx.subagents.start('fork', {
-            label: CHILD_LABEL,
-            prompt: promptBlocks,
-            parent: agent,
-            persona: PERSONA,
-            toolFilter: { allow: [...childTools] },
-            signal: ctrl.signal,
-          })
-          childId = res?.id ?? null
-          if (childId) childSessions.add(childId)
-          await res?.result
+          // 【v0.3】0.1.6+ 移除了 start(providerName, req) 一次性接口 ⇒ 统一走 startContinuable
+          //   （子会话本就可续用，行为等价）。旧 start 路径保留给 0.1.5。
+          if (typeof ctx.subagents?.start === 'function') {
+            const res = await ctx.subagents.start('fork', {
+              label: CHILD_LABEL,
+              prompt: promptBlocks,
+              parent: agent,
+              persona: PERSONA,
+              toolFilter: { allow: [...childTools] },
+              signal: ctrl.signal,
+            })
+            childId = res?.id ?? null
+            if (childId) childSessions.add(childId)
+            await res?.result
+          } else {
+            const res = await ctx.subagents.startContinuable({
+              provider: 'fork',
+              label: CHILD_LABEL,
+              request: { parent: agent, persona: PERSONA, toolFilter: { allow: [...childTools] }, prompt: promptBlocks },
+              signal: ctrl.signal,
+            })
+            childId = res?.childId ?? null
+            if (childId && sid) { childByParent.set(sid, childId); childSessions.add(childId) }
+            await waitChildTurn(childId, TURN_TIMEOUT_MS, agent, sid, 0)
+            log({ tag: 'child-start', sid, childId, mode: 'oneshot-as-continuable' })
+          }
         } else {
           childId = sid ? (childByParent.get(sid) ?? null) : null
           // 缓存丢失（进程重启/长驻会话）⇒ 从 DSH 的持久子会话列表**找回**上一次那个，
@@ -748,7 +772,7 @@ export default {
             // 【修 2】EXTREASON_DIGEST_MAX=0 ⇒ 整段跳过：不构建、不推进游标、不往 followup 里塞摘要块
             if (DIGEST_ON) {
               try {
-                const evs = agent?.session?.events ?? []
+                const evs = allEvents(agent?.session)
                 const fromSeq = digestCursor.get(sid) ?? 0
                 digest = buildDigest(evs, fromSeq)
                 digestCursor.set(sid, maxSeqOf(evs) || fromSeq)
@@ -757,10 +781,18 @@ export default {
             const followBlocks = digest
               ? [{ type: 'text', text: `What the main model did since your last turn (incremental log, for situational alignment):\n${digest}` }, ...promptBlocks]
               : promptBlocks
-            await ctx.subagents.followup(agent, childId, followBlocks, {
-              source: { kind: 'plugin', plugin: 'EXTREASON' },
-              signal: ctrl.signal,
-            })
+            // 【v0.3 / DSH 0.1.6+】subagents seam 重命名：followup(agent, childId, blocks, {source,signal})
+            //   → sendMessage(agent, childId, blocks, {signal})；source 参数消失（消息归属由宿主
+            //   producer-owned 标记，插件不再自报 source——恰是 v4 "producer-owned source kind" 的语义）。
+            //   保留旧 API 回退，同一文件仍可跑 0.1.5。
+            if (typeof ctx.subagents?.sendMessage === 'function') {
+              await ctx.subagents.sendMessage(agent, childId, followBlocks, { signal: ctrl.signal })
+            } else {
+              await ctx.subagents.followup(agent, childId, followBlocks, {
+                source: { kind: 'plugin:EXTREASON' },
+                signal: ctrl.signal,
+              })
+            }
             log({ tag: 'child-followup', sid, childId, digestChars: digest.length })
           } else {
             childBaseline = 0
@@ -782,7 +814,7 @@ export default {
               childSessions.add(childId)
               // 子会话的 seed 已覆盖"此刻之前的父日志"⇒ 增量摘要从此刻起算
               try {
-                const evs = agent?.session?.events ?? []
+                const evs = allEvents(agent?.session)
                 digestCursor.set(sid, maxSeqOf(evs))
               } catch { /* ignore */ }
             }

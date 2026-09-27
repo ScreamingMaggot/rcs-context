@@ -132,24 +132,38 @@ export const INJECTED_USER_PREFIXES = [
   '[ROUND]',
 ]
 
+// 【v1.10.27 · DSH 0.1.6+ session-format v4 兼容】
+//   v4 退役了 {kind:'plugin', plugin:'X'} 包装（持久化层对 kind==='plugin' 直接抛
+//   "format v4 message requires a producer-owned source kind"，且在编码路径上**打死宿主进程**），
+//   官方 v3→v4 迁移器把老数据重写为 {kind:'plugin:X'}。故写侧一律发新形态（v3 持久化对 kind
+//   无枚举校验，同一形态两类宿主通吃）；读侧必须同时认两种形态——老宿主给旧形态，
+//   迁移后的会话数据给新形态。
+export function pluginIdOf(source) {
+  const k = source?.kind
+  if (typeof k !== 'string') return null
+  if (k === 'plugin') return typeof source.plugin === 'string' && source.plugin.length > 0 ? source.plugin : null
+  if (k.startsWith('plugin:')) return k.slice(7)
+  return null
+}
+
 export function classifyMessageSource(source, opts = {}) {
   const self = opts.selfPlugin ?? SELF_PLUGIN_NAME
   const src = source ?? null
   if (!src || typeof src !== 'object') return { cls: 'opaque', kind: undefined }
   const kind = src.kind
   const form = src.form
-  const plugin = src.plugin
+  const plugin = pluginIdOf(src) ?? (typeof src.plugin === 'string' ? src.plugin : undefined)
   if (kind === 'user') return { cls: 'user' }
-  if (kind === 'plugin' && plugin === self) return { cls: 'self' }
+  if (plugin === self) return { cls: 'self' }
   // 【extreason 接入（取自 RCS-0.1.0）】外置推理简报：文本本身已是 `[R] …` 行 ⇒ 单独一类，
   //   两个转录器都按行保留、不计 ROUND。它是 append-only 日志的一部分（会被折进转录并永久保留），
   //   不是易失注入。位置必须在 opaque 兜底之前，否则会落 opaque ⇒ 两转录器都不转录（静默丢内容）。
-  if (kind === 'plugin' && plugin === 'EXTREASON') return { cls: 'extreason' }
+  if (plugin === 'EXTREASON') return { cls: 'extreason' }
   // subagent 报告：内容需主模型看到，但语义接近工具结果 ⇒ 走 [T]/[V]，不计 ROUND
   if (kind === 'subagent-report' || form === 'relay') return { cls: 'relay', agentId: opts.agentId ?? null }
   if (kind === 'subagent-settled') return { cls: 'notice', sub: 'subagent' }
   // 无 form 的 notice 类插件（实测 user-approval 不带 form）
-  if (kind === 'plugin' && NOTICE_SUB_BY_PLUGIN[plugin]) return { cls: 'notice', sub: NOTICE_SUB_BY_PLUGIN[plugin] }
+  if (plugin !== null && plugin !== undefined && NOTICE_SUB_BY_PLUGIN[plugin]) return { cls: 'notice', sub: NOTICE_SUB_BY_PLUGIN[plugin] }
   if (form === 'snapshot') return { cls: 'snapshot', sections: Array.isArray(src.sections) ? src.sections : [] }
   if (form === 'catalog' || kind === 'skill-catalog') return { cls: 'catalog' }
   if (form === 'notice') return { cls: 'notice', sub: NOTICE_SUB_BY_PLUGIN[plugin] ?? 'notice' }

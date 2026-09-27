@@ -13,7 +13,7 @@
 //
 // 折叠纪律（主设计 §8.1）：
 //   1 只折已闭合前缀；2 新折叠消息 = 旧折叠消息 + 纯拼接增量（单调在场）；
-//   3 触发点仅 round 边界；4 source.kind='plugin'（防自转录）；5 禁工具正文。
+//   3 触发点仅 round 边界；4 自身节点 source.kind='plugin:CONTEXTinjector'（防自转录；v1.10.27 起 v4 形态，读侧双形态兼容）；5 禁工具正文。
 // v1.5 condense 档（off/single/double，默认 off；红线勘误见主设计 §8.2）：
 //   折叠增量内新 [A] 前向浓缩（single：语义浓缩；double：双提取=语义+载荷直抄），
 //   [U]/[T]/[ROUND] 与旧 transcript 不动绝不回写；失败自动回退无损；
@@ -38,7 +38,7 @@ import { foldOne as foldToolResult } from '../toolfold/toolfold.mjs'
 // §13 消息来源分型（condense/ 共享纯模块，仿 ../toolfold 顶层兄弟目录惯例）：
 //   注入器侧转录 ROUND 仅计真人轮（source.kind==='user'），subagent 回传等不再漏进 [U]。
 //   与 LOGcompiler §13 修复对仗。设计见 docs/v2-优化设计.md §13。
-import { classifyMessageSource, subagentIdOf, snapshotSummary, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES } from '../condense/chunk.mjs'
+import { classifyMessageSource, subagentIdOf, snapshotSummary, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES, pluginIdOf } from '../condense/chunk.mjs'
 import { ivrLoad, ivrRecord } from '../condense/ivr.mjs' // #5 IVR 注入经济计量簿记（仅 node:fs）
 
 const ENABLED = process.env.DSH_CONTEXTINJECTOR_ENABLED === '1'
@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复)'
+const PLUGIN_VERSION = 'v1.10.27 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -419,10 +419,11 @@ function snapshotOf(session) {
   try { return session.deriveMessages().map((m) => summarize(m)) } catch { return null }
 }
 // 折叠消息视图：只挑 CONTEXTinjector 自己的折叠消息（runtime-context 等注入面也带
-// source.kind=plugin，但 plugin 标识不同），验证其进入真实请求后逐字节在场
+// plugin 族 source，但标识不同；v1.10.27 起双形态——旧 kind:'plugin'+plugin 字段 / 新 kind:'plugin:X'），
+// 验证其进入真实请求后逐字节在场
 function transcriptNodesOf(msgs) {
   return (msgs ?? [])
-    .filter((m) => m?.source?.plugin === 'CONTEXTinjector')
+    .filter((m) => pluginIdOf(m?.source) === 'CONTEXTinjector')
     .map((m) => { const b = messageBytes(m); return { bytes: b.length, hash: hash256(b).slice(0, 16) } })
 }
 
@@ -457,7 +458,7 @@ export function collectDeadCalls(entries, session) {
     }
     const dead = new Set()
     if (calls.size === 0) return dead
-    const evs = session?.events ?? []
+    const evs = allEvents(session)
     for (const [id, i] of calls) {
       if (results.has(id)) continue
       const seq = entries[i]?.seq
@@ -559,10 +560,11 @@ export function pairSplitIds(insideMsgs, outsideMsgs) {
 //         skiphead 遮蔽段避开注入节点 → 折叠后 8 step runtimeCount 恒 1、supersedes 零新增、任务完成；
 //         splitfold 同一步两次 surfaceOp replace 均 ok:true（注入节点穿插时可分段）。
 //   对策（v1.6 keepInject）：遮蔽区间永不包含 DSH 注入节点 → 快照始终在场 → 零补发。
-// isDshInjected（v1.6）：DSH 注入判定精确化——**自身转录消息（source.plugin='CONTEXTinjector'）不算注入**，
-//   必须可遮蔽（新转录以旧文本为前缀，遮蔽换新安全）；其余 plugin user 与 runtime/policy 前缀 user 才算注入。
+// isDshInjected（v1.6）：DSH 注入判定精确化——**自身转录消息（plugin 标识='CONTEXTinjector'）不算注入**，
+//   必须可遮蔽（新转录以旧文本为前缀，遮蔽换新安全）；其余 plugin 族与 runtime/policy 前缀 user 才算注入。
+//   v1.10.27：plugin 族判定走 pluginIdOf（双形态兼容 v4 的 kind:'plugin:X'）。
 function isOwnTranscript(m) {
-  return m?.source?.kind === 'plugin' && m?.source?.plugin === 'CONTEXTinjector'
+  return pluginIdOf(m?.source) === 'CONTEXTinjector'
 }
 // 【取自 RCS-0.1.0】DSH 以非 plugin 形式注入的节点 kind 白名单（实测 skill 目录节点：
 //   kind==='skill-catalog'、文本以 <system-reminder> 开头）——不判为注入的话它会被折进遮蔽区，
@@ -570,10 +572,11 @@ function isOwnTranscript(m) {
 const DSH_INJECTED_KINDS = new Set(['skill-catalog'])
 function isDshInjected(m) {
   if (!m || m.role !== 'user') return false
-  // 【extreason 接入（取自 RCS-0.1.0）】外置推理简报节点（source.plugin==='EXTREASON'）**不算 DSH 注入**：
+  // 【extreason 接入（取自 RCS-0.1.0）】外置推理简报节点（plugin 标识==='EXTREASON'）**不算 DSH 注入**：
   //   它是易失量（每轮由插件重发），必须可被折叠吞掉；否则会被 keepInject 钉在 surface 上、逐轮累积。
-  if (m.source?.plugin === 'EXTREASON') return false
-  if (m.source?.kind === 'plugin') return !isOwnTranscript(m)
+  const pid = pluginIdOf(m.source)
+  if (pid === 'EXTREASON') return false
+  if (pid !== null) return !isOwnTranscript(m)
   if (DSH_INJECTED_KINDS.has(m.source?.kind)) return true
   const text = blocksOf(m)
     .filter((b) => b.type === 'text').map((b) => b.text ?? '').join('')
@@ -589,8 +592,9 @@ function isDshInjected(m) {
 function isInjectedUser(m) {
   if (!m || m.role !== 'user') return false
   // 【extreason 接入（取自 RCS-0.1.0）】同上：简报节点在 keepInject 关闭的旧语义下也必须可折叠
-  if (m.source?.plugin === 'EXTREASON') return false
-  if (m.source?.kind === 'plugin') return true
+  const pid = pluginIdOf(m.source)
+  if (pid === 'EXTREASON') return false
+  if (pid !== null) return true
   const text = blocksOf(m)
     .filter((b) => b.type === 'text').map((b) => b.text ?? '').join('')
     .replace(/[\r\n]+/g, ' ').trim()
@@ -665,6 +669,15 @@ function replaceOp(startSeq, endSeq) {
 function evAt(session, seq) {
   if (typeof session?.eventAt === 'function') return session.eventAt(seq)
   return session?.events?.[seq]
+}
+// v1.10.27 (DSH rc.3+/0.1.7 compat): the public `session.events` array is gone there;
+// enumerate via ownEvents() when present. `?? []` alone was a silent-degrade trap —
+// empty event lists read as "no dead calls / no transcript" without any error.
+function allEvents(session) {
+  if (typeof session?.ownEvents === 'function') return session.ownEvents()
+  const snap = session?.snapshotEvents
+  if (typeof snap === 'function') { try { return snap.call(session) } catch { return [] } }
+  return session?.events ?? []
 }
 function seedFoldState(session, surface, st) {
   try {
@@ -948,7 +961,7 @@ async function userMessage(text) {
     try { _msgCtor = (await import('@deepseek-ai/dsh-llm')).createUserMessage ?? null } catch { _msgCtor = null }
   }
   const content = [{ type: 'text', text }]
-  const source = { kind: 'plugin', plugin: 'CONTEXTinjector' }
+  const source = { kind: 'plugin:CONTEXTinjector' }
   if (_msgCtor) {
     try { return _msgCtor({ content, source }) } catch { /* 退回手写值 */ }
   }
@@ -1718,7 +1731,7 @@ export default {
         id: randomUUID(),
         role: 'user',
         content: [{ type: 'text', text: segmentsOn ? segNewText : transcript }],
-        source: { kind: 'plugin', plugin: 'CONTEXTinjector' }, // 纪律 4：防自转录
+        source: { kind: 'plugin:CONTEXTinjector' }, // 纪律 4：防自转录
       }
       // 【v1.10.13】多段转录：本段只承载"本次增量"，替换区间从"最后一个自身段节点之后"起算
       //   （旧段节点 seq === foldSeq ⇒ 不在增量内 ⇒ 不被覆盖、留在表面）。关闭时 = 旧行为（全部被遮蔽 seq）。
@@ -1815,7 +1828,7 @@ export default {
         //   新段的区间从"最后一个段节点之后"起算（既有段留在表面 ⇒ 拼起来才是完整转录）。
         //   中间状态必须先写回 st：若第二段失败，catch 会清空状态强制重新 seed（从表面真值重建）。
         if (segHeadPlan) {
-          const headMsg = { id: randomUUID(), role: 'user', content: [{ type: 'text', text: segHeadPlan.text }], source: { kind: 'plugin', plugin: 'CONTEXTinjector' } }
+          const headMsg = { id: randomUUID(), role: 'user', content: [{ type: 'text', text: segHeadPlan.text }], source: { kind: 'plugin:CONTEXTinjector' } }
           session.append('user/message', headMsg, {
             surfaceOp: replaceOp(segHeadPlan.startSeq, segHeadPlan.endSeq),
             sourceEventSeqs: [...segHeadPlan.seqs],

@@ -110,3 +110,26 @@ RCS 安装时由 DSH 初始化的 profile manifest 只有 `name`、无 `version`
    届时 `npm approve-scripts --allow-scripts-pending` 放行后重装。
 3. 旧会话（0.1.1 时代）的 v0 日志存在 seq 缺口（实测 ffab17e9：2756 事件 / seq 0..96428），
    迁移到 v3 后缺口被规范化（1282 事件 / 连续），当前功能正常；历史数据完整性未逐会话核验。
+
+—— 09-27 夜补录（DSH 0.1.7-rc.2 / session-format v4 适配，桌面工作副本就地升级）——
+【改】contextinjector v1.10.27 / extreason v0.3 M2 / condense·chunk：
+  ① v4 退役 source.kind='plugin'（写入即抛、宿主进程死）⇒ 写侧 6 处改 producer-owned
+    {kind:'plugin:CONTEXTinjector'/'plugin:EXTREASON'}（与官方 v3→v4 迁移同形态）；
+    读侧 7 处（防自转录/注入避让/分类器）统一 pluginIdOf() 双形态识别。
+  ② session.events 公开数组被移除 ⇒ 新增 allEvents()（ownEvents→snapshotEvents→旧数组兜底），
+    消除 ??[] 空表静默降级；multiturn-driver:86 同类崩溃在 pilot 副本 driver-compat.mjs 修复。
+  ③ subagents seam 重命名：followup(...)→sendMessage(agent,childId,blocks,{signal})（source 参数
+    由宿主 producer-owned 接管）；start('fork') 一次性接口移除 ⇒ oneshot 归一到 startContinuable。
+【证】无头 E1 12/12 inject-brief、父会话 12 个 plugin:EXTREASON v4 节点（旧形态×0）；
+  web 实测 10+ 小时长会话 turn4-12 每回合 child-followup+inject-brief，零 no-brief。
+【保留/遗留】registerContinuableSetup 被宿主移除 ⇒ 子会话 report-guard 失去挂载点
+  （暂由人设提示词兜底，本轮未见子代理误用 report）；未跑 fold 路径的 v4 复验（off/single/double
+  若在新宿主重跑需先同步 bench 隔离家插件副本——其内仍是 v1.10.25）。
+【09-27 晚追加·漂移#10】0.1.7 新增请求扩展贡献者 dsh_plugin_packages（dsh-plugin-package-inventory-deepseek，
+  默认 enabled）在含 surfaceOp 折叠事务的会话上 prepare 抛错 ⇒ 每个模型请求秒死
+  （报错只有一层壳 "DeepSeek request extension preparation failed"，cause 被吞）。
+  单变量归因：只关 inventory ⇒ off 折叠臂 80s PASS / 23 次折叠 / monotonic=true / fold-errors 空 /
+  foldRatioAgg 0.199；session-log-deepseek 无罪（开着也过）。
+  处置：bench/pilot overlay 模板对折叠臂显式 config enabled:false（rc.2 无此特性，关之=与 284 批同构语义）。
+  遗留：真凶抛点未定位（cause 无日志出口），已向宿主侧记账；WebUI 用户在 0.1.7 开折叠同样会踩——
+  需在 ~/.dsh profile 层同样关闭该扩展（待办，周一演示前检查）。
