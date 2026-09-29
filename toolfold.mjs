@@ -1,4 +1,4 @@
-// Copyright (c) 2026 ScreamingMaggot. This source code is licensed under the MIT License.
+// Copyright (c) 2026 无稽烦忧 - StateCompiler 专有 (Proprietary); internal test only, not open source.
 // toolfold.mjs — 工具结果折叠：结构化短行 [T] 升级 + 值保真链 [V]（A档最小集，纯规则）
 // 规格：docs/seminar/Draft of the tool result collapse rules.md (§1.1/1.2/1.3)
 // 行格式（旧档前缀兼容）：
@@ -13,9 +13,12 @@ const C = { HEAD: 200, TAIL: 200, TEE_BYTES: 2048, GREP_MATCHES: 10, GLOB_MATCHE
 // ---- 转义（只做一次；值内含裸 | \ " 换行时整体引号包裹并转义）----
 function escVal(raw, forceQuote = false) {
   let s = String(raw == null ? '' : raw)
-  const special = /[|\\"\n]/.test(s)
+  // ⚠ 必须连 \r 一起转义：本模块的输出是**行式**格式（一行一条 [T]/[V]），而 Windows 工具
+  //   正文普遍是 \r\n。只转 \n 会留下裸 CR，写进只增日志后 CR 自身被当换行 ⇒ 一行撑成多行，
+  //   面板 parseTranscript 与任何按行解析的下游都会读到垃圾续行（2026-09-29 重建事故日志时暴露）。
+  const special = /[|\\"\n\r]/.test(s)
   if (!forceQuote && !special) return s
-  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\|/g, '\\|').replace(/\n/g, '\\n') + '"'
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\|/g, '\\|').replace(/\r/g, '\\r').replace(/\n/g, '\\n') + '"'
 }
 // 字段段：k=v（v 只在组装时转义一次）
 const pair = (k, v, quote = false) => ({ k, v, quote })
