@@ -29,6 +29,19 @@ contextinjector-webui（「注入」面板）** 一起直装进 DeepSeek Harness
 └── RCS-0.1.11-改进与保留项.txt   本版改动、保留项、读数纪律
 ```
 
+## 从零安装（终端，适用于 GitHub 克隆）
+
+```bash
+git clone https://github.com/ScreamingMaggot/rcs-context.git
+cd rcs-context
+powershell -ExecutionPolicy Bypass -File ./install.ps1
+# 需指定目标时：-DSH_HOME <配置家目录>  -DshInstall <dsh 安装根>
+```
+
+安装脚本会：备份现网 → 落位插件与 WebUI 包 → 幂等追加 profile 补丁（四项挂载 + 一条按宿主探测的兼容项）→ 自校验。重复运行安全。
+本仓库未发布 npm 包，故不使用 `dsh plugin add`；安装走上述脚本（或双击 `install.cmd`）。
+**平台说明**：插件本体为跨平台 `.mjs`（随宿主运行）；安装/卸载脚本目前仅提供 Windows PowerShell 版本。
+
 ## 一键直装（Windows）
 在**已运行/即将运行的 DSH 所在机器**上，双击 `install.cmd`，或：
 ```powershell
@@ -52,6 +65,33 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 4. **EXTREASON（外置推理，默认开）**：主模型 `reasoningEffort: off`（或模型无思维链能力）时，
    每轮自动跑一个只读子代理（UI 里显示为「外部思考中」）并把它的 `[R] ` 行注入当轮请求。
    不需要时设环境变量 `EXTREASON=0`。详见 `EXTREASON/README.md`。
+
+## 界面截图（实拍）
+
+**①「注入」面板**：左上为压缩比走势（蓝线=每轮、绿线=累计，虚线=比值 1 参考线），中间是本次折叠读数
+（`8951 → 725 B`、8%、档位 `double`、单调性 ✓）与请求结构逐段字节，右侧是当前会话的档位与开关。
+
+![注入面板](docs/panel-inject.png)
+
+**② 会话输入区的档位选择器**（默认「关」；开启折叠后每一轮的下方即出现压缩读数）：
+
+![档位选择器](docs/tier-selector.png)
+
+**③「外部思考中」**：主模型少想快跑的同时，只读调查员在当轮实际执行 分析 / 搜索代码 / 读取文件：
+
+![外部思考](docs/extreason-running.png)
+
+**④ 调查员简报（`[R]` 行）**：逐行标明文件与行号、指出唯一实质性不一致点并给出两个可选动作，末尾声明
+「只做了只读检查、未运行、未改动任何文件」：
+
+![R 简报](docs/brief-lines.png)
+
+**⑤ 折叠进行中**：会话标签旁显示「压缩中」，面板给出触发点（TURN-END）、耗时与本轮读数
+（`775 → 179 B`、23%、档位 `single`、单调性 ✓）：
+
+![折叠进行中](docs/fold-inflight.png)
+
+> 截图取自真实长会话，未做美化；会话 ID 与本地路径为你自己的环境，若公开传播建议自行打码。
 
 ## 成本提示（重要）：压缩通道请走本地或廉价模型
 
@@ -92,6 +132,17 @@ llm-pi-ai:
 
 **EXTREASON 不需要单独配**：它的子调查员每轮调用一次模型，但简报会让主模型少读历史——
 实测计费中位反而更低（11.2 万 vs 不开的 14.0 万），故无需为它指定廉价模型。
+
+## 权限边界与第三方网络依赖（如实声明）
+
+- **写入范围**：仅 `$DSH_HOME`（web profile 目录、`state-compiler` 状态目录、转录日志、按需创建的 `raw/` 归档与折叠审计 `fold-index/`）。不写系统目录、不改 PATH、不改 shell 配置。
+- **进程形态**：作为宿主进程内插件加载，不安装后台服务、不注册开机项。
+- **插件自身不发起任何网络请求**。仅两处例外，且都必须由你显式配置后才发生：
+  1. 把压缩通道指向本地/远程 Ollama（或任一 OpenAI 兼容端点）时，该请求由宿主的 LLM 适配器发出；
+  2. EXTREASON 的子调查员使用**宿主已注册**的模型与只读检索工具（若启用了网页检索，则走宿主自身的检索通道）。
+- **子会话权限**：EXTREASON 的子会话以只读工具集运行（读文件 / 检索），不具备写权限；产出以 `[R] ` 行注入。
+- **凭据**：插件不读取、不存储模型凭据（由宿主凭据服务管理）。
+- **卸载**：`uninstall.ps1` 回滚补丁项与文件（含安装时备份的还原）。
 
 ## 卸载
 ```powershell
