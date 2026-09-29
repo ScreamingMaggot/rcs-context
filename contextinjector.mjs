@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.27 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复)'
+const PLUGIN_VERSION = 'v1.10.29 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -679,6 +679,30 @@ function allEvents(session) {
   if (typeof snap === 'function') { try { return snap.call(session) } catch { return [] } }
   return session?.events ?? []
 }
+// 【v1.10.28 · 漂移 #11】0.1.7 把工具调用从"助手消息内的 tool-call 内容块"改成**独立 tool/call 事件**
+//   （载荷 data:{callId,name,arguments}，arguments 为 JSON 字符串）。派生的 tool-result 块仍在，但
+//   transcribeIncremental 的 `pending` 再无登记 ⇒ 每条 [T] 落进兜底 `{op:'?',path:'-'}` ⇒ 118/118 全成
+//   `?|?|-|OK`，工具名与目标**整列丢失**（转录仍可回放，但"每条断言可指回原文"的记录价值归零）。
+//   修法：以事件层为权威源建 callId → {op,path,args} 索引，块级取不到时回查。老宿主块里有 name，
+//   回查分支不会命中 ⇒ 同一份代码双宿主通吃（与 source.kind 的 pluginIdOf 同思路）。
+function callIndexFromEvents(session) {
+  const map = new Map()
+  try {
+    for (const e of allEvents(session) ?? []) {
+      const ty = e?.type
+      if (ty !== 'tool/call' && ty !== 'tool-call' && ty !== 'toolCall') continue
+      const d = e?.data ?? e
+      const id = d?.callId ?? d?.toolCallId ?? d?.id
+      if (id == null || id === '') continue
+      map.set(String(id), {
+        op: d?.name ?? d?.toolName ?? '?',
+        path: pathOf(d?.arguments),
+        args: argsOf(d?.arguments),
+      })
+    }
+  } catch { /* best-effort：索引失败退回旧行为 */ }
+  return map
+}
 function seedFoldState(session, surface, st) {
   try {
     const nodes = [...(surface?.nodes ?? [])]
@@ -724,13 +748,44 @@ function toolResultText(m, resultBlock) {
   if (resultBlock && typeof resultBlock.content === 'string' && resultBlock.content) parts.push(resultBlock.content)
   return parts.join('\n')
 }
+// 【漂移 #11】工具结果消息的双形态判定：
+//   0.1.5 及更早：消息 content 内含 {type:'tool-result', toolCallId, isError} 块；
+//   0.1.7 起：结果消息是 {role:'tool', toolCallId, isError, source:{kind:'tool',callId}, content:[{type:'text'}]}
+//             —— **没有** tool-result 块。只认块级会让整类结果在转录里凭空消失。
+function isToolResultMsg(m) {
+  if (!m) return false
+  if (m.role === 'tool' || m?.source?.kind === 'tool') return true
+  return blocksOf(m).some((b) => b?.type === 'tool-result')
+}
+function toolResultCallId(m, block) {
+  return String(block?.toolCallId ?? block?.callId ?? m?.toolCallId ?? m?.callId ?? m?.source?.callId ?? '')
+}
 function transcribeIncremental(msgs, roundState, opts = {}) {
   const rows = []
   const pending = new Map() // callId -> {op, path, args}
   const structured = !!(opts && opts.structured)
+  const calls = (opts && opts.calls) instanceof Map ? opts.calls : null // 漂移 #11：事件层索引
+  // 一行工具记录（块级与消息级两条路径共用，保证输出逐字同形）
+  function emitToolRow(callId, isErr, m, block) {
+    const rec = pending.get(String(callId)) ?? calls?.get(String(callId))
+      ?? { op: block?.name ?? m?.toolName ?? '?', path: '-', args: {} }
+    if (structured) {
+      const text = toolResultText(m, block)
+      const { t, vs } = foldToolResult({ action: rec.op, args: rec.args || {}, text, isError: isErr, fs: { readFileSync }, tool: toolDomainOf(rec.op) })
+      for (const v of vs) rows.push(v)
+      rows.push(t)
+    } else {
+      rows.push(`[T] ${rec.op} | ${rec.path} | ${isErr ? 'ERR' : 'OK'}`)
+    }
+  }
   for (const m of msgs) {
     const role = m?.role
     const src = m?.source?.kind
+    // 漂移 #11：0.1.7 形态的结果消息没有 tool-result 块 ⇒ 走消息级路径，并**跳过**块循环
+    if ((role === 'tool' || src === 'tool') && !blocksOf(m).some((b) => b?.type === 'tool-result')) {
+      emitToolRow(toolResultCallId(m), m?.isError === true, m, null)
+      continue
+    }
     for (const b of blocksOf(m)) {
       if (isReasoningBlock(b)) continue // §1.2 content-only：reasoning 块剥离（不转录）
       // 注：subagent relay/settled 正文实测以 text 块到达（deepseek-v4-flash），不受此影响；
@@ -787,21 +842,14 @@ function transcribeIncremental(msgs, roundState, opts = {}) {
       }
       if (b.type === 'tool-call') {
         const id = b.id ?? b.toolCallId ?? ''
-        if (id) pending.set(id, { op: b.name ?? '?', path: pathOf(b.arguments), args: argsOf(b.arguments) })
+        const ev = (id && calls && calls.get(String(id))) || null
+        const op = b.name ?? b.toolName ?? ev?.op ?? '?'
+        if (id) pending.set(String(id), { op, path: (b.arguments != null ? pathOf(b.arguments) : (ev?.path ?? '-')), args: (b.arguments != null ? argsOf(b.arguments) : (ev?.args ?? {})) })
         continue
       }
       if (b.type === 'tool-result') {
-        const id = b.toolCallId ?? b.callId ?? ''
-        const isErr = b.isError === true
-        const rec = pending.get(id) ?? { op: b.name ?? '?', path: '-', args: {} }
-        if (structured) {
-          const text = toolResultText(m, b)
-          const { t, vs } = foldToolResult({ action: rec.op, args: rec.args || {}, text, isError: isErr, fs: { readFileSync }, tool: toolDomainOf(rec.op) })
-          for (const v of vs) rows.push(v)
-          rows.push(t)
-        } else {
-          rows.push(`[T] ${rec.op} | ${rec.path} | ${isErr ? 'ERR' : 'OK'}`)
-        }
+        // 块级形态（老宿主）：isError 优先取块，缺失时回落消息层
+        emitToolRow(toolResultCallId(m, b), (b.isError !== undefined ? b.isError === true : m?.isError === true), m, b)
       }
     }
   }
@@ -1532,6 +1580,7 @@ export default {
       const deadCalls = collectDeadCalls(entries, session)
       let end = closedPrefixEnd(entries.map((e) => e.msg), { deadCalls })
       if (end < 0) return { folded: false, reason: 'no-closed-prefix' } // 尚无闭合前缀（首轮未产生 assistant↔tool 闭合），留给下一轮
+      const callsIdx = callIndexFromEvents(session) // 漂移 #11：一次建索引，head 补录与增量共用
       const ki = keepInjectOn(gate, ctrl) // v1.6 注入节点避让：快照始终在场 → 零 policy 补发
       // 遮蔽区间排除末端注入型节点（最新 runtime/policy 快照保留在 surface）——保转录纯度；
       // v1.6（ki）用精确判定（自身转录消息可遮蔽、只剔 DSH 注入）；v1.5 兼容用旧语义（任何 plugin user）
@@ -1553,7 +1602,7 @@ export default {
         // 【v1.10.1 修复】被截掉的那段（注入**之前**的普通节点 = 首条 user）过去既不被遮蔽、也不被
         //   转录 ⇒ 转录从第 2 轮起（面板显示 ROUND 1 = 第二条消息）。现按 foldHeadTranscript 的契约
         //   在首次折叠时"只转录不遮蔽"补录一次；注入节点本身仍绝不进 head/tail（keepInject 不变）。
-        const ht = foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true })
+        const ht = foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx })
         headRows = ht.rows
         headSeqs = ht.head.map((e) => e.seq)
         headEntries = ht.head
@@ -1593,8 +1642,20 @@ export default {
         }
       } catch { /* 守卫失败不阻断主链 */ }
 
-      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true })
+      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx })
       if (newRows.length === 0) return { folded: false, reason: 'no-rows' }
+      // 【覆盖守卫 · 漂移 #11 的教训】增量里每一个工具结果消息都必须在转录里留下一行 [T]。
+      //   少一行 ⇒ 某一类节点被整类跳过（形状漂移的典型症状，真机表现为 205 节点折成 0 行工具记录）。
+      //   这时**拒绝提交**、本轮按原文发送：宁可这一轮不省，也绝不带着"看起来完整、其实缺整段"的历史继续。
+      //   旧的五项校验比的是字节与关键值，对"少产出行"不敏感——本守卫补的正是这个盲区。
+      {
+        const wantTool = incremental.filter((e) => isToolResultMsg(e.msg)).length
+        const gotTool = newRows.reduce((n, r) => n + (/^\[T\] /.test(r) ? 1 : 0), 0)
+        if (gotTool < wantTool) {
+          console.log(`[contextinjector] fold-rejected-coverage trigger=${trigger} step=${stepNo} sid=${sid} want=${wantTool} got=${gotTool} (工具结果未逐条进转录 ⇒ 本轮不折叠)`)
+          return { folded: false, reason: 'tool-coverage', wantTool, gotTool }
+        }
+      }
       // condense 档：mode=off|single|double。只对增量内新 [A] 浓缩（[U]/[T]/[ROUND] 不动），
       // 失败回退无损。旧 transcript 绝不回写：condense 只作用于本次增量。
       const mode = condenseMode(gate, ctrl, sid)
@@ -2121,4 +2182,4 @@ try {
   },
 }
 // 测试/诊断句柄（named export 不影响 cordis 按 default 加载插件）
-export { condenseMode, perSessionMode, condenseText, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
+export { condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }

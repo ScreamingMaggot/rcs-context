@@ -280,10 +280,13 @@ function write(st, ev) {
     }
     case 'tool/result': {
       const d = ev.data ?? {}
-      const blocks = Array.isArray(d.message?.content) ? d.message.content : []
+      const m = d.message ?? {}
+      const blocks = Array.isArray(m.content) ? m.content : []
       const resultBlocks = blocks.filter((b) => b.type === 'tool-result')
-      const isErr = resultBlocks.some((b) => b.isError === true)
-      const callId = resultBlocks[0]?.toolCallId
+      // 漂移 #11：0.1.7 的结果消息没有 tool-result 块（content 只有 text），callId/isError 在消息层。
+      //   旧写法 callId 恒 undefined ⇒ pendingCalls 查不到 ⇒ [T] 整列退化为 `?|?`。
+      const isErr = resultBlocks.length ? resultBlocks.some((b) => b.isError === true) : m.isError === true
+      const callId = resultBlocks[0]?.toolCallId ?? m.toolCallId ?? m.callId ?? m.source?.callId ?? d.callId
       const { op, path, args } = st.pendingCalls.get(callId) ?? { op: '?', path: '?', args: {} }
       st.pendingCalls.delete(callId)
       if (ctxToolfoldOn()) {

@@ -2,8 +2,13 @@
     "package": "rcs",
     "name": "RCS",
     "expansion": "Reasoning · Co-work · State  (R=reasoning, S=state, C=co-work)",
-    "version": "0.1.22",
-    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility (producer-owned message sources / ownEvents enumeration / subagents sendMessage seam) + request-extension conflict workaround (dsh_plugin_packages off for folding) + dual-host compatibility layer (0.1.5-rc.2 legacy forms retained)",
+    "version": "0.1.23",
+    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility + drift #11 fix (0.1.7 tool-result shape: transcript now dual-form, tool traces no longer vanish) + coverage guard (rejects folds that drop tool rows) + request-extension conflict workaround + dual-host compatibility layer",
+    "pluginVersions": {
+        "contextinjector": "v1.10.29",
+        "extreason": "v0.3",
+        "logcompiler": "v3"
+    },
     "dshBaseline": "0.1.5-rc.2 (dual-form compatible; verified on both lines)",
     "dshVerified": "0.1.7-rc.2",
     "dshTarget": "0.1.7-rc.2",
@@ -16,13 +21,19 @@
         "condense/chunk.mjs",
         "condense/ivr.mjs",
         "contextinjector-webui/",
+        "tests/drift11-toolcall-event-index.test.mjs",
         "install.ps1",
         "uninstall.ps1",
         "README.md",
+        "RCS-0.1.23-改进与保留项.txt",
         "RCS-0.1.21-改进与保留项.txt",
         "RCS-0.1.20-改进与保留项.txt",
         "RCS-0.1.19-改进与保留项.txt"
     ],
-    "commit": "93d7a27+v0.1.22-metadata",
-    "builtAt": "2026-09-27T21:40:00+08:00"
+    "verification": {
+        "regression": "node tests/drift11-toolcall-event-index.test.mjs -> 18/18 PASS",
+        "realDataReplay": "archived 220 messages of session 5fe3512e -> [T] rows 0 (before) -> 114 (after), 0 degraded",
+        "syntax": "node --check on contextinjector/logcompiler in all three copies"
+    },
+    "builtAt": "2026-09-29T19:59:15+08:00"
 }
