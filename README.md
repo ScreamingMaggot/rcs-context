@@ -91,7 +91,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 ![折叠进行中](docs/fold-inflight.png)
 
-> 截图取自真实长会话，未做美化；会话 ID 与本地路径为你自己的环境，若公开传播建议自行打码。
+> 截图取自真实长会话，未做美化。
 
 ## 成本提示（重要）：压缩通道请走本地或廉价模型
 
