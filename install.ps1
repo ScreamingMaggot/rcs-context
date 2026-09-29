@@ -126,6 +126,28 @@ $entryYaml = [ordered]@{
   'logcompiler'           = "- insert:`n    - id: logcompiler`n      name: './logcompiler.mjs'`n"
   'contextinjector-webui' = "- insert:`n    - id: contextinjector-webui`n      name: 'contextinjector-webui'`n"
   'extreason'             = "- insert:`n    - id: extreason`n      name: './extreason.mjs'`n"
+  # 0.1.7+ 新增的 dsh_plugin_packages 请求扩展与折叠（改写历史）互斥：折叠档位下会让请求秒败。
+  # rc.2 无此特性 ⇒ 对 web profile 关闭该遥测扩展，恢复与历史批次同构的宿主语义。
+  'plugin-package-inventory-deepseek' = "- id: plugin-package-inventory-deepseek`n  config:`n    enabled: false`n"
+}
+# 该兼容补丁只对**确实带此扩展的宿主**有意义：旧宿主没有该插件，未知 id 的 patch 可能干扰启动。
+# 三段式判定：找到→保留；能定位安装根但确无→跳过；一个候选根都解析不出→保留（对现代宿主 fail-safe）。
+function Test-InventoryPlugin([string]$root) {
+  if ([string]::IsNullOrWhiteSpace($root)) { return $false }
+  $p = Join-Path $root 'node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai\dsh-plugin-package-inventory-deepseek'
+  if (Test-Path -LiteralPath $p) { return $true }
+  $p2 = Join-Path $root '@deepseek-ai\dsh\node_modules\@deepseek-ai\dsh-plugin-package-inventory-deepseek'
+  return (Test-Path -LiteralPath $p2)
+}
+$invCands = @()
+if ($DshInstall) { $invCands += $DshInstall }
+try { $npmRoot = (& npm root -g 2>$null); if ($npmRoot) { $invCands += $npmRoot.Trim() } } catch { }
+if ($env:APPDATA) { $invCands += (Join-Path $env:APPDATA 'npm\node_modules') }
+$invFound = $false; $invAnyRoot = $false
+foreach ($c in $invCands) { if (Test-Path -LiteralPath $c) { $invAnyRoot = $true; if (Test-InventoryPlugin $c) { $invFound = $true; break } } }
+if (-not $invFound -and $invAnyRoot) {
+  $entryYaml.Remove('plugin-package-inventory-deepseek') | Out-Null
+  Col Yellow '宿主未含 dsh_plugin_packages 扩展（旧版本）→ 跳过该项兼容补丁（不影响插件功能）。'
 }
 $block = $hdrLine + (-join @($entryYaml.Values))
 function Has-InsertYaml($t, $id) { return ($t -match ("(?m)^\s*-\s*id:\s*" + [regex]::Escape($id) + '\s*$')) }
@@ -148,15 +170,15 @@ if (-not (Test-Path -LiteralPath $patch)) {
       $newTxt = ($kept -join "`n")
       if (-not $newTxt.EndsWith("`n")) { $newTxt += "`n" }
       U8W $patch ($newTxt + $block.TrimStart("`n"))
-      Col Green '空 patch 层（注释 + []）→ 已用四项 insert 替换占位（避免在 [] 之后追加导致 YAML 解析失败）。'
+      Col Green '空 patch 层（注释 + []）→ 已用四项 insert + 一条兼容补丁替换占位（避免在 [] 之后追加导致 YAML 解析失败）。'
     } else {
       if (-not $txt.EndsWith("`n")) { $txt += "`n" }
       $add = $hdrLine + (-join @($missing | ForEach-Object { $entryYaml[$_] }))
       U8W $patch ($txt + $add)
-      Col Green ("已追加缺的 {0} 条 insert（{1}）。" -f $missing.Count, ($missing -join ', '))
+      Col Green ("已追加缺的 {0} 条补丁项（{1}）。" -f $missing.Count, ($missing -join ', '))
     }
   } else {
-    Col Yellow 'cordis.patch.yml 已含四项 insert，跳过（幂等）。'
+    Col Yellow 'cordis.patch.yml 已含全部补丁项，跳过（幂等）。'
   }
 }
 
@@ -166,7 +188,7 @@ foreach ($need in @((Join-Path $profDir 'contextinjector.mjs'), (Join-Path $prof
   if (-not (Test-Path -LiteralPath $need)) { Col Red "校验失败: $need"; $ok = $false }
 }
 $patchTxt = if (Test-Path -LiteralPath $patch) { U8 $patch } else { '' }
-foreach ($id in $entryYaml.Keys) { if (-not (Has-InsertYaml $patchTxt $id)) { Col Red "补丁校验失败：缺 insert id: $id"; $ok = $false } }
+foreach ($id in $entryYaml.Keys) { if (-not (Has-InsertYaml $patchTxt $id)) { Col Red "补丁校验失败：缺补丁项 id: $id"; $ok = $false } }
 
 if ($ok) {
   Col Green "`n安装完成（web profile）。"

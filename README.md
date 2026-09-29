@@ -1,5 +1,7 @@
 # StateCompiler — 直装包（EXTREASON 外置推理 + CONTEXTinjector + LOGcompiler + WebUI 面板）
 
+> **把长对话的重复计费砍掉一半，再给模型配一名只读调查员：先核实，后动手。**
+
 把 **EXTREASON（reasoning 外置）+ CONTEXTinjector（注入折叠）+ LOGcompiler（转录日志）+
 contextinjector-webui（「注入」面板）** 一起直装进 DeepSeek Harness（DSH）的 **web profile**。
 装好后在会话侧边找到「注入」tab 使用。
@@ -7,9 +9,9 @@ contextinjector-webui（「注入」面板）** 一起直装进 DeepSeek Harness
 > 本包版本 / 来源提交 / 构建时间见同目录 **`version.json`**；本版改动与保留项见
 > **`RCS-0.1.11-改进与保留项.txt`**（同目录）。
 
-> ⚠️ **DSH 版本绑定**：本包基于 `@deepseek-ai/dsh 0.1.1-rc.2` 验证
-> （用到 `agent/pre-step`、`surfaceOp replace` 折叠、`ctx.llm` 浓缩、`conversation.view` 客户端注入面）。
-> 装到其它 DSH 版本前请先核实；`install.ps1 -DshInstall <dsh安装根>` 可做版本探测（仅警告）。
+> **兼容性（dshTarget: 0.1.7-rc.2）**：插件含**双代兼容层**——同一份文件同时适配 `0.1.5-rc.2` 与 `0.1.7-rc.2` 两代宿主接口（消息来源标记 / 事件枚举 / 子代理接口三族差异均为双形态实现）。
+> 已验证：`0.1.7-rc.2`（session-format v4 全链路，含折叠提交与审计）。
+> 注意：新宿主的 `dsh_plugin_packages` 请求扩展与『改写历史』的折叠互斥，折叠档位需按 `RCS-0.1.21-改进与保留项.txt` 的 09-27 补录在 profile 层关闭该扩展（安装脚本已处理）。
 
 ## 目录
 ```
@@ -45,10 +47,51 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
      - 双压缩=单次压缩基础上进行关键值保真提取
    - **LOGcompiler（默认全会话记录）**：日志写到 `$DSH_HOME/state-compiler/transcripts/<sid>.log`；
      在「日志编译」区可改输出目录/停用/逐会话开关。
-3. 无本地 Ollama 也能用 single/double（浓缩走 DSH 已注册模型，默认跟随会话模型）。
+3. 压缩通道（single/double 的浓缩调用）**默认跟随会话模型——不建议**：那会按主模型价格计费。
+   请按下方『成本提示』把浓缩指向本地 Ollama 或任一廉价模型；压缩失败会无损回退，不会破坏档案。
 4. **EXTREASON（外置推理，默认开）**：主模型 `reasoningEffort: off`（或模型无思维链能力）时，
    每轮自动跑一个只读子代理（UI 里显示为「外部思考中」）并把它的 `[R] ` 行注入当轮请求。
    不需要时设环境变量 `EXTREASON=0`。详见 `EXTREASON/README.md`。
+
+## 成本提示（重要）：压缩通道请走本地或廉价模型
+
+**为什么**：`single` / `double` 档位会为每条被折叠的助手输出调用一次"压缩模型"（实测每局中位 20 / 42 次）。
+若这条通道走主模型，等于用主模型的价格反复付压缩费——省钱的效果会被吃掉大半。
+把压缩模型换成本地 Ollama 或任一低价模型，这部分开销接近于零，而**无损折叠的收益一分不少**（收益主要来自工具结果折叠，它不需要模型）。
+
+**怎么配（两步）**
+
+① 在 DSH 的 `~/.dsh/settings.yaml` 注册本地 Ollama（三个字段缺一不可，都是实测踩出来的）：
+
+```yaml
+llm-pi-ai:
+  providers:
+    ollama:
+      displayName: Ollama (本地)
+      api: openai-completions
+      baseURL: http://127.0.0.1:11434/v1
+      apiKeyEnv: OLLAMA_API_KEY          # 本地服务任意值即可，但字段必须在
+      compat:
+        maxTokensField: max_tokens       # 关键：ollama 只认 max_tokens，缺此字段输出上限失效
+      streamIdleTimeoutMs: 30000         # 卡住 30s 即无损回退，不拖垮整轮
+      models:
+        - id: qwen3:4b-instruct-2507-q4_K_M
+          name: Qwen3 4B (本地压缩器)
+          reasoningEfforts:
+            off: null
+            medium: medium               # 显式声明：不写会被判为"不支持任何思考档"
+```
+
+② 把压缩通道指过去（三选一，优先级从高到低）：
+- WebUI「注入」面板里为该会话选择压缩模型（最直观）；
+- 会话的 `control.json` 写 `{"condenseProvider":"ollama","condenseModel":"qwen3:4b-instruct-2507-q4_K_M"}`；
+- 环境变量 `DSH_CONTEXTINJECTOR_CONDENSE_PROVIDER` / `DSH_CONTEXTINJECTOR_CONDENSE_MODEL`。
+
+**用弱模型的代价**：压缩率会低一些、单次更慢（4B 级一条约 7–15s），**但不会出错**——
+压缩超预算或质量不达标时插件一律无损回退（原文照旧进转录），档案与可回放性不受影响。
+
+**EXTREASON 不需要单独配**：它的子调查员每轮调用一次模型，但简报会让主模型少读历史——
+实测计费中位反而更低（11.2 万 vs 不开的 14.0 万），故无需为它指定廉价模型。
 
 ## 卸载
 ```powershell
