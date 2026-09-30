@@ -1,4 +1,4 @@
-// Copyright (c) 2026 无稽烦忧 - StateCompiler 专有 (Proprietary); internal test only, not open source.
+// Copyright (c) 2026 ScreamingMaggot. This source code is licensed under the MIT License.
 // toolfold.mjs — 工具结果折叠：结构化短行 [T] 升级 + 值保真链 [V]（A档最小集，纯规则）
 // 规格：docs/seminar/Draft of the tool result collapse rules.md (§1.1/1.2/1.3)
 // 行格式（旧档前缀兼容）：
