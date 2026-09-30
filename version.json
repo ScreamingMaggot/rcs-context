@@ -10,8 +10,8 @@
         "logcompiler": "v3"
     },
     "dshBaseline": "0.1.5-rc.2 (dual-form compatible; verified on both lines)",
-    "dshVerified": "0.1.7-rc.2",
-    "dshTarget": "0.1.7-rc.2",
+    "dshVerified": "0.1.7-rc.2 + 0.2.0-rc.2",
+    "dshTarget": "0.2.0-rc.2",
     "license": "MIT",
     "contents": [
         "extreason.mjs",
@@ -39,5 +39,6 @@
         "syntax": "node --check on contextinjector/logcompiler in all three copies",
         "toolfold": "node tests/toolfold-single-line.test.mjs -> ALL PASS (counter-proof: pre-fix escVal emits raw CR)"
     },
-    "builtAt": "2026-09-29T21:39:31+08:00"
+    "builtAt": "2026-09-29T21:39:31+08:00",
+    "dshCompatNote": "0.2.0-rc.2：14 个关键宿主包中 10 个逐字节相同（含 dsh-session-format / dsh-session-projection / dsh-tool-subagent*），16 条插件侧接缝 0 消失 0 改名；dsh_session_log 配置 schema 收紧（enabled 改 Volatile、maxBytes 必填带默认）不影响本包，drift #10 的 inventory 扩展 schema 未变。装载与真实会话使用已验；npm/git 规格安装尚不可用（仓库根无 package.json），安装路径为 install.ps1。"
 }
