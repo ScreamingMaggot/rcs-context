@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.29 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)'
+const PLUGIN_VERSION = 'v1.10.30 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -446,6 +446,36 @@ function pathOf(argsJson) {
 //   判据：该 call 所属的那一轮**已经结束**（其节点 seq 之后存在 `turn/end` 事件）⇒ 结果确定不会再来。
 //   这类 call 允许被跨越；**轮未结束**（工具在飞、结果可能马上到）时绝不跨越 —— 否则结果晚到会成
 //   孤儿 tool-result（v1.6 的 INVALID_REQUEST 血债）。拿不准一律返回空集（保守）。
+// 【当前轮保护 · 2026-09-30 真机 session-de4959d2 修复】
+//   病灶：pre-step 折若发生在"本轮第 2 步"（本轮首个 tool-call 已配到 result），closedPrefixEnd 会因
+//   "所有 call 都已闭合"而返回**表面末端** ⇒ 本轮的 user 消息与刚产出的助手回复一起被折进转录，
+//   表面尾部变成一条 **user 角色**的转录 ⇒ 宿主视其为"未回答的用户轮" ⇒ 再跑一步、同一条用户消息
+//   被答两次（真机 turn=2：连续两条对同一问题的不同回答）。
+//   判据与既有纪律一致——只折叠"已经彻底结束"的内容：某轮结束 ⇔ 其起点之后存在 turn/end 事件
+//   （与 collectDeadCalls 的 dead-call 判定同源）。查不到事件时**不钳制**，退回旧行为，
+//   以免因查询失败让折叠永久停摆。纯函数，可单测。
+export function openRoundClampEnd(entries, session, end) {
+  try {
+    if (!(end >= 0)) return end
+    let openIdx = -1
+    for (let i = Math.min(end, (entries?.length ?? 0) - 1); i >= 0; i--) {
+      const m = entries[i]?.msg
+      if (!m || m.role !== 'user') continue
+      let cls = null
+      try { cls = classifyMessageSource(m.source)?.cls ?? null } catch { cls = null }
+      if (cls === 'user') { openIdx = i; break }
+    }
+    if (openIdx < 0) return end                       // 没有真人轮起点（异常形态）⇒ 不钳制
+    const seq = entries[openIdx]?.seq
+    if (!Number.isFinite(seq)) return end
+    const evs = allEvents(session)
+    let ended = false
+    for (let s = seq + 1; s < evs.length; s++) { if (evs[s]?.type === 'turn/end') { ended = true; break } }
+    if (ended) return end                             // 该轮已结束 ⇒ 允许折叠它（轮末折的主路径）
+    return Math.min(end, openIdx - 1)                 // 仍在飞 ⇒ 遮蔽终点钳到该轮起点之前
+  } catch { return end }                              // 任何异常 ⇒ 不钳制（保守回退到旧行为）
+}
+
 export function collectDeadCalls(entries, session) {
   try {
     const calls = new Map()   // id -> 在 entries 中的下标
@@ -1580,6 +1610,15 @@ export default {
       const deadCalls = collectDeadCalls(entries, session)
       let end = closedPrefixEnd(entries.map((e) => e.msg), { deadCalls })
       if (end < 0) return { folded: false, reason: 'no-closed-prefix' } // 尚无闭合前缀（首轮未产生 assistant↔tool 闭合），留给下一轮
+      // 【当前轮保护】仍在飞的那一轮不进遮蔽集（否则表面尾部会变成 user 角色的转录 ⇒ 宿主再跑一步 ⇒ 重复回答）
+      {
+        const clamped = openRoundClampEnd(entries, session, end)
+        if (clamped !== end) {
+          console.log(`[contextinjector] fold-clamped-to-open-round trigger=${trigger} step=${stepNo} sid=${sid} end=${end}→${clamped} (当前轮仍在飞，本轮不折它)`)
+          end = clamped
+          if (end < 0) return { folded: false, reason: 'open-round' }
+        }
+      }
       const callsIdx = callIndexFromEvents(session) // 漂移 #11：一次建索引，head 补录与增量共用
       const ki = keepInjectOn(gate, ctrl) // v1.6 注入节点避让：快照始终在场 → 零 policy 补发
       // 遮蔽区间排除末端注入型节点（最新 runtime/policy 快照保留在 surface）——保转录纯度；
