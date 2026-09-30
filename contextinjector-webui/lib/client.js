@@ -678,7 +678,7 @@ window.__ModuleLoader__.load({
 								(lf ? [
 									e("div", { key: "m", className: "ci-metrics" },
 										e("span", null, "round ", e("b", null, lf.round ?? "?"), " · step ", e("b", null, lf.step ?? "?")),
-										e("span", null, "压缩 ", e("b", null, (lf.shadowedBytes ?? "?") + " → " + (lf.transcriptBytes ?? "?") + " B"), " (", e("b", null, Math.round((lf.shrink ?? 1) * 100) + "%"), ")"),
+										e("span", null, "压缩 ", e("b", null, (lf.incrementalRawBytes ?? lf.shadowedBytes ?? "?") + " → " + (lf.appendedBytes ?? lf.transcriptBytes ?? "?") + " B"), " (", e("b", null, Math.round((lf.shrink ?? 1) * 100) + "%"), ")"),
 										e("span", null, "gate ", e("b", null, lf.gate || "?")),
 										e("span", null, "档 ", e("b", null, lf.mode || "off")),
 										e("span", null, "hash ", e("b", null, String(lf.transcriptHash || "").slice(0, 8))),
