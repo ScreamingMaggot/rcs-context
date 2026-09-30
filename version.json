@@ -2,11 +2,11 @@
     "package": "rcs",
     "name": "RCS",
     "expansion": "Reasoning · Co-work · State  (R=reasoning, S=state, C=co-work)",
-    "version": "0.1.24",
-    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility + drift #11 fix (0.1.7 tool-result shape: transcript now dual-form, tool traces no longer vanish) + coverage guard (rejects folds that drop tool rows) + toolfold single-line contract (escVal now escapes CR) + request-extension conflict workaround + dual-host compatibility layer",
+    "version": "0.1.25",
+    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility + drift #11 fix (0.1.7 tool-result shape) + coverage guard + toolfold single-line contract + **package layout (installable as a dsh plugin bundle via dsh.bundle)**",
     "pluginVersions": {
         "contextinjector": "v1.10.29",
-        "extreason": "v0.3",
+        "extreason": "v0.3 M2",
         "logcompiler": "v3"
     },
     "dshBaseline": "0.1.5-rc.2 (dual-form compatible; verified on both lines)",
@@ -14,24 +14,27 @@
     "dshTarget": "0.2.0-rc.2",
     "license": "MIT",
     "contents": [
-        "extreason.mjs",
-        "contextinjector.mjs",
-        "logcompiler.mjs",
-        "toolfold.mjs",
+        "web/contextinjector.mjs",
+        "web/logcompiler.mjs",
+        "web/extreason.mjs",
         "condense/chunk.mjs",
         "condense/ivr.mjs",
+        "toolfold/toolfold.mjs",
         "contextinjector-webui/",
+        "package.json",
+        "cordis.patch.yml",
         "install.ps1",
         "uninstall.ps1",
+        "install.cmd",
         "README.md",
-        "RCS-0.1.19-改进与保留项.txt",
+        "docs/",
+        "tests/",
+        "RCS-0.1.25-改进与保留项.txt",
         "RCS-0.1.24-改进与保留项.txt",
         "RCS-0.1.23-改进与保留项.txt",
         "RCS-0.1.21-改进与保留项.txt",
         "RCS-0.1.20-改进与保留项.txt",
-        "RCS-0.1.19-改进与保留项.txt",
-        "tests/drift11-toolcall-event-index.test.mjs",
-        "tests/toolfold-single-line.test.mjs"
+        "RCS-0.1.19-改进与保留项.txt"
     ],
     "verification": {
         "regression": "node tests/drift11-toolcall-event-index.test.mjs -> 18/18 PASS",
@@ -39,6 +42,14 @@
         "syntax": "node --check on contextinjector/logcompiler in all three copies",
         "toolfold": "node tests/toolfold-single-line.test.mjs -> ALL PASS (counter-proof: pre-fix escVal emits raw CR)"
     },
-    "builtAt": "2026-09-29T21:39:31+08:00",
-    "dshCompatNote": "0.2.0-rc.2：14 个关键宿主包中 10 个逐字节相同（含 dsh-session-format / dsh-session-projection / dsh-tool-subagent*），16 条插件侧接缝 0 消失 0 改名；dsh_session_log 配置 schema 收紧（enabled 改 Volatile、maxBytes 必填带默认）不影响本包，drift #10 的 inventory 扩展 schema 未变。装载与真实会话使用已验；npm/git 规格安装尚不可用（仓库根无 package.json），安装路径为 install.ps1。"
+    "builtAt": "2026-09-30T15:22:29+08:00",
+    "dshCompatNote": "0.2.0-rc.2：14 个关键宿主包中 10 个逐字节相同（含 dsh-session-format / dsh-session-projection / dsh-tool-subagent*），16 条插件侧接缝 0 消失 0 改名；dsh_session_log 配置 schema 收紧（enabled 改 Volatile、maxBytes 必填带默认）不影响本包，drift #10 的 inventory 扩展 schema 未变。装载与真实会话使用已验；npm/git 规格安装尚不可用（仓库根无 package.json），安装路径为 install.ps1。",
+    "layout": {
+        "package": "web/ (contextinjector, logcompiler, extreason) + condense/ + toolfold/ + contextinjector-webui/",
+        "bundleLayer": "cordis.patch.yml (root)",
+        "installPaths": [
+            "dsh plugin add github:ScreamingMaggot/rcs-context  → select rcs-context into dsh.profile.bundles",
+            "install.ps1 -DSH_HOME <dir> (offline / no pnpm)"
+        ]
+    }
 }

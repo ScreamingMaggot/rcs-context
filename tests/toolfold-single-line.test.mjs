@@ -11,7 +11,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 // 装配成安装布局（profiles/web + profiles/condense + profiles/toolfold）再 import，顺带验证交付结构
 const root = mkdtempSync(join(tmpdir(), 'rcs-tf-'))
 for (const d of ['web', 'condense', 'toolfold']) mkdirSync(join(root, d), { recursive: true })
-copyFileSync(join(SRC, 'toolfold.mjs'), join(root, 'toolfold', 'toolfold.mjs'))
+copyFileSync(join(SRC, 'toolfold', 'toolfold.mjs'), join(root, 'toolfold', 'toolfold.mjs'))
 const { foldOne } = await import(pathToFileURL(join(root, 'toolfold', 'toolfold.mjs')).href)
 
 let fails = 0

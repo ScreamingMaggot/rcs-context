@@ -21,10 +21,10 @@ $ErrorActionPreference = 'Stop'
 
 # ---- 源（本发布目录自身）----------------------------------------------------
 $src = $PSScriptRoot
-$pluginCtx = Join-Path $src 'contextinjector.mjs'
-$pluginLg  = Join-Path $src 'logcompiler.mjs'
+$pluginCtx = Join-Path $src 'web\contextinjector.mjs'
+$pluginLg  = Join-Path $src 'web\logcompiler.mjs'
 # EXTREASON 外置推理插件（发布包顶层 extreason.mjs → 落位 profiles/web/extreason.mjs）
-$pluginEx  = Join-Path $src 'extreason.mjs'
+$pluginEx  = Join-Path $src 'web\extreason.mjs'
 $pluginCond= Join-Path $src 'condense\chunk.mjs'
 $pluginIvr = Join-Path $src 'condense\ivr.mjs'
 $webuiDir  = Join-Path $src 'contextinjector-webui'
@@ -102,7 +102,7 @@ Copy-Item -LiteralPath $pluginLg  -Destination (Join-Path $profDir 'logcompiler.
 Copy-Item -LiteralPath $pluginEx  -Destination (Join-Path $profDir 'extreason.mjs') -Force
 $tfDir = Join-Path $DSH_HOME 'profiles\toolfold'
 if (-not (Test-Path -LiteralPath $tfDir)) { New-Item -ItemType Directory -Path $tfDir -Force | Out-Null }
-Copy-Item -LiteralPath (Join-Path $src 'toolfold.mjs') -Destination (Join-Path $tfDir 'toolfold.mjs') -Force
+Copy-Item -LiteralPath (Join-Path $src 'toolfold\toolfold.mjs') -Destination (Join-Path $tfDir 'toolfold.mjs') -Force
 # v2 §13 condense 纯模块 -> profiles/condense/（logcompiler import ../condense/chunk.mjs）
 $condDir = Join-Path $DSH_HOME 'profiles\condense'
 if (-not (Test-Path -LiteralPath $condDir)) { New-Item -ItemType Directory -Path $condDir -Force | Out-Null }

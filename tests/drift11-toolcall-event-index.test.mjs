@@ -13,9 +13,9 @@ import { fileURLToPath } from 'node:url'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 const root = mkdtempSync(join(tmpdir(), 'rcs-layout-'))
 for (const d of ['web', 'condense', 'toolfold']) mkdirSync(join(root, d), { recursive: true })
-copyFileSync(join(SRC, 'contextinjector.mjs'), join(root, 'web', 'contextinjector.mjs'))
+copyFileSync(join(SRC, 'web', 'contextinjector.mjs'), join(root, 'web', 'contextinjector.mjs'))
 for (const f of ['chunk.mjs', 'ivr.mjs']) copyFileSync(join(SRC, 'condense', f), join(root, 'condense', f))
-copyFileSync(join(SRC, 'toolfold.mjs'), join(root, 'toolfold', 'toolfold.mjs'))
+copyFileSync(join(SRC, 'toolfold', 'toolfold.mjs'), join(root, 'toolfold', 'toolfold.mjs'))
 
 const { transcribeIncremental, callIndexFromEvents, isToolResultMsg, toolResultCallId } = await import(
   new URL('file:///' + join(root, 'web', 'contextinjector.mjs').replace(/\\/g, '/')))

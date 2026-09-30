@@ -9,28 +9,50 @@ contextinjector-webui（「注入」面板）** 一起直装进 DeepSeek Harness
 > 本包版本 / 来源提交 / 构建时间见同目录 **`version.json`**；本版改动与保留项见
 > **`RCS-0.1.11-改进与保留项.txt`**（同目录）。
 
-> **兼容性（dshTarget: 0.2.0-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` 三代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名，宿主装载与真实会话使用均已验证。安装路径为 `install.ps1`（`dsh plugin add <git 规格>` 目前不可用：本仓库根不含 package.json，pnpm 会生成占位清单而 cordis 无从加载）。
+> **兼容性（dshTarget: 0.2.0-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` 三代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名，宿主装载与真实会话使用均已验证。安装方式见下节：**包安装**（`dsh plugin add`，0.1.25 起支持）或 **install.ps1**（离线 / 无 pnpm 环境）。
 > 已验证：`0.1.7-rc.2`（session-format v4 全链路，含折叠提交与审计）。
 - 折叠的**内容完整性**由提交前守卫保证：其中一条专门比对"被折叠的工具结果数 ↔ 转录里留下的工具记录数"，少一行就整次拒绝、本轮按原文发送（0.1.23 起；动机见 `RCS-0.1.23-改进与保留项.txt`）。
 > 注意：新宿主的 `dsh_plugin_packages` 请求扩展与『改写历史』的折叠互斥，折叠档位需按 `RCS-0.1.21-改进与保留项.txt` 的 09-27 补录在 profile 层关闭该扩展（安装脚本已处理）。
 
 ## 目录
 ```
-├── contextinjector.mjs         注入折叠插件（单文件）
-├── logcompiler.mjs             转录日志插件（单文件）
-├── extreason.mjs               外置推理插件（EXTREASON，单文件）
-├── toolfold.mjs                工具结果折叠（被上面两个 import，须与 condense/ 同级）
+├── web/                        插件本体（进 profiles/web/）
+│   ├── contextinjector.mjs     注入折叠插件
+│   ├── logcompiler.mjs         转录日志插件
+│   └── extreason.mjs           外置推理插件（EXTREASON）
 ├── condense/chunk.mjs,ivr.mjs  共享纯模块（转录分型 / 压缩器 IO 比）
+├── toolfold/toolfold.mjs       工具结果折叠（被上面两个 import）
 ├── contextinjector-webui/      WebUI 面板 npm 包（host /api + client 注入）
+├── package.json                包清单（声明 dsh.bundle）
+├── cordis.patch.yml            包自带补丁层（四条 insert）
 ├── install.ps1 / install.cmd   直装（web profile）
 ├── uninstall.ps1               卸载/回滚
+├── tests/                      回归测试（漂移 #11 覆盖 / toolfold 单行契约）
 ├── README.md                   本说明
 ├── LICENSE.txt                 MIT 开源许可证
 ├── version.json                产物来源/版本/提交/构建时间
-└── RCS-0.1.11-改进与保留项.txt   本版改动、保留项、读数纪律
+└── RCS-0.1.*-改进与保留项.txt    各版改动、保留项、读数纪律
 ```
 
+> 目录分成 `web/ + condense/ + toolfold/` 不是随手排的：插件源码里写的是 `../condense/chunk.mjs`、
+> `../toolfold/toolfold.mjs`，而这个布局**与装进 `DSH_HOME/profiles/` 后的布局同构**，
+> 于是"包安装"与"脚本安装"两条路共用同一份源码，不需要任何分叉。
+
 ## 从零安装（终端，适用于 GitHub 克隆）
+
+**方式一：作为插件包安装（0.1.25 起，推荐）**
+
+```bash
+dsh plugin --profile web add github:ScreamingMaggot/rcs-context
+# 然后把它选进该 profile 的层列表（dsh plugin add 不会自动激活 bundle）：
+#   编辑 <DSH_HOME>/profiles/web/package.json，把 "rcs-context" 加进 dsh.profile.bundles
+# 最后重启 dsh web
+```
+
+装成功并激活后，启动日志里应出现四条装载行（`[CONTEXTinjector] armed …` / `[logcompiler] v3 …`
+/ `[EXTREASON] armed …` / `[contextinjector-webui] … ready`）。没有这四行 = 层没被选中。
+
+**方式二：install.ps1 直装（离线 / 无 pnpm 环境）**
 
 ```bash
 git clone https://github.com/ScreamingMaggot/rcs-context.git
@@ -40,7 +62,6 @@ powershell -ExecutionPolicy Bypass -File ./install.ps1
 ```
 
 安装脚本会：备份现网 → 落位插件与 WebUI 包 → 幂等追加 profile 补丁（四项挂载 + 一条按宿主探测的兼容项）→ 自校验。重复运行安全。
-本仓库未发布 npm 包，故不使用 `dsh plugin add`；安装走上述脚本（或双击 `install.cmd`）。
 **平台说明**：插件本体为跨平台 `.mjs`（随宿主运行）；安装/卸载脚本目前仅提供 Windows PowerShell 版本。
 
 ## 一键直装（Windows）

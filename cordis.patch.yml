@@ -1,0 +1,22 @@
+# RCS bundle layer — 随包分发，`dsh plugin add` 装好后由 profile 的 dsh.profile.bundles 选中即生效。
+#
+# 入口一律用**包内相对路径**：本包的目录布局（web/ + condense/ + toolfold/）与安装进
+# DSH_HOME 后的布局同构，插件源码里的 `../condense/*`、`../toolfold/*` 相对导入因此
+# 在两种装法（本 bundle / install.ps1）下都成立，源码无需分叉。
+- insert:
+    - id: contextinjector
+      name: './web/contextinjector.mjs'
+- insert:
+    - id: logcompiler
+      name: './web/logcompiler.mjs'
+- insert:
+    - id: extreason
+      name: './web/extreason.mjs'
+- insert:
+    - id: contextinjector-webui
+      name: './contextinjector-webui/lib/index.mjs'
+
+# 注：0.1.7-rc.2 一代宿主上，折叠与宿主自带的 `plugin-package-inventory-deepseek`
+# 请求扩展互斥（折叠会触发该扩展抛 REQUEST_EXTENSION）。本 bundle **刻意不在此处关它**——
+# bundle 补丁无法探测该扩展是否存在，对不存在的 id 做 config 覆盖不安全。
+# 那一代为唯一会踩到的宿主，处理方式见 README「兼容性」一节（install.ps1 会按探测结果处理）。
