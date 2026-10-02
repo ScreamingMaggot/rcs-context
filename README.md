@@ -1,13 +1,16 @@
-# StateCompiler — 直装包（EXTREASON 外置推理 + CONTEXTinjector + LOGcompiler + WebUI 面板）
+# StateCompiler（RCS）— DSH 插件包 / 直装包
+
+[![dshfind](https://dshfind.com/api/badge/ScreamingMaggot/rcs-context?lang=zh)](https://dshfind.com/zh/plugins/ScreamingMaggot/rcs-context?ref=badge)
 
 > **把长对话的重复计费砍掉一半，再给模型配一名只读调查员：先核实，后动手。**
 
 把 **EXTREASON（reasoning 外置）+ CONTEXTinjector（注入折叠）+ LOGcompiler（转录日志）+
-contextinjector-webui（「注入」面板）** 一起直装进 DeepSeek Harness（DSH）的 **web profile**。
-装好后在会话侧边找到「注入」tab 使用。
+contextinjector-webui（「注入」面板）** 一起装进 DeepSeek Harness（DSH）的 **web profile**。
+装好后在会话侧边找到「注入」tab 使用。自 0.1.25 起，本仓库同时是**可被 `dsh plugin add` 直接安装的插件包**
+（仓库根有 `package.json` 声明 `dsh.bundle`，随包自带补丁层）。
 
 > 本包版本 / 来源提交 / 构建时间见同目录 **`version.json`**；本版改动与保留项见
-> **`RCS-0.1.11-改进与保留项.txt`**（同目录）。
+> **`RCS-0.1.27-改进与保留项.txt`**（历史各版同目录）。
 
 > **兼容性（dshTarget: 0.2.0-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` 三代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名，宿主装载与真实会话使用均已验证。安装方式见下节：**包安装**（`dsh plugin add`，0.1.25 起支持）或 **install.ps1**（离线 / 无 pnpm 环境）。
 > 已验证：`0.1.7-rc.2`（session-format v4 全链路，含折叠提交与审计）。
