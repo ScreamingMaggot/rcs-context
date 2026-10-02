@@ -19,8 +19,7 @@
     "contextinjector-webui",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE.txt",
-    "docs"
+    "LICENSE.txt"
   ],
   "keywords": [
     "dsh",
