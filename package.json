@@ -1,16 +1,17 @@
 {
   "name": "rcs-context",
   "version": "0.1.27",
-  "type": "module",
   "description": "RCS — cut the repeated per-turn context cost of a long coding session, and give the model a read-only verifier. DeepSeek Harness plugin bundle (context compression + external reasoning + append-only transcript + web panel).",
-  "license": "MIT",
-  "keywords": [
-    "dsh",
-    "dsh-plugin",
-    "deepseek-harness",
-    "context-management",
-    "llm-agent"
-  ],
+  "type": "module",
+  "main": "./web/contextinjector.mjs",
+  "exports": {
+    ".": "./web/contextinjector.mjs",
+    "./web/*": "./web/*",
+    "./condense/*": "./condense/*",
+    "./toolfold/*": "./toolfold/*",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
   "files": [
     "web",
     "condense",
@@ -21,13 +22,33 @@
     "LICENSE.txt",
     "docs"
   ],
-  "exports": {
-    ".": "./web/contextinjector.mjs",
-    "./web/*": "./web/*",
-    "./condense/*": "./condense/*",
-    "./toolfold/*": "./toolfold/*",
-    "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "context-management",
+    "llm-agent"
+  ],
+  "license": "MIT",
+  "author": "ScreamingMaggot",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ScreamingMaggot/rcs-context.git"
+  },
+  "homepage": "https://github.com/ScreamingMaggot/rcs-context#readme",
+  "bugs": {
+    "url": "https://github.com/ScreamingMaggot/rcs-context/issues"
+  },
+  "engines": {
+    "dsh": ">=0.1.5-rc.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.5-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
   },
   "dsh": {
     "bundle": {
