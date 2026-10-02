@@ -16,3 +16,6 @@ state/
 *.log
 node_modules/
 AI-CACHE/
+
+# 本地打包产物（npm pack）
+*.tgz
