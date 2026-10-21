@@ -39,7 +39,7 @@
 // The tiny callId -> {op,path} map is transcript bookkeeping only (never exposed
 // to the model). Every tool/call receives exactly one tool/result, so no [T] row
 // is orphaned.
-import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 // A档：结构化工具折叠（与 CONTEXTinjector 同源 toolfold；默认随其 control.toolfoldStructured 关闭）。
@@ -143,12 +143,25 @@ function fileSize(path) {
   try { return statSync(path).size } catch { return 0 }
 }
 // 断点续传（跨进程重启/会话重开）：DSH 装载 session 不重放历史事件，round 纯内存会复位。
-// 创建某会话状态时，从它既有的 <sid>.log（含轮转段）里读出最大 [ROUND] n 作起始，续编号不重复。
+// 创建某会话状态时，从它既有的 <sid>.log（含**全部**轮转段）里读出最大 [ROUND] n 作起始，续编号不重复。
+// 【v1.10.32 修复】旧实现写死扫 [base, .1, .2, .3] 四个文件，而轮转段编号是**无上限**的
+//   （长会话实测出到 .4 以上）⇒ 重启后只看到较旧段的轮号 ⇒ 新轮从偏小的号续 ⇒ **轮号重复**。
+//   实测：8 轮会话轮转出 5 段，重启后新轮仍写 [ROUND] 8（应为 9）。改为扫目录取全部匹配段。
+//   交叉印证：WebUI 的转录导出早就按 ".log.1 … .log.<maxN> + 当前段"动态拼接过（contextinjector-webui/lib/index.mjs），
+//   两处口径现在一致。
 function lastRoundInDir(dir, key) {
   let mx = 0
-  const base = join(dir, key + '.log')
+  const baseName = key + '.log'
+  const segs = []
   try {
-    for (const seg of [base, base + '.1', base + '.2', base + '.3']) {
+    for (const f of readdirSync(dir)) {
+      if (f === baseName) segs.push(join(dir, f))
+      else if (f.startsWith(baseName + '.') && /^\d+$/.test(f.slice(baseName.length + 1))) segs.push(join(dir, f))
+    }
+  } catch { /* 目录不可读 ⇒ 退回只扫 base */ }
+  if (segs.length === 0) segs.push(join(dir, baseName))
+  try {
+    for (const seg of segs) {
       let txt = ''
       try { txt = readFileSync(seg, 'utf8') } catch { continue }
       for (const ln of txt.split('\n')) {

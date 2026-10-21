@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留)'
+const PLUGIN_VERSION = 'v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -177,6 +177,21 @@ function writeFoldIndex(rec) {
   try {
     mkdirSync(FOLD_INDEX_DIR, { recursive: true })
     const bare = String(rec.sid ?? '').replace(/^session-?/i, '').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)
+    const fp = join(FOLD_INDEX_DIR, bare + '.jsonl')
+    // 【v1.10.32 · 幂等记账】turn-stopping 与 turn/end 兜底是**两个独立触发点**，同一区间可能各提交一次
+    //   折叠（实测：0.2 真机上每笔折叠被写两行，除时间戳外逐字相同，间隔 1.7–1.9s）。
+    //   旧实现各写一行 ⇒ 任何「按行求和」的总账（raw / appended / 压缩倍数）翻倍。
+    //   这里比对最后一行：同一 foldSeq 再来一次即视为同一笔，跳过记账（读数以先到的那次为准）。
+    try {
+      const prevText = readFileSync(fp, 'utf8')
+      const lastLine = prevText.trim().split('\n').pop()
+      if (lastLine) { const prev = JSON.parse(lastLine); if (prev && prev.foldSeq === rec.foldSeq) return }
+    } catch { /* 文件尚不存在或不可读 ⇒ 正常写入 */ }
+    // 【v1.10.32 · monotonic 实算】旧值是硬编码 true（自证字段）；改为按遮蔽 seq 与累计行号实算，
+    //   免得下游把「机器没验过」当成「已验证」（与 22.4× 那次教训同类）。
+    const seqs = Array.isArray(rec.shadowedSeqs) ? rec.shadowedSeqs.map(Number) : []
+    const seqMono = seqs.every((v, i) => i === 0 || v > seqs[i - 1])
+    const cumMono = !(Number.isFinite(rec.cumBefore) && Number.isFinite(rec.cumAfter)) || rec.cumAfter >= rec.cumBefore
     const line = JSON.stringify({
       t: Date.now(), sessionId: rec.sid, foldSeq: rec.foldSeq, shadowedSeqs: rec.shadowedSeqs ?? [],
       cumLines: { before: rec.cumBefore, after: rec.cumAfter },
@@ -186,11 +201,11 @@ function writeFoldIndex(rec) {
       ...(Number.isFinite(rec.liveBytes) ? { live: rec.liveBytes } : {}),
       ...(Number.isFinite(rec.incrementalRawBytes) ? { raw: rec.incrementalRawBytes } : {}),
       ...(Number.isFinite(rec.appendedBytes) ? { appended: rec.appendedBytes } : {}),
-      monotonic: true, rotate: { file: 'transcripts', index: foldRotateIndex(rec.sid) }, trigger: rec.trigger,
+      monotonic: seqMono && cumMono, rotate: { file: 'transcripts', index: foldRotateIndex(rec.sid) }, trigger: rec.trigger,
       // v1.10.13 多段转录：本次折叠同时遮蔽的 head 段 seq（附加字段，cumLines 语义不变 ⇒ 消费方无需改）
       ...(Array.isArray(rec.headSeqs) && rec.headSeqs.length > 0 ? { headSeqs: rec.headSeqs } : {}),
     })
-    appendFileSync(join(FOLD_INDEX_DIR, bare + '.jsonl'), line + '\n', 'utf8')
+    appendFileSync(fp, line + '\n', 'utf8')
   } catch (err) { console.error('[contextinjector] fold-index failed:', err?.message ?? err) }
 }
 function foldInflightFile(sid) {
@@ -1066,6 +1081,11 @@ async function llmText(ctx, route, system, user, maxTokens, sink, llmFixed, opts
   const llm = llmFixed ?? llmOf(ctx)
   if (!llm) { sink?.('llm service unavailable'); return null }
   if (!route?.provider || !route?.model) { sink?.('condense route missing'); return null }
+  // 【v1.10.32 · 计量口径】真实**发起**的调用次数（含随后失败/被拒的）：记在 io.attempts 上。
+  //   修的是"预约 ≠ 调用"：applyCondense 里 `foldCalls += 1` 是预算预约，短行/回本闸会在
+  //   condenseText 内部**提前返回**、一次请求都没发，但 last-fold 的 `calls` 已经 +1 —— 于是
+  //   "本次折叠发起了几次付费调用"被虚高（实测：tooShort 行 calls=1 而 auxCalls=0）。
+  if (opts && opts.io) opts.io.attempts = (opts.io.attempts ?? 0) + 1
   // 【v1.10.20 · P0】推理档位（缺省 off）。opts.effort 显式给定则优先，否则沿用 io/env 解析结果。
   const eff = opts && opts.effort !== undefined ? String(opts.effort).trim().toLowerCase() : LOSSY_EFFORT
   const meta = (opts && opts.meta) || null // 可选：回填 finish 详情，供调用方做截断抢救判定
@@ -1256,7 +1276,7 @@ async function condenseText(text, io) {
     const condenseSys = (io && io.condenseSys) || CONDENSE_SYS // #10 可自定义提示词
     const meta = {}
     const a0 = io?.aux ? { ...io.aux } : null
-    const viaDsh = await llmText(io?.ctx, io?.route, condenseSys, '原文：\n' + body + '\n\n——\n浓缩：', mx, (r) => pushErr(io, r), io?.llm, { effort: effortOf(io), salvage: true, meta, usageSink: io?.aux })
+    const viaDsh = await llmText(io?.ctx, io?.route, condenseSys, '原文：\n' + body + '\n\n——\n浓缩：', mx, (r) => pushErr(io, r), io?.llm, { effort: effortOf(io), salvage: true, meta, usageSink: io?.aux, io })
     // 事后核验：本次调用真实花了多少（含失败——失败也付费），以及据此算出的实测回本回合
     if (io && a0 && io.aux && io.aux.calls > a0.calls) {
       const d = { calls: io.aux.calls - a0.calls, in: io.aux.in - a0.in, cacheRead: io.aux.cacheRead - a0.cacheRead, out: io.aux.out - a0.out }
@@ -1316,7 +1336,7 @@ async function extractKeys(text, io, opts) {
     // 【v1.10.20 · P0】K 通道同样关掉思维链（它和浓缩是同一类"只删不改/逐字摘抄"任务，推理无收益）。
     //   【P2】但 K 通道**不开**截断抢救：截断会切在某个值中间，产出一个"半个值"，
     //   而本插件的既定原则是"错误载荷比丢失更糟" ⇒ K 通道截断仍整条判失败。
-    const viaDsh = await llmText(io?.ctx, io?.route, keysSys, '原文：\n' + body + '\n\n——\n载荷清单，一行一个：', mx, (r) => pushErr(io, r), io?.llm, { effort: effortOf(io), usageSink: io?.aux })
+    const viaDsh = await llmText(io?.ctx, io?.route, keysSys, '原文：\n' + body + '\n\n——\n载荷清单，一行一个：', mx, (r) => pushErr(io, r), io?.llm, { effort: effortOf(io), usageSink: io?.aux, io })
     if (viaDsh) {
       const lines = dedupeKeys(viaDsh)
       if (lines) { kd(io, 'ok', viaDsh.length + '->' + lines.split('\n').length); return lines }
@@ -1390,6 +1410,12 @@ function verifyAgainstSource(condensed, source) {
 const A_LINE_RE = /^\[A\] /
 async function applyCondense(rows, mode = 'single', io = null) {
   const stat = { a: 0, folded: 0, fallback: 0, keys: 0, rawBytes: 0, outBytes: 0 }
+  // 【v1.10.32】off 档在函数**内部**也认：此前只靠调用方 `if (mode !== 'off')` 防护 —— 任何新调用点
+  //   漏掉那个判断，off 档就会照样发起付费浓缩（实测：直接 applyCondense(rows,'off',io) 真的会调模型、
+  //   真花钱、真改行）。契约下沉到函数内部，比靠每个调用点自觉可靠。
+  if (mode === 'off') return { rows: Array.isArray(rows) ? [...rows] : [], stat: { ...stat, calls: 0, callsReserved: 0, ms: 0, budgetHit: false } }
+  // 真实发起次数基线（见 llmText 的 io.attempts）：用于把 "calls" 从"预算预约数"改成"真发起的请求数"。
+  const attemptsBase = Number.isFinite(io && io.attempts) ? io.attempts : 0
   // 【默认与 RCS-0.1.0 对齐 · 2026-09-10】值保真闸 `verifyAgainstSource` 默认**关闭**：
   //   RCS 实测三类误杀（`README.md → 伪 token README`；URL 贪婪吞中文标点；`0.111.0 → 伪 token 111.0`）
   //   会让整条 [A] 白退化成无损回退、白花一次模型调用。
@@ -1476,7 +1502,13 @@ const acRaw = await condenseText(g.text, io)
     out.push('[A] ' + text)
     stat.outBytes += text.length
   }
-  stat.calls = foldCalls; stat.ms = Date.now() - t0; stat.budgetHit = budgetHit
+  // 【v1.10.32】`calls` = **真实发起的调用次数**（llmText 里计数，含随后失败的）；预算预约数另存
+  //   callsReserved 备查。修的是"预约≠调用"：短行/回本闸会在 condenseText 内部提前返回、一次请求
+  //   都没发，旧口径却已经 +1（实测 tooShort 行 calls=1 而 auxCalls=0）。
+  const attempts = (Number.isFinite(io && io.attempts) ? io.attempts : 0) - attemptsBase
+  stat.calls = attempts
+  if (attempts !== foldCalls) stat.callsReserved = foldCalls
+  stat.ms = Date.now() - t0; stat.budgetHit = budgetHit
   // 【v1.10.19 · P5】回退原因分型（只统计非零项，避免污染 last-fold）
   // 【v1.10.20 · P2】`salvaged` 单列进 stat：它是**成功**（换了条路拿到可用的浓缩结果），
   //   不是回退，混进 fallbackReasons 会让人误读成"又回退了几条"。
@@ -1508,7 +1540,10 @@ const acRaw = await condenseText(g.text, io)
   return { rows: out, stat }
 }
 // raw 权威存证：被遮蔽节点（本次 fold 的增量段）原文全量追加落盘，供回放/审计/有损后的无损恢复
-const sanitizeSid = (s) => String(s ?? 'unknown').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120)
+// 【v1.10.32】空串与纯空白必须回退成 'unknown'：旧实现 String(s ?? 'unknown') 对 '' 仍得 ''，
+//   于是 fold-index / last-fold / raw 的文件名变成 `.jsonl` / `.json` / `.jsonl`——同一目录下
+//   所有「sid 为空」的会话共用同名文件 ⇒ 账本互相混写。
+const sanitizeSid = (s) => String(s ?? '').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'unknown'
 function rawAppend(sid, entries) {
   try {
     if (!entries || entries.length === 0) return
@@ -2239,4 +2274,4 @@ try {
   },
 }
 // 测试/诊断句柄（named export 不影响 cordis 按 default 加载插件）
-export { condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
+export { writeFoldIndex, condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
