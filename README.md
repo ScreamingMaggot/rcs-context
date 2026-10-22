@@ -1,315 +1,135 @@
-# StateCompiler（RCS）— DSH 插件包 / 直装包
+# RCS — DSH 插件包
 
 [![dshfind](https://dshfind.com/api/badge/ScreamingMaggot/rcs-context?lang=zh)](https://dshfind.com/zh/plugins/ScreamingMaggot/rcs-context?ref=badge)
 
-> **把长对话的重复计费砍掉一半，再给模型配一名只读调查员：先核实，后动手。**
+**上下文折叠 + 外置推理 + 转录日志 + 外部记忆**，为 DeepSeek Harness (DSH) 的 web profile 设计。
 
-把 **EXTREASON（reasoning 外置）+ CONTEXTinjector（注入折叠）+ LOGcompiler（转录日志）+
-contextinjector-webui（「注入」面板）** 一起装进 DeepSeek Harness（DSH）的 **web profile**。
-装好后在会话侧边找到「注入」tab 使用。自 0.1.25 起，本仓库同时是**可被 `dsh plugin add` 直接安装的插件包**
-（仓库根有 `package.json` 声明 `dsh.bundle`，随包自带补丁层）。
+装好后在会话侧边栏找到「注入」和「记忆」tab 使用。
 
-> 本包版本 / 来源提交 / 构建时间见同目录 **`version.json`**；本版改动与保留项见
-> **`RCS-0.1.27-改进与保留项.txt`**（历史各版同目录）。
+## 功能
 
-> **兼容性（dshTarget: 0.2.1-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.2` 四代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名。0.2.1-rc.2 已实测：五插件全部装载；`session/event`（含独立 `tool/call`/`tool/result`）、`agent/pre-step`、`ctx.tools`、`ctx.slots`、`webServer`、`requestHeader`、`ownEvents` 均正常；记忆目录注入、`memory_catalog` 调用、轻 LLM 编译、真实折叠（`3714B → 186B`）与 LOGcompiler 转录均通过。0.2.1 的 `llm` 服务可能在本插件 `apply` 之后才挂载，诊断行已改为 1s 复查（运行时本就每轮惰性解析，折叠实测 `via=ollama/qwen3`）。安装方式见下节：**包安装**（`dsh plugin add`，0.1.25 起支持）或 **install.ps1**（离线 / 无 pnpm 环境）。
-> 已验证：`0.1.7-rc.2`（session-format v4 全链路，含折叠提交与审计）。
-- 折叠的**内容完整性**由提交前守卫保证：其中一条专门比对"被折叠的工具结果数 ↔ 转录里留下的工具记录数"，少一行就整次拒绝、本轮按原文发送（0.1.23 起；动机见 `RCS-0.1.23-改进与保留项.txt`）。
-> 注意：新宿主的 `dsh_plugin_packages` 请求扩展与『改写历史』的折叠互斥，折叠档位需按 `RCS-0.1.21-改进与保留项.txt` 的 09-27 补录在 profile 层关闭该扩展（安装脚本已处理）。
+| 插件 | 作用 | 默认 |
+|---|---|---|
+| **CONTEXTinjector** | 工具结果折叠、语义压缩、值保真提取 | 关（按会话启用） |
+| **EXTREASON** | 外置推理：只读子代理先核实，主模型后动手 | 开 |
+| **LOGcompiler** | 转录日志，完整记录会话事件流 | 开 |
+| **memory.mjs** | 外部记忆：SQLite 存储 + 轻 LLM 编译 | 关 |
 
-## 目录
-```
-├── web/                        插件本体（进 profiles/web/）
-│   ├── contextinjector.mjs     注入折叠插件
-│   ├── logcompiler.mjs         转录日志插件
-│   ├── extreason.mjs           外置推理插件（EXTREASON）
-│   └── memory.mjs              外部记忆（实验，默认关）
-├── condense/chunk.mjs,ivr.mjs  共享纯模块（转录分型 / 压缩器 IO 比）
-├── toolfold/toolfold.mjs       工具结果折叠（被上面两个 import）
-├── contextinjector-webui/      WebUI 面板 npm 包（host /api + client 注入）
-├── package.json                包清单（声明 dsh.bundle）
-├── cordis.patch.yml            包自带补丁层（四条 insert）
-├── install.ps1 / install.cmd   直装（web profile）
-├── uninstall.ps1               卸载/回滚
-├── tests/                      回归测试（漂移 #11 覆盖 / toolfold 单行契约）
-├── README.md                   本说明
-├── LICENSE.txt                 MIT 开源许可证
-├── version.json                产物来源/版本/提交/构建时间
-└── RCS-0.1.*-改进与保留项.txt    各版改动、保留项、读数纪律
-```
+## 安装
 
-> 目录分成 `web/ + condense/ + toolfold/` 不是随手排的：插件源码里写的是 `../condense/chunk.mjs`、
-> `../toolfold/toolfold.mjs`，而这个布局**与装进 `DSH_HOME/profiles/` 后的布局同构**，
-> 于是"包安装"与"脚本安装"两条路共用同一份源码，不需要任何分叉。
-
-## 从零安装（终端，适用于 GitHub 克隆）
-
-**方式一：作为插件包安装（0.1.25 起，推荐）**
+**方式一：插件包安装（推荐）**
 
 ```bash
 dsh plugin --profile web add github:ScreamingMaggot/rcs-context
-# 然后把它选进该 profile 的层列表（dsh plugin add 不会自动激活 bundle）：
-#   编辑 <DSH_HOME>/profiles/web/package.json，把 "rcs-context" 加进 dsh.profile.bundles
-# 最后重启 dsh web
 ```
 
-装成功并激活后，启动日志里应出现四条基础装载行（`[CONTEXTinjector] armed …` / `[logcompiler] v3 …`
-/ `[EXTREASON] armed …` / `[contextinjector-webui] … ready`）；另有一条 `[MEMORY] armed|disabled`（默认关）。
-没有这些行 = 层没被选中。
+然后在 `<DSH_HOME>/profiles/web/package.json` 的 `dsh.profile.bundles` 中加入 `"rcs-context"`，重启 `dsh web`。
 
-**方式二：install.ps1 直装（离线 / 无 pnpm 环境）**
+**方式二：脚本直装**
 
 ```bash
 git clone https://github.com/ScreamingMaggot/rcs-context.git
 cd rcs-context
 powershell -ExecutionPolicy Bypass -File ./install.ps1
-# 需指定目标时：-DSH_HOME <配置家目录>  -DshInstall <dsh 安装根>
 ```
 
-安装脚本会：备份现网 → 落位插件与 WebUI 包 → 幂等追加 profile 补丁（四项挂载 + 一条按宿主探测的兼容项）→ 自校验。重复运行安全。
-**平台说明**：插件本体为跨平台 `.mjs`（随宿主运行）；安装/卸载脚本目前仅提供 Windows PowerShell 版本。
+安装脚本会备份现网、落位插件、追加补丁层、自校验。重复运行安全。
 
-## 一键直装（Windows）
-在**已运行/即将运行的 DSH 所在机器**上，双击 `install.cmd`，或：
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-# 默认装到 %DSH_HOME% 或 ~\.dsh 的 web profile；可显式指定：
-.\install.ps1 -DSH_HOME "D:\path\to\.dsh" -DshInstall "D:\path\to\dsh-runtime"
-```
-脚本会：备份现网 → 落位插件与 WebUI 包 → 幂等追加 `cordis.patch.yml` 四项 insert → 自校验。重复运行安全。
+## 装后配置
 
-## 装完必做
-1. **重启 dsh web**（client 装载器按名缓存，必须重启才生效；刷新页面不够）。
-2. 打开一个会话 → **「注入」tab**：
-   - **CONTEXTinjector（默认关）**：右栏「当前会话」卡为本会话选「工具折叠 / 单压缩 / 双压缩」即启用折叠；
-     - 工具折叠=对每轮对话做工具转录折叠（保留原始信息）
-     - 单压缩=对每轮AI输出进行语义压缩
-     - 双压缩=单次压缩基础上进行关键值保真提取
-   - **LOGcompiler（默认全会话记录）**：日志写到 `$DSH_HOME/state-compiler/transcripts/<sid>.log`；
-     在「日志编译」区可改输出目录/停用/逐会话开关。
-3. 压缩通道（single/double 的浓缩调用）**默认跟随会话模型——不建议**：那会按主模型价格计费。
-   请按下方『成本提示』把浓缩指向本地 Ollama 或任一廉价模型；压缩失败会无损回退，不会破坏档案。
-4. **EXTREASON（外置推理，默认开）**：主模型 `reasoningEffort: off`（或模型无思维链能力）时，
-   每轮自动跑一个只读子代理（UI 里显示为「外部思考中」）并把它的 `[R] ` 行注入当轮请求。
-   不需要时设环境变量 `EXTREASON=0`。详见 `EXTREASON/README.md`。
+1. **重启 dsh web**（客户端插件按名缓存，刷新页面不够）
+2. 打开会话 → 「注入」tab → 为本会话选择折叠档位（工具折叠/单压缩/双压缩）
+3. **压缩模型**：建议指向本地 Ollama 或廉价模型，避免按主模型价格计费。在「注入」面板或 `control.json` 中配置 `condenseProvider` / `condenseModel`
+4. **外部记忆**（可选）：`control.json` 写 `"memoryEnabled": true`，重启后在「记忆」tab 查看
 
-## 界面截图（实拍）
+## 压缩模型配置
 
-**①「注入」面板**：左上为压缩比走势（蓝线=每轮、绿线=累计，虚线=比值 1 参考线），中间是本次折叠读数
-（`8951 → 725 B`、8%、档位 `double`、单调性 ✓）与请求结构逐段字节，右侧是当前会话的档位与开关。
-
-![注入面板](docs/panel-inject.png)
-
-**② 会话输入区的档位选择器**（默认「关」；开启折叠后每一轮的下方即出现压缩读数）：
-
-![档位选择器](docs/tier-selector.png)
-
-**③「外部思考中」**：主模型少想快跑的同时，只读调查员在当轮实际执行 分析 / 搜索代码 / 读取文件：
-
-![外部思考](docs/extreason-running.png)
-
-**④ 调查员简报（`[R]` 行）**：逐行标明文件与行号、指出唯一实质性不一致点并给出两个可选动作，末尾声明
-「只做了只读检查、未运行、未改动任何文件」：
-
-![R 简报](docs/brief-lines.png)
-
-**⑤ 折叠进行中**：会话标签旁显示「压缩中」，面板给出触发点（TURN-END）、耗时与本轮读数
-（`775 → 179 B`、23%、档位 `single`、单调性 ✓）：
-
-![折叠进行中](docs/fold-inflight.png)
-
-> 截图取自真实长会话，未做美化。
-
-## 成本提示（重要）：压缩通道请走本地或廉价模型
-
-**为什么**：`single` / `double` 档位会为每条被折叠的助手输出调用一次"压缩模型"（实测每局中位 20 / 42 次）。
-若这条通道走主模型，等于用主模型的价格反复付压缩费——省钱的效果会被吃掉大半。
-把压缩模型换成本地 Ollama 或任一低价模型，这部分开销接近于零，而**无损折叠的收益一分不少**（收益主要来自工具结果折叠，它不需要模型）。
-
-**怎么配（两步）**
-
-① 在 DSH 的 `~/.dsh/settings.yaml` 注册本地 Ollama（三个字段缺一不可，都是实测踩出来的）：
+把压缩通道指向本地 Ollama（以 qwen3:4b 为例）：
 
 ```yaml
+# ~/.dsh/settings.yaml
 llm-pi-ai:
   providers:
     ollama:
       displayName: Ollama (本地)
       api: openai-completions
       baseURL: http://127.0.0.1:11434/v1
-      apiKeyEnv: OLLAMA_API_KEY          # 本地服务任意值即可，但字段必须在
+      apiKeyEnv: OLLAMA_API_KEY
       compat:
-        maxTokensField: max_tokens       # 关键：ollama 只认 max_tokens，缺此字段输出上限失效
-      streamIdleTimeoutMs: 30000         # 卡住 30s 即无损回退，不拖垮整轮
+        maxTokensField: max_tokens
+      streamIdleTimeoutMs: 30000
       models:
         - id: qwen3:4b-instruct-2507-q4_K_M
-          name: Qwen3 4B (本地压缩器)
+          name: Qwen3 4B
           reasoningEfforts:
             off: null
-            medium: medium               # 显式声明：不写会被判为"不支持任何思考档"
+            medium: medium
 ```
 
-② 把压缩通道指过去（三选一，优先级从高到低）：
-- WebUI「注入」面板里为该会话选择压缩模型（最直观）；
-- 会话的 `control.json` 写 `{"condenseProvider":"ollama","condenseModel":"qwen3:4b-instruct-2507-q4_K_M"}`；
-- 环境变量 `DSH_CONTEXTINJECTOR_CONDENSE_PROVIDER` / `DSH_CONTEXTINJECTOR_CONDENSE_MODEL`。
+然后在「注入」面板选择该模型，或在 `control.json` 写：
+```json
+{ "condenseProvider": "ollama", "condenseModel": "qwen3:4b-instruct-2507-q4_K_M" }
+```
 
-**用弱模型的代价**：压缩率会低一些、单次更慢（4B 级一条约 7–15s），**但不会出错**——
-压缩超预算或质量不达标时插件一律无损回退（原文照旧进转录），档案与可回放性不受影响。
+弱模型压缩率略低、单次 7–15s，但失败时无损回退，不影响档案完整性。
 
-**EXTREASON 不需要单独配**：它的子调查员每轮调用一次模型，但简报会让主模型少读历史——
-实测计费中位反而更低（11.2 万 vs 不开的 14.0 万），故无需为它指定廉价模型。
+## 外部记忆
 
-## 权限边界与第三方网络依赖（如实声明）
+订阅 `session/event`，抽取工具结果、用户轮、任务锚点存入 SQLite。
 
-- **写入范围**：仅 `$DSH_HOME`（web profile 目录、`state-compiler` 状态目录、转录日志、按需创建的 `raw/` 归档与折叠审计 `fold-index/`）。不写系统目录、不改 PATH、不改 shell 配置。
-- **进程形态**：作为宿主进程内插件加载，不安装后台服务、不注册开机项。
-- **插件自身不发起任何网络请求**。仅两处例外，且都必须由你显式配置后才发生：
-  1. 把压缩通道指向本地/远程 Ollama（或任一 OpenAI 兼容端点）时，该请求由宿主的 LLM 适配器发出；
-  2. EXTREASON 的子调查员使用**宿主已注册**的模型与只读检索工具（若启用了网页检索，则走宿主自身的检索通道）。
-- **子会话权限**：EXTREASON 的子会话以只读工具集运行（读文件 / 检索），不具备写权限；产出以 `[R] ` 行注入。
-- **凭据**：插件不读取、不存储模型凭据（由宿主凭据服务管理）。
-- **卸载**：`uninstall.ps1` 回滚补丁项与文件（含安装时备份的还原）。
+**启用**：`control.json` 写 `"memoryEnabled": true`，重启。
+
+**只读工具**：
+- `memory_catalog` — 查看记录种类/键
+- `memory_search` — 按文本/键/种类检索
+- `memory_get` — 取单条记录（`includeRaw=true` 回解原文）
+
+**轻 LLM 编译**（可选）：`"memoryLlmEnabled": true`，每轮结束把新事件编译为 insight 记录。可在「记忆」面板选择编译模型（如本地 qwen3:4b），留空则跟随会话模型。
+
+**目录注入**（默认开）：会话首次 pre-step 注入 insight 摘要（最多 8 条），模型无需调用工具即可感知记忆内容。
+
+## 兼容性
+
+| DSH 版本 | 状态 |
+|---|---|
+| 0.2.1-rc.2 | 已验证（五插件全装载，事件/工具/槽位/WebServer 正常） |
+| 0.2.0-rc.2 | 已验证（14 关键包中 10 个逐字节相同，16 条接缝 0 消失 0 改名） |
+| 0.1.7-rc.2 | 已验证（session-format v4 全链路） |
+| 0.1.5-rc.2 | 兼容 |
+
+插件含多代兼容层，同一份文件适配四代宿主接口。
+
+## 目录结构
+
+```
+├── web/                        插件本体
+│   ├── contextinjector.mjs     注入折叠
+│   ├── logcompiler.mjs         转录日志
+│   ├── extreason.mjs           外置推理
+│   └── memory.mjs              外部记忆
+├── condense/                   共享模块（分型/压缩器）
+├── toolfold/                   工具结果折叠
+├── contextinjector-webui/      WebUI 面板
+├── tests/                      回归测试
+├── package.json                包清单
+├── cordis.patch.yml            补丁层
+├── install.ps1 / uninstall.ps1 安装/卸载
+└── version.json                版本/构建信息
+```
 
 ## 卸载
+
 ```powershell
-.\uninstall.ps1                 # 还原安装前备份 / 移除补丁项与文件
+.\uninstall.ps1
 ```
-删干净后再重启 web。
 
-## A档实验：工具结果结构化折叠（0.2.0 起，默认关）
-> 实验功能，默认 **OFF**，不影响既有行为。开启后，折叠历史里的工具结果会从 `[T] tool|path|OK`
-> 升级为结构化短行 `[T] <域>|<action>|<target>|OK|P0–P3|<k=v>…` 并追加值保真链 `[V]`：
-> read 保留 `size/sha8/lines`、edit/write 失败把 err 原文入 [V]、glob/grep 留 `pattern/count/matches≤K`、
-> bash 留 `head/tail/tee`、`working_directory` 留 `cd=` 与返回的 `cwd=`、**ask_user 答复 P3 逐字入 [V]**（不可重建）。
-> 开启方法：装好后在会话「注入」tab → 右栏「当前会话」卡 → 先为本会话选一个压缩档
-> （工具折叠/单压缩/双压缩，让它进入折叠），再打开下方 **「工具结果结构化折叠（实验）」** 开关。
-> 纯规则、无 LLM；有 token 成本，仅在你开启的会话生效。若内测发现问题，把现象/转录反馈即可。
->
-> **可逆性（v1.10.33+）**：每条 `[T]` 末尾带 `raw=<seq>`，指向被遮蔽事件在 `.ctxinjector/raw/<sid>.jsonl`
-> 中的序号；`write` / `edit` / `str_replace_editor` 另带 `call=<seq>`（工具调用消息），展开即得实际 patch 参数。
-> 模型可用只读工具 `transcript_expand { seq, maxChars? }` 取回原文（默认 4000 字符，上限 20000）。
-> 未命中专用规则的工具（`web_fetch` / `web_search` / `skill` / `present` 等）不再只留 status，而是保留
-> `out_n` + 有界 `head/tail`（超过 200 字符标 `trunc=mid`）；`read` 折叠保留**有界正文预览**：首 24 行 /
-> 800 字 + 末 8 行 / 280 字 + 代码结构大纲（函数/类/标题，≤320 字），超长时标 `trunc=mid`，
-> 完整原文仍可经 `raw` 精确展开；`edit`/`write` 另记 `del`/`ins` 行数（有界统计，不回流 patch 正文）。
-> 预览与统计均为纯规则、不调用模型；实测 `尸检.py`（8365B）折叠后 1141B 且保留结构。
-> 大纲是行级词法抽取而非 AST：按扩展名分规则，支持多行签名拼接、箭头函数与 IIFE 区分、类/impl
-> 上下文前缀（`Class.method`），剔除注释与单行函数体；仍受 8 项 / 320 字上限。真机 10 个文件、
-> 388 个声明的复算：74 个输出项全部对应真实声明（precision 100%），前 8 项覆盖 72/74（其余两项是
-> 第 9 个之后的声明，受上限所限）；大文件单次约 2.5–10ms。漏报/误报只影响“目录页”，正文仍在
-> `head/tail` 与 `raw=<seq>`。
->
-> **WebUI 可见性（0.1.33 起）**：DSH 聊天页只把 `surfaceOp="append"` 的消息当人类转录、把 `replace`
-> 副本当模型专用。折叠因此改用宿主 compaction 协议提交：`compaction/start` → `compaction/summary`
-> → `source.kind="compact-checkpoint"` 的替换消息 → `compaction/end`。**宿主自带的「上下文已压缩」行
-> 已由插件 CSS 隐藏**，改由输入框左侧状态胶囊自绘：
-> - 折叠完成后一行中性文字 **「本折 98% · 累计 62%」**（`<1` = 省；悬停显示小数口径）；
-> - 折叠在飞：琥珀脉冲 **「压缩中 Ns」**；宿主原生 compaction 在飞：**「原生压缩中」**；
-> - 记忆编译在飞：**「记忆编译中」**；成功后 30s 内 **「记忆 +N」**。
->
-> 胶囊只在有状态时渲染，同一事件的状态原地更新，不追加行。被折叠轮的**原始助手正文仍在人类转录里
-> 可见**；模型侧只看到检查点消息与保留节点。**同一会话复用同一个 `compactionId`**，聊天区只维护
-> 一条检查点（原地更新）。`[S]` 快照行不再进入折叠转录，续传时会清掉旧残留。
-> 0.1.28 之前已折叠过的轮次仍带着旧的裸 `replace` 副本（日志不可改写），新发生的折叠不受影响。
-> 原文始终在 `.ctxinjector/raw/`，压缩转录可在 `transcripts/` 或「注入」面板查看。
+回滚备份、移除补丁项与文件。重启 dsh web 生效。
 
-## 外部记忆（实验，默认关）
+## 数据位置
 
-订阅 `session/event`，把工具结果、真人用户轮和任务锚点确定性抽取成 SQLite 记录；不调用任何模型。
-**启用**：`DSH_MEMORY=1`，或在 `$DSH_HOME/state-compiler/control.json` 写 `"memoryEnabled": true`，然后重启 `dsh web`。
-数据：`$DSH_HOME/state-compiler/memory/memory.sqlite`（`events` 追加、`records` 当前视图、`meta` 游标）。
-模型可见的只读工具：
+- 运行时：`$DSH_HOME/state-compiler/`（control、transcripts、raw、fold-index）
+- 安装备份：`$DSH_HOME/.statecompiler-backup-<时间戳>/`
 
-- `memory_catalog` — 当前会话有哪些记录种类/键；
-- `memory_search` — 按文本、精确键或种类检索；
-- `memory_get` — 取一条记录；`includeRaw=true` 时按 `(sid, seq)` 回解 raw 原文预览。
+## 许可证
 
-记录种类：`file_state` / `command` / `search` / `error` / `user_answer` / `job` / `task` / `user_turn` / `insight` / `tool_unknown`。
-每条记录带 `(sid, seq, callId)` 源指针；同一 `(sid, seq, kind, key)` 只写一次（重放幂等）。
-**生命周期**：同类调用成功后，之前同一主键的 `error` 自动转为 `resolved`（记录保留、带 `resolvedBy`，默认检索隐藏，`status:'all'` 可查）；Windows 下 `type` 等命令即使 `exit=0` 也会把"找不到路径"打在输出里，按输出强特征额外记 `error`；`memory_get` 对 `file_state` 现场 stat 并返回 `fresh.changed`。
-**作用域**：项目事实（文件、命令、检索、错误、任务、答复）按工作区（会话 `cwd`）共享——同一目录下的多个会话看到同一份当前视图，后写覆盖前写；`user_turn` 仍按会话隔离。三个工具都接受 `scope: project|session`，默认 `project`（本工作区事实 ∪ 本会话轮次），`session` 只看本会话。没有 `cwd` 时自动退化为会话级。旧版数据库在启动时自动迁移（`scope` 列回填为 `sess:<sid>`）。
-
-**轻 LLM 编译层（实验，默认关）**：`DSH_MEMORY_LLM=1` 或 `control.json { "memoryLlmEnabled": true }`（依赖 `memoryEnabled`）。
-在每个**活轮结束**（`turn/end`）时，把上次编译之后的新事件（最多 40 条、预算 4000 字符，含一条真人轮即可触发）交给会话当前模型做一次小上下文调用，产出 `kind='insight'` 记录（稳定 key + 摘要 + 证据事件 id + 置信度），写入工作区作用域。
-纪律：只在模型正常结束且 JSON 可解析时推进 `llmThrough:<sid>` 游标；失败进入 60s 冷却且候选保留；补课（历史会话首次装载）不触发编译；最多 4 条/次。默认跟随会话当前模型；可在「记忆」面板的「编译模型」里选任意 provider/model（写入 `control.memoryLlmProvider` / `control.memoryLlmModel`，选择「跟随会话模型」即清除），也可用旧版配置键固定。本地轻模型（如 `ollama-local / qwen3:4b`）可显著降低费用，但 4B 的 JSON 纪律弱于会话模型。
-准入与归并：`pwsh-*` / `cmd:*` / `session-*` 等瞬时执行型 key 直接丢弃；摘要中 ≥3 位数字必须逐字出现在候选原文或现存摘要里（防止小模型把 8848 抄成 8840）；同批近重复与跨 key 近重复归并到一条当前视图（保留较长摘要与较高置信度），归并数写入 `[MEMORY] compiled … merged=` 日志；归一化文本相似但数字集合不同的摘要**不**归并（仅端口号不同也是两条事实）。小模型把 JSON 写成 `{"insights:[]}` 这类缺引号形式时做一次最小修复；用户明确说「记住 / add this into memory」时，把原话逐字落成 `user-memo:*` insight，不依赖模型是否判定为"闲聊"。
-**目录注入（默认开，随记忆层）**：会话第一次 `pre-step` 时把已编译的 **insight 语义摘要**（最多 8 条、每条 ≤100 字）作为 `plugin:MEMORY` 消息追加到决策末尾，模型无需先调用工具即可知道记忆里有什么；注入文本**不出现** kind、计数或 key（`user_turn` 与对话本身重复，也不注入），没有 insight 时不注入。空库不注入、子代理不注入、每会话只注一次（`meta.injected:<sid>`）。关闭：`DSH_MEMORY_INJECT=0` 或 `control.memoryInjectCatalog=false`。该消息被转录分类器判为注入（不计真人轮），折叠侧按注入节点避让。
-语义编译目前是"每轮一次"的最小实现。`node:sqlite` 不可用、写库失败或工具注册失败时整层自动关闭，不影响主会话与折叠。
-**WebUI 观测（会话页「记忆」tab）**：只读快照每 5s 刷新（后台标签页暂停），展示运行状态（运行中/待重启/未启用）、三项开关、**编译模型选择器**（provider + model，留空跟随会话）、活跃/已解决记录、知识洞察（含置信度与证据条数）、作用域分布、当前会话的写入/编译游标、记录构成与最近记录。编译在飞时面板「当前会话」标题旁显示琥珀脉冲「记忆编译中 Ns」（状态标记在 `$STATE_DIR/.memory/compile-inflight/`，结束时删除；最近一次结果留在 `compile-last/`）。三个开关可直接写 `control.json`：
-- 已武装进程内，关掉「记忆层」立即停写（工具仍可读取既有记忆），重新开启后下一事件自动补课停写期间错过的事件；
-- 「轻 LLM 编译」与「目录注入」每轮/每步重读，即时生效；
-- 启动时未加载记忆层（启动前未启用）只能重启后启用；`DSH_MEMORY` / `DSH_MEMORY_LLM` / `DSH_MEMORY_INJECT` 仍然硬覆盖，被锁定的开关在面板中显示「锁定」且不可点击。
-回归：`node tests/memory-extract-store.test.mjs`。
-
-## 说明 / 数据位置
-- 运行时配置与控制：`$DSH_HOME/state-compiler/`（`control.json`、`logcompiler.control.json`、`last-fold.json`、`transcripts/`、`.ctxinjector/raw/`）。
-- 安装备份：`$DSH_HOME/.statecompiler-backup-<时间戳>/`（uninstall 用它回滚）。
-- 源码与重建：见 StateCompiler 仓库 `build-dist.ps1`（从 git HEAD 可复现本目录；该脚本自带
-  pre/post-flight：校验发布脚本 BOM、校验 `version.json` 版本号、对每个 `.mjs` 跑 `node --check`）。
-
-## 发布前自检（仓库侧，可随时复跑）
-```powershell
-powershell -ExecutionPolicy Bypass -File StateCompiler\packaging\smoke-install.ps1
-```
-它在 `%TEMP%` 造一个假 DSH_HOME 真跑一遍 **安装 → 重复安装（幂等）→ 半装升级 → 卸载回滚**，
-并核对本目录自洽（清单齐全、`version.json` 可解析且版本一致、`.ps1` 带 BOM、`.mjs` 不带 BOM、
-发布说明是合法 UTF-8 中文、装出来的插件与 `dist` 逐字节一致）。全绿才发。
-
-## 运行参数（`control.json`，多数热读、免重启）
-| 键 | 缺省 | 作用 |
-|---|---|---|
-| `enabled` | `true` | 总开关 |
-| `sessions` / `sessionModes` | `[]` / `{}` | 白名单会话及其压缩档（`off`/`single`/`double`/工具折叠）。**未列出的会话不折叠**（无全局默认档） |
-| `keepInject` | **ON** | DSH 注入节点（runtime/policy 快照、skill 目录）永不被遮蔽 ⇒ 快照零补发 |
-| `toolfoldStructured` | `true` | 工具结果结构化 `[T]`/`[V]` |
-| `condenseProvider` / `condenseModel` | 跟随会话 | 指定浓缩模型（如本地 `ollama`） |
-| `condenseMinBytes` | 240 | 单条 `[A]` 低于此字节不送浓缩（0 = 全送，注意小值会让折叠变慢：实测 15 曾导致 243s 一次折叠） |
-| `condenseMaxTokens` | 700 | 单条浓缩输出上限 |
-| `condenseBudgetMs` / `condenseMaxCallsPerFold` | 15000 / 12 | 一次折叠的硬预算（时间长/调用多即止损回退） |
-| `foldAtTurnEnd` | **ON** | 轮末（`turn/end`）后台折叠，唯一的生产触发点；关掉 ⇒ 完全不折（`pre-step` 只 join） |
-| `foldMinShadowBytes` | 2048 | 新原料低于此值不折，等后续轮累积（`0` = 关闭门槛）；避免微轮每轮都刷检查点 |
-| `foldJoinTimeoutMs` | 3000 | 下一轮发请求前等待后台折叠的上限；超时就先发请求，绝不拖住对话 |
-| `segments` | **OFF** | 多段转录（head 独立成段零重复 + 各段独立留面）。真机已验证，默认关；开启前建议按 NOTES 的样本门槛评估 |
-| `standalone` | **OFF** | 遗留开关（新段不带旧前缀）。其目的已被多段转录覆盖，暂不推荐单开 |
-
-## 装好后怎么自查（不看日志也能判）
-- **面板**：会话「注入」tab 显示最近一次折叠（模式/触发/字节/压缩比/`monotonic`）、面板「压缩中」在飞标记。
-- **端点**：`GET /api/context-inject/status`（含 `lastFold`、`foldInflight`、`control`、`sessions`）。
-- **文件**（都在 `$DSH_HOME/state-compiler/`）：
-  - `.ctxinjector/fold-index/<sid>.jsonl` —— 每次折叠一行：`cumLines.before/after` 应相邻承接、`after` 等于转录行数；
-  - `.ctxinjector/fold-errors/<sid>.jsonl` —— 拒折/异常账本（**空 = 健康**）；出现持续 `foldtext-drift` 表示表面转录与状态脱节、折叠会停摆；
-  - `last-fold.json` —— 最近一次折叠详情（含 `full` 转录全文、`segments`、`afterNodes`）。
-- **一键体检**（仓库侧，任意机器只读运行）：
-  ```powershell
-  node StateCompiler\CONTEXTinjector\tools\verify-fold-integrity.mjs --state <DSH_HOME>\state-compiler --all
-  ```
-  逐会话输出 PASS/WARN/FAIL：索引承接、`full` 段头链、拒折账本；可选 `--replay` 追加"表面段拼接 == full"校验。
-
-## 什么时候开 single / double（实证口径，2026-09-12）
-
-用 12 个真实工作场景 × 4 档（`bare` 基线 / `off` 无损工具折叠 / `single` / `double`）实测的结果：
-
-| 档 | 机制级压缩率（字节加权） | 峰值上下文比（中位） | 峰值 ≥18K 时 |
-|---|---|---|---|
-| `off`（工具折叠） | **0.227**（压到约 1/4） | **0.931×** | **0.717×** |
-| `single` | 0.209 | 1.049× | 0.843× |
-| `double` | 0.210 | 0.991× | 0.742× |
-
-- **无损工具折叠（`off`）在任何规模都稳赚**，且不调用任何模型（零 token、零延迟），是默认推荐档。
-- **LLM 浓缩（`single`/`double`）只在长会话转正**：峰值 ≥18–20K token 才有净收益（0.72–0.84×）；
-  10–25K 的常见中短任务上是 1.0–1.4×，即**净开销**（压缩省下的上下文盖不过调用与延迟）。
-  ⇒ 建议：**日常用「工具折叠」；确认会长跑（峰值 ≥20K）的会话再选「单压缩/双压缩」**。
-- 压缩收益**主要来自三者共有的无损工具折叠**；`[A]` 段浓缩是增益项而非主力。
-- 判据看 `last-fold`：`aCount/aFolded`（命中率）、`fallbackReasons`（回退原因分型：`truncated`/`empty`/
-  `noShrink`/`llmErr`/`payloadGate`/`maxCalls`/`budgetMs`/`keysErr`）、`keys`、`shrink`。
-  注意 `ms` 会被机器休眠放大，不能当算力时间读。
-
-## 已知取舍（如实说明）
-1. **默认行为**：多段转录与 standalone 默认关闭 ⇒ 本包默认行为与 0.1.8 逐字一致。
-2. **本地小模型慢**：4B 级浓缩一次 `[A]` 约 7~15s；一次折叠超预算就无损回退（转录照旧完整，只是没压缩）。
-   判"有没有压缩"看 `calls`/`aFolded`；`ms` 可为 0，也会被机器休眠放大（实测有 4.7h 的读数）。
-3. **无 `[R]` 的两种正常情形**：主模型 reasoning 未关（不做外置推理）；或该 preset 裁剪了工具集
-   （此时账本记 `skip-no-readonly-tools`，不再报错）。
-4. **装完必须重启 dsh web**：客户端插件按名缓存，刷新页面不够。
-5. **本包基于 `@deepseek-ai/dsh 0.1.1-rc.2` 验证**；换 DSH 版本前请先核实。
+MIT
