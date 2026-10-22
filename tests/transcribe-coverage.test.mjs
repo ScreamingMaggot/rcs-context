@@ -85,7 +85,7 @@ const r6 = transcribeIncremental(selfMsgs, st6)
 check('④ 本插件注入（plugin:CONTEXTinjector）完全不转录',
   !r6.some((l) => l.includes('旧指令')), r6.join(' ;; ').slice(0, 80))
 check('④ 注入不递增 ROUND（roundState 保持 3）', st6.n === 3, 'n=' + st6.n)
-check('④ 快照走 [S] 摘要而非全文', r6.filter((l) => /^\[S\] /.test(l)).length === 1, r6.filter((l) => /^\[S\]/.test(l)).join())
+check('④ 快照不转录 [S]（宿主每 step 重注入，最新快照仍在表面）', r6.filter((l) => /^\[S\] /.test(l)).length === 0, r6.filter((l) => /^\[S\]/.test(l)).join())
 
 /* ── ⑤ 五类行纪律：不出现未知行类 ─────────────────────────────────── */
 const ALLOWED = ['[ROUND]', '[U]', '[A]', '[T]', '[M]', '[R]', '[C]', '[S]', '[N]', '[V]']

@@ -1,7 +1,7 @@
 ﻿# =============================================================================
-# StateCompiler 卸载器：移除 EXTREASON + CONTEXTinjector + LOGcompiler + WebUI 面板
+# StateCompiler 卸载器：移除 EXTREASON + CONTEXTinjector + LOGcompiler + Memory + WebUI 面板
 # 优先用 <DSH_HOME>/.statecompiler-backup-<stamp> 还原安装前现场；无备份则删除
-# 四项 insert 与已落位文件。
+# 五项 insert 与已落位文件。
 # 用法：.\uninstall.ps1 [-DSH_HOME <dir>] [-BackupDir <dir>] [-Force]
 # =============================================================================
 param(
@@ -30,7 +30,7 @@ if ([string]::IsNullOrWhiteSpace($BackupDir)) {
     $bp = Join-Path $c.FullName 'cordis.patch.yml'
     if (Test-Path -LiteralPath $bp) {
       $t = [IO.File]::ReadAllText($bp, [Text.Encoding]::UTF8)
-      if (-not ($t.Contains('id: contextinjector-webui') -or $t.Contains('id: logcompiler') -or $t.Contains('id: extreason'))) {
+      if (-not ($t.Contains('id: contextinjector-webui') -or $t.Contains('id: logcompiler') -or $t.Contains('id: extreason') -or $t.Contains('id: memory'))) {
         $BackupDir = $c.FullName; $hasBk = $true; break   # 找到原貌备份
       }
     }
@@ -57,7 +57,7 @@ function Strip-StateCompiler($txt) {
         $block.Add($b); $j++
       }
       $joined = ($block -join "`n")
-      if ($joined -match 'id:\s*contextinjector' -or $joined -match 'id:\s*logcompiler' -or $joined -match 'id:\s*extreason') {
+      if ($joined -match 'id:\s*contextinjector' -or $joined -match 'id:\s*logcompiler' -or $joined -match 'id:\s*extreason' -or $joined -match 'id:\s*memory') {
         # 命中目标 → 跳过整块（含开头的 '- insert:')
         $i = $j; continue
       }
@@ -74,7 +74,7 @@ function Strip-StateCompiler($txt) {
 # ---- 执行 -------------------------------------------------------------------
 if ($hasBk) {
   Col Yellow "使用备份还原: $BackupDir"
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','cordis.patch.yml')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','cordis.patch.yml')) {
     $b = Join-Path $BackupDir $name
     $t = Join-Path $profDir $name
     if (Test-Path -LiteralPath $b) { Copy-Item -LiteralPath $b -Destination $t -Force; Col Green "还原 $name" }
@@ -89,7 +89,7 @@ if ($hasBk) {
     Col Green '删除新增 contextinjector-webui（原貌无此包）'
   }
   # 备份里没有而仍在的（本次安装新增、安装前不存在）→ 删除
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs')) {
     $b = Join-Path $BackupDir $name
     $t = Join-Path $profDir $name
     if (-not (Test-Path -LiteralPath $b) -and (Test-Path -LiteralPath $t)) { Remove-Item -LiteralPath $t -Force; Col Green "删除新增 $name" }
@@ -99,7 +99,7 @@ if ($hasBk) {
   }
 } else {
   Col Yellow '未找到备份，直接按现状移除。'
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs')) {
     $t = Join-Path $profDir $name
     if (Test-Path -LiteralPath $t) { Remove-Item -LiteralPath $t -Force; Col Green "删除 $name" }
   }

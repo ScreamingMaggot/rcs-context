@@ -143,6 +143,9 @@ export function pluginIdOf(source) {
   if (typeof k !== 'string') return null
   if (k === 'plugin') return typeof source.plugin === 'string' && source.plugin.length > 0 ? source.plugin : null
   if (k.startsWith('plugin:')) return k.slice(7)
+  // 压缩检查点：宿主只认 kind='compact-checkpoint'。插件自己的检查点额外带 plugin 字段，
+  // 读侧据此仍能识别为自身转录（宿主原生 compaction 不带该字段）。
+  if (k === 'compact-checkpoint') return typeof source.plugin === 'string' && source.plugin.length > 0 ? source.plugin : null
   return null
 }
 

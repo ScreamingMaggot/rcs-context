@@ -5,7 +5,7 @@
 //   运行：node tests/drift11-toolcall-event-index.test.mjs
 // ⚠ 插件源码里的 import 是**安装后布局**（profiles/web/contextinjector.mjs → ../condense/、../toolfold/），
 //   而仓库是平铺的。故本测试先把交付文件装配成安装布局再 import——顺带验证交付包结构本身可加载。
-import { mkdtempSync, mkdirSync, copyFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,7 @@ copyFileSync(join(SRC, 'web', 'contextinjector.mjs'), join(root, 'web', 'context
 for (const f of ['chunk.mjs', 'ivr.mjs']) copyFileSync(join(SRC, 'condense', f), join(root, 'condense', f))
 copyFileSync(join(SRC, 'toolfold', 'toolfold.mjs'), join(root, 'toolfold', 'toolfold.mjs'))
 
-const { transcribeIncremental, callIndexFromEvents, isToolResultMsg, toolResultCallId } = await import(
+const { transcribeIncremental, callIndexFromEvents, isToolResultMsg, toolResultCallId, readRawEntry, makeTranscriptExpandTool } = await import(
   new URL('file:///' + join(root, 'web', 'contextinjector.mjs').replace(/\\/g, '/')))
 
 let fails = 0
@@ -106,6 +106,35 @@ check('⑦ isToolResultMsg 认块级', isToolResultMsg({ role: 'user', content: 
 check('⑦ isToolResultMsg 不认普通 user/assistant', !isToolResultMsg(asst) && !isToolResultMsg({ role: 'user', content: [{ type: 'text', text: 'hi' }] }))
 check('⑦ callId 提取双形态', toolResultCallId({ toolCallId: 'a1' }) === 'a1' && toolResultCallId({}, { toolCallId: 'a2' }) === 'a2'
   && toolResultCallId({ source: { kind: 'tool', callId: 'a3' } }) === 'a3')
+
+// —— ⑧ raw 指针：两种转录行都指回被遮蔽事件 ——
+const seqMap = new Map([[results[0], 101], [results[1], 102]])
+const rawPlain = transcribeIncremental([asst, ...results], { n: 1 }, { structured: false, calls, seqOf: seqMap }).filter((r) => r.startsWith('[T]'))
+check('⑧ plain [T] 带 raw 指针', rawPlain[0].endsWith('raw=101') && rawPlain[1].endsWith('raw=102') && !rawPlain[2].includes('raw='), rawPlain.join(' ;; '))
+const rawStruct = transcribeIncremental([asst, ...results], { n: 1 }, { structured: true, calls, seqOf: seqMap }).filter((r) => r.startsWith('[T]'))
+check('⑧ structured [T] 带 raw 指针', /raw=101$/.test(rawStruct[0]) && /raw=102$/.test(rawStruct[1]) && !rawStruct[2].includes('raw='), rawStruct[0])
+const seqLegacy = new Map([[legacy[2], 8], [legacy[6], 203]])
+const legacyWithCall = transcribeIncremental(legacy, { n: 1 }, { structured: true, calls, seqOf: seqLegacy }).filter((r) => r.startsWith('[T]'))
+const editRow = legacyWithCall.find((r) => r.includes('|edit|'))
+check('⑧ 写入类 [T] 同时带 raw 与 call 指针', !!editRow && /raw=203/.test(editRow) && /call=8/.test(editRow), editRow)
+
+// —— ⑨ raw 回取：按 seq 展开被遮蔽原文（含工具调用参数）——
+const rawDir = join(root, 'raw')
+mkdirSync(rawDir, { recursive: true })
+writeFileSync(join(rawDir, 'session-s1.jsonl'), [
+  JSON.stringify({ seq: 7, msg: { role: 'tool', content: [{ type: 'text', text: 'FILE CONTENT HERE' }] } }),
+  JSON.stringify({ seq: 8, msg: { role: 'assistant', content: [{ type: 'tool-call', name: 'edit', arguments: '{"path":"a.py"}' }] } }),
+  JSON.stringify({ seq: 9, msg: { role: 'tool', content: [{ type: 'text', text: 'x'.repeat(1000) }] } }),
+].join('\n') + '\n')
+const r7 = readRawEntry(rawDir, 's1', 7, 4000)
+check('⑨ raw 展开返回工具结果原文', r7.ok === true && r7.text.includes('FILE CONTENT HERE') && r7.truncated === false, JSON.stringify(r7).slice(0, 100))
+const r8 = readRawEntry(rawDir, 's1', 8, 4000)
+check('⑨ raw 展开包含工具调用参数', r8.ok === true && r8.text.includes('"path":"a.py"'), r8.text)
+check('⑨ 不存在的 seq 明确失败', readRawEntry(rawDir, 's1', 99).ok === false)
+check('⑨ 超长原文按 maxChars 截断', readRawEntry(rawDir, 's1', 9, 200).truncated === true && readRawEntry(rawDir, 's1', 9, 200).text.length === 200)
+const expandTool = makeTranscriptExpandTool({ rawDir })
+const toolOut = await expandTool.execute({ seq: 7 }, { agent: { session: { id: 's1' } } })
+check('⑨ transcript_expand 工具可执行', toolOut.ok === true && toolOut.text.includes('FILE CONTENT HERE'), JSON.stringify(toolOut).slice(0, 100))
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

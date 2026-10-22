@@ -13,6 +13,9 @@
     - id: extreason
       name: './web/extreason.mjs'
 - insert:
+    - id: memory
+      name: './web/memory.mjs'
+- insert:
     - id: contextinjector-webui
       name: './contextinjector-webui/lib/index.mjs'
 

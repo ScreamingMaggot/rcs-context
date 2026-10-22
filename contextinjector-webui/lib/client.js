@@ -110,6 +110,70 @@ window.__ModuleLoader__.load({
 			".ci-foldchip{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:13px;line-height:20px;font-weight:500;white-space:nowrap;box-sizing:border-box;padding:0 8px;border-radius:999px;border:1px solid var(--dsw-alias-state-warn-secondary,var(--dsw-static-amber-400,rgba(255,180,84,.5)));background:var(--dsw-alias-state-warn-tertiary,var(--dsw-static-amber-100,rgba(255,180,84,.14)));color:var(--dsw-alias-label-primary,#0f1115)}",
 			// 胶囊内的脉冲点用同一族令牌（深色下更亮、浅色下更饱和），动画仍是上面那一套 @keyframes ci-pulse
 			".ci-foldchip .ci-pulse{background:var(--dsw-alias-state-warn-primary,var(--dsw-static-amber-500,#f59e0b))}",
+			// 【v1.10.39 · 宿主折叠行隐藏】宿主按 compaction 协议渲染的「上下文已压缩 / 已压缩 N 条…」
+			//   每折一次占一行、越来越长。插件改为在 composer 左侧自绘一行紧凑状态（本折/累计比值 +
+			//   压缩中/记忆编译中脉冲）；宿主行全部隐藏。宿主原生 compaction 由本插件另写
+			//   native-compaction 标记并在同一行补回（见 FoldChip），不会静默丢失。
+			'[class*="compactionRow"]{display:none!important}',
+			// 完成后收成中性色（琥珀只留给“正在发生”的状态，不再长期占据注意）
+			".ci-foldchip-done{border-color:var(--dsw-alias-border-l2,rgba(127,127,150,.3));background:transparent;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8));font-weight:400}",
+			".ci-foldchips{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}",
+			// ===== MEMORY 面板 =====
+			".mem-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0}",
+			"@media (max-width:900px){.mem-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}",
+			".mem-kpi{border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.22));border-radius:11px;padding:9px 11px;background:rgba(127,127,150,.04)}",
+			".mem-kpi b{display:block;font-size:20px;line-height:1.2;font-weight:650;font-variant-numeric:tabular-nums}",
+			".mem-kpi span{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.75));margin-top:2px}",
+			".mem-kpi.mem-warn b{color:var(--dsw-alias-state-warn-primary,#f59e0b)}",
+			".mem-bars{display:flex;flex-direction:column;gap:7px}",
+			".mem-bar{display:grid;grid-template-columns:112px minmax(40px,1fr) 44px;align-items:center;gap:8px;font-size:11px}",
+			".mem-bar .k{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-track{display:block;height:7px;border-radius:99px;background:rgba(127,127,150,.14);overflow:hidden}",
+			".mem-fill{display:block;height:100%;border-radius:99px;background:rgba(100,140,255,.72)}",
+			".mem-bar .n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace)}",
+			".mem-ins{display:flex;flex-direction:column;gap:7px;max-height:300px;overflow:auto;overscroll-behavior:contain}",
+			".mem-card{border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.2));border-radius:10px;padding:8px 10px;background:rgba(127,127,150,.035)}",
+			".mem-card-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}",
+			".mem-key{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);font-size:11px;padding:1px 7px;border-radius:6px;border:1px solid rgba(100,140,255,.4);background:rgba(100,140,255,.12)}",
+			".mem-conf{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid rgba(127,127,150,.35);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
+			".mem-conf.low{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.12);color:inherit}",
+			".mem-summary{margin-top:4px;font-size:12px;line-height:1.5;word-break:break-word}",
+			".mem-meta{margin-top:4px;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-recent{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;overscroll-behavior:contain}",
+			".mem-row{display:grid;grid-template-columns:92px minmax(80px,1fr) 70px 74px;gap:8px;align-items:center;font-size:11px;padding:3px 2px;border-bottom:1px solid rgba(127,127,150,.08)}",
+			".mem-row .k{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-st{font-size:10px;letter-spacing:.04em}",
+			".mem-st.active{color:#58c46b}",
+			".mem-st.resolved{color:var(--dsw-alias-label-secondary,rgba(180,180,195,.6))}",
+			".mem-off{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;border:1px solid var(--dsw-alias-state-warn-secondary,rgba(255,180,84,.5));background:var(--dsw-alias-state-warn-tertiary,rgba(255,180,84,.14));font-size:12px;margin:8px 0;color:var(--dsw-alias-label-primary,#0f1115)}",
+			".mem-flag{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(127,127,150,.08)}",
+			".mem-flag:last-child{border-bottom:none}",
+			".mem-foot{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);flex-wrap:wrap;word-break:break-all}",
+			".mem-empty{padding:14px 4px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.75));font-size:12px}",
+			// 记忆面板补充：状态胶囊 / 可访问开关 / 作用域表 / 五列近期记录
+			".mem-hd-t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}",
+			".mem-state{font-size:10px;line-height:16px;padding:0 7px;border-radius:999px;border:1px solid rgba(127,127,150,.35);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8));white-space:nowrap}",
+			".mem-state.on{border-color:rgba(52,199,89,.55);background:rgba(52,199,89,.12);color:#58c46b}",
+			".mem-state.pending{border-color:rgba(245,158,11,.55);background:rgba(245,158,11,.12);color:var(--dsw-alias-state-warn-primary,#f59e0b)}",
+			".mem-dot-pending{background:var(--dsw-alias-state-warn-primary,#f59e0b);box-shadow:0 0 8px rgba(245,158,11,.6)}",
+			".mem-state.off{border-color:rgba(127,127,150,.35);background:rgba(127,127,150,.08)}",
+			".mem-flag-t{min-width:0}",
+			".mem-flag-state{font-size:11px;min-width:26px;text-align:right;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8))}",
+			".mem-dis{opacity:.42;cursor:not-allowed}",
+			// 开关容器不能再挂 .ci-on（那会把整块染绿）；用独立的 mem-on 只驱动滑块
+			".ci-toggle.mem-on .ci-switch{background:rgba(52,199,89,.22);border-color:rgba(52,199,89,.6)}",
+			".ci-toggle.mem-on .ci-switch:before{transform:translateX(15px);opacity:1}",
+			".mem-evidence{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid rgba(100,140,255,.35);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
+			".mem-ws{display:flex;flex-direction:column;gap:4px}",
+			".mem-ws-row{display:grid;grid-template-columns:minmax(0,1fr) 44px 76px;gap:8px;align-items:center;font-size:11px;padding:2px 0}",
+			".mem-ws-row .k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-ws-row .n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace)}",
+			".mem-ws-row .t{text-align:right;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7))}",
+			".mem-row{grid-template-columns:86px minmax(80px,1fr) 112px 62px 76px}",
+			".mem-row .mem-scope{font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-row .mem-time{text-align:right;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7))}",
+			".mem-row.mem-head{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.65));border-bottom:1px solid rgba(127,127,150,.18);padding-bottom:4px;margin-bottom:2px}",
+			"@media (max-width:720px){.mem-row{grid-template-columns:80px minmax(70px,1fr) 60px 70px}.mem-row .mem-scope,.mem-row.mem-head .mem-scope{display:none}}",
 			"@media (prefers-reduced-motion:reduce){.ci-switch,.ci-caret,.cim-chip{transition:none}.ci-pulse{animation:none;opacity:.9}}"
 		].join("");
 		var CSS_TAG = "contextinjector-webui/client.css";
@@ -200,9 +264,12 @@ window.__ModuleLoader__.load({
 				refresh: function (key) { return read(key); },
 			};
 		})();
-		// 触发点中文标签（foldAttempt 的两个触发点；未知值原样显示，不隐藏信息）——面板与新小标共用
+		// 触发点中文标签（v1.10.37 起生产触发点只有 turn-end；旧记录里的 turn-stopping 仍照常显示）
 		function trigLabel(t) {
-			return t === "turn-stopping" ? "本轮结束触发" : t === "pre-step" ? "下一轮开始前触发" : (t || "触发点未知");
+			return t === "turn-end" ? "本轮结束触发"
+				: t === "turn-stopping" ? "本轮结束触发（旧触发点）"
+				: t === "pre-step" ? "下一轮开始前触发（旧触发点）"
+				: (t || "触发点未知");
 		}
 		function InjectView(props) {
 			var _d = useState(null), data = _d[0], setData = _d[1];
@@ -377,7 +444,7 @@ window.__ModuleLoader__.load({
 			}
 			var lf = (data && data.lastFold) || null;
 			// 【在飞折叠】「上一轮输出压缩中…」：数据来自 /status.foldInflight（host 读插件写的在飞标记）。
-			// 为什么需要：turn-stopping 触发的是**后台**折叠（只排队、不阻塞本轮），浓缩模型要跑几秒~十几秒；
+			// 为什么需要：turn-end 触发的是**后台**折叠（只排队、不阻塞本轮），浓缩模型要跑几秒~十几秒；
 			//   这段时间 lastFold 仍是上一轮的结果，面板看起来"什么都没发生"（用户实测困惑点）。
 			// 秒数不需要额外定时器：本视图每 0.5s 轮询 /status，重渲染即自动走秒。
 			var fin = (data && data.foldInflight) || null;
@@ -670,15 +737,16 @@ window.__ModuleLoader__.load({
 								e("div", { className: "ci-sub", style: { marginTop: 6 } }, "\u6BD4\u503C = \u8F93\u5165 \u00F7 \u8F93\u51FA\u3002\u503C\u8D8A\u5927\u5219\u538B\u7F29\u6389\u7684\u91CF\u8D8A\u5927\uFF0C\u4FDD\u5B88\u53CD\u6620\u8F93\u5165\u7ECF\u6D4E\u6027\u3002\u84DD\u7EBF\uFF1D\u6BCF\u8F6E\uFF0C\u7EFF\u7EBF\uFF1D\u7D2F\u8BA1\uFF1B\u865A\u7EBF\uFF1D\u6BD4\u503C 1 \u53C2\u8003\u7EBF\u3002")),
 							e("div", { className: "ci-sec" },
 								e("div", { className: "ci-sech" }, "最近一次折叠",
-									// 上次折叠的触发点标签：用户靠它判断"本轮结束即折"（turn-stopping）到底有没有跑过
-									(lf && lf.trigger ? e("span", { className: "ci-sub", title: "这次折叠由哪个触发点产生：turn-stopping = 本轮 AI 输出结束即折；pre-step = 下一轮请求前折" }, "触发：" + trigLabel(lf.trigger)) : null),
+									// 上次折叠的触发点标签：用户靠它判断"本轮结束即折"（turn-end）到底有没有跑过
+									(lf && lf.trigger ? e("span", { className: "ci-sub", title: "这次折叠由哪个触发点产生：turn-end = 本轮 AI 输出结束后台折；pre-step = 旧版的下一轮请求前折（已移除）" }, "触发：" + trigLabel(lf.trigger)) : null),
 									e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: status }, "刷新")),
 								// 在飞 → 醒目显示「上一轮输出压缩中…」；刚结束 → 极简「已完成」；平时什么都不显示
 								(finOn ? inflightLine(fin) : (finDoneAt && (Date.now() - finDoneAt) < FIN_DONE_MS ? e("div", { className: "ci-sub", style: { marginBottom: 6, color: "rgba(52,199,89,.9)" } }, "已完成") : null)),
 								(lf ? [
 									e("div", { key: "m", className: "ci-metrics" },
 										e("span", null, "round ", e("b", null, lf.round ?? "?"), " · step ", e("b", null, lf.step ?? "?")),
-										e("span", null, "压缩 ", e("b", null, (lf.incrementalRawBytes ?? lf.shadowedBytes ?? "?") + " → " + (lf.appendedBytes ?? lf.transcriptBytes ?? "?") + " B"), " (", e("b", null, Math.round((lf.shrink ?? 1) * 100) + "%"), ")"),
+										e("span", null, "本折 ", e("b", null, (lf.incrementalRawBytes ?? lf.shadowedBytes ?? "?") + " → " + (lf.appendedBytes ?? lf.transcriptBytes ?? "?") + " B"), " (", e("b", null, Math.round((lf.foldRatio ?? lf.shrink ?? 1) * 100) + "%"), ")"),
+										e("span", null, "累计 ", e("b", null, lf.cumRatio == null ? "?" : Math.round(lf.cumRatio * 100) + "%")),
 										e("span", null, "gate ", e("b", null, lf.gate || "?")),
 										e("span", null, "档 ", e("b", null, lf.mode || "off")),
 										e("span", null, "hash ", e("b", null, String(lf.transcriptHash || "").slice(0, 8))),
@@ -937,22 +1005,69 @@ window.__ModuleLoader__.load({
 			//   多会话同时折叠时一律不显示（避免把别人的折叠显示成本会话的）；显示时 title 会写明"会话未知"。
 			var all = (st && st.foldInflightAll) || null;
 			var infer = (!sid && all && all.length === 1) ? all[0] : null;
-			if (!forced && !f && !infer) return null; // 常态：一个节点都不渲染（不占位、不影响布局）
-			var t0 = Number(f && f.startedAt);
-			var sec = Number.isFinite(t0) ? Math.max(0, Math.round((Date.now() - t0) / 1000)) : null;
-			var title;
-			if (f) {
-				title = "上一轮输出正在后台压缩（" + trigLabel(f && f.trigger) + (sec != null ? " · 已 " + sec + "s" : "") + "）：浓缩模型返回后写入 last-fold，下一轮请求前并入上下文";
-			} else if (infer) {
-				title = "有会话正在后台压缩，但会话未知：全机恰好只有 1 个会话在飞（" + shortId(infer.sessionId) + " · " + trigLabel(infer.trigger) + "）。本插槽没拿到当前会话 id，故按全局唯一在飞推断，可能与当前会话无关；多会话同时在飞时本小标不显示";
-			} else {
-				title = "强制显示（调试）：实际只在折叠在飞时出现。当前采样=" + (st ? "无在飞" : "尚未返回") + "，sid=" + (sid || "(未解析到)") + "，形态 " + ciShapeBrief(props)
-					+ "。关闭：localStorage.removeItem('ciFoldChipForce') 后刷新页面";
+			// v1.10.39：宿主折叠行已由 CSS 隐藏；这里自绘一行紧凑状态。
+			//   · 折叠完成 ⇒ 「本折 98% · 累计 62%」（百分比 <100% 才是省）
+			//   · 折叠在飞 ⇒ 琥珀脉冲 +「压缩中」（原样保留）
+			//   · 记忆编译在飞 ⇒ 琥珀脉冲 +「记忆编译中」；成功 30s 内 ⇒「记忆 +N」
+			//   · 宿主原生 compaction 在飞 ⇒「原生压缩中」（补回被隐藏的宿主信号）
+			var lf = (st && st.lastFold) || null;
+			var mi = (st && st.memoryInflight) || null;
+			var ml = (st && st.memoryLast) || null;
+			var ni = (st && st.nativeCompaction) || null;
+			var pctOf = function (v) {
+				var n = Number(v);
+				return Number.isFinite(n) ? Math.round(n * 100) : null;
+			};
+			var foldPct = pctOf(lf && (lf.foldRatio != null ? lf.foldRatio : lf.shrink));
+			var cumPct = pctOf(lf && lf.cumRatio);
+			// 只在拿到本会话自己的折叠结果时显示（status 无 per-sid 文件时会回退全局 last-fold ⇒ 别拿别人会话的比值冒充）
+			var hasFoldDone = foldPct != null && cumPct != null && (!sid || (st && st.lastFoldPerSession === true));
+			var memRecent = !!(ml && ml.ok === true && Number.isFinite(Number(ml.t)) && (Date.now() - Number(ml.t)) < 30000);
+			if (!forced && !f && !infer && !ni && !mi && !hasFoldDone && !memRecent) return null; // 常态：一个节点都不渲染
+			var secOf = function (x) {
+				var t0 = Number(x && x.startedAt);
+				return Number.isFinite(t0) ? Math.max(0, Math.round((Date.now() - t0) / 1000)) : null;
+			};
+			var chips = [];
+			if (f || infer || forced) {
+				var sec = secOf(f);
+				var title;
+				if (f) {
+					title = "上一轮输出正在后台压缩（" + trigLabel(f && f.trigger) + (sec != null ? " · 已 " + sec + "s" : "") + "）：浓缩模型返回后写入 last-fold，下一轮请求前并入上下文";
+				} else if (infer) {
+					title = "有会话正在后台压缩，但会话未知：全机恰好只有 1 个会话在飞（" + shortId(infer.sessionId) + " · " + trigLabel(infer.trigger) + "）。本插槽没拿到当前会话 id，故按全局唯一在飞推断，可能与当前会话无关；多会话同时在飞时本小标不显示";
+				} else {
+					title = "强制显示（调试）：实际只在折叠/记忆编译有状态时出现。当前采样=" + (st ? "无在飞" : "尚未返回") + "，sid=" + (sid || "(未解析到)") + "，形态 " + ciShapeBrief(props)
+						+ "。关闭：localStorage.removeItem('ciFoldChipForce') 后刷新页面";
+				}
+				chips.push(e("span", { key: "f", className: "ci-foldchip", title: title,
+					"data-ci-foldchip": forced ? "force" : (f ? "inflight" : "inferred") },
+					e("span", { className: "ci-pulse" }),
+					"压缩中" + (f && sec != null ? " " + sec + "s" : "")));
+			} else if (hasFoldDone) {
+				chips.push(e("span", { key: "f", className: "ci-foldchip ci-foldchip-done", "data-ci-foldchip": "done",
+					title: "本折 " + (lf.foldRatio != null ? Number(lf.foldRatio).toFixed(2) : "—")
+						+ " · 累计 " + (lf.cumRatio != null ? Number(lf.cumRatio).toFixed(2) : "—")
+						+ "（<1 表示省）；本折 = 本次新增转录 ÷ 本次新原料，累计 = 当前转录 ÷ 累计折叠原料" },
+					"本折 " + foldPct + "% · 累计 " + cumPct + "%"));
 			}
-			return e("span", { className: "ci-foldchip", role: "status", "aria-live": "polite",
-				title: title, "data-ci-foldchip": forced ? "force" : (f ? "inflight" : "inferred") },
-				e("span", { className: "ci-pulse" }),
-				"压缩中");
+			if (ni) {
+				var nsec = secOf(ni);
+				chips.push(e("span", { key: "n", className: "ci-foldchip", "data-ci-foldchip": "native",
+					title: "DSH 原生上下文压缩正在运行" + (nsec != null ? "（已 " + nsec + "s）" : "") + "；插件折叠已让路，避免作废它的总结" },
+					e("span", { className: "ci-pulse" }), "原生压缩中"));
+			}
+			if (mi) {
+				var msec = secOf(mi);
+				chips.push(e("span", { key: "m", className: "ci-foldchip", "data-ci-foldchip": "memory",
+					title: "轻 LLM 正在把本轮新事件编译为记忆" + (msec != null ? "（已 " + msec + "s）" : "") + "；完成后写入 memory.sqlite" },
+					e("span", { className: "ci-pulse" }), "记忆编译中"));
+			} else if (memRecent) {
+				chips.push(e("span", { key: "m", className: "ci-foldchip ci-foldchip-done", "data-ci-foldchip": "memory-done",
+					title: "最近一次记忆编译：+" + (ml.insights || 0) + " 条洞察" + (ml.through != null ? "，至 seq " + ml.through : "") + (ml.model ? " · " + ml.model : "") },
+					"记忆 +" + (ml.insights || 0)));
+			}
+			return e("span", { className: "ci-foldchips", role: "status", "aria-live": "polite" }, chips);
 		}
 		// #5 压缩器IO比折线：横轴逐轮，蓝=每轮 I/O 比值，绿=累计 I/O 比值。★=里程碑轮
 		//   ⚠ 修（本地缺陷：标签被拉扁/挤扁）【取自 RCS-0.1.0 返回包】：
@@ -1017,6 +1132,294 @@ window.__ModuleLoader__.load({
 			}, []);
 			return ivrChart(props.rounds, wh.w, wh.h, ref);
 		}
+		// ===== MEMORY「外部记忆」面板 =====
+		// 数据面：GET /api/memory/status（只读 SQLite 快照）＋ POST /api/memory/config（三个开关热写 control.json）。
+		// 视觉沿用本插件的 DSW token 体系；KPI 用显式 4 列网格（窄屏 2 列），不依赖自动排布。
+		function memAgo(ts) {
+			var n = Number(ts);
+			if (!isFinite(n) || n <= 0) return "—";
+			var d = Date.now() - n;
+			if (d < 60000) return Math.max(1, Math.round(d / 1000)) + " 秒前";
+			if (d < 3600000) return Math.round(d / 60000) + " 分钟前";
+			if (d < 86400000) return Math.round(d / 3600000) + " 小时前";
+			return new Date(n).toLocaleDateString();
+		}
+		function memScope(s) {
+			var t = String(s || "");
+			if (t.indexOf("ws:") === 0) {
+				var p = t.slice(3).split("/").filter(Boolean);
+				return "工作区 " + (p.length ? p.slice(-2).join("/") : t.slice(3));
+			}
+			if (t.indexOf("sess:") === 0) return "会话 " + t.slice(5, 13);
+			return t || "—";
+		}
+		function memBytes(n) {
+			var v = Number(n) || 0;
+			if (v < 1024) return v + " B";
+			if (v < 1048576) return (v / 1024).toFixed(1) + " KB";
+			return (v / 1048576).toFixed(1) + " MB";
+		}
+		function memCursor(n) {
+			var v = Number(n);
+			return Number.isFinite(v) && v >= 0 ? String(v) : "—";
+		}
+		var MEM_ENV = { memoryEnabled: "DSH_MEMORY", memoryLlmEnabled: "DSH_MEMORY_LLM", memoryInjectCatalog: "DSH_MEMORY_INJECT" };
+		var MEM_LOCK = { memoryEnabled: "enabled", memoryLlmEnabled: "llmEnabled", memoryInjectCatalog: "injectCatalog" };
+		function MemoryView(props) {
+			var _d = useState(null), data = _d[0], setData = _d[1];
+			var _e = useState(null), err = _e[0], setErr = _e[1];
+			var _b = useState(false), busy = _b[0], setBusy = _b[1];
+			var sid = (props && props.sessionId) || "";
+			// 编译模型覆盖（control.memoryLlmProvider/Model）：空 = 跟随会话当前模型。
+			var _mp = useState(""), memP = _mp[0], setMemP = _mp[1];
+			var _mm = useState(""), memM = _mm[0], setMemM = _mm[1];
+			var _mps = useState([]), memProviders = _mps[0], setMemProviders = _mps[1];
+			var _mms = useState([]), memModels = _mms[0], setMemModels = _mms[1];
+			var _mde = useState(null), memMdlErr = _mde[0], setMemMdlErr = _mde[1];
+			var memPicked = useRef(false); // 用户手动改过后，轮询不再覆盖选择
+			function loadMemModels(p) {
+				if (!p) { setMemModels([]); return Promise.resolve(); }
+				return fetch("/api/context-inject/models", {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ provider: p }),
+				}).then(function (r) { return r.json(); }).then(function (j) {
+					if (j && j.ok === false) { setMemMdlErr((j && j.error) || "模型目录请求失败"); return; }
+					setMemMdlErr(null);
+					setMemModels((j && j.models) || []);
+				}).catch(function (x) { setMemMdlErr("模型目录不可用：" + String((x && x.message) || x)); });
+			}
+			useEffect(function () {
+				fetch("/api/context-inject/models", { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) { if (j && j.ok !== false) setMemProviders(j.providers || []); })
+					.catch(function (x) { setMemMdlErr("模型目录不可用：" + String((x && x.message) || x)); });
+			}, []);
+			function saveMemRoute(p, m) {
+				if (busy) return Promise.resolve();
+				setBusy(true);
+				return fetch("/api/memory/config", {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ memoryLlmProvider: p || null, memoryLlmModel: m || null }),
+				}).then(function (r) { return r.json(); }).then(function (s) {
+					if (!s || !s.ok) setErr(new Error((s && s.error) || "config failed"));
+					else setErr(null);
+					return pull();
+				}).catch(function (x) { setErr(x); }).finally(function () { setBusy(false); });
+			}
+			function onMemProviderChange(ev) {
+				var p = (ev && ev.target && ev.target.value) || "";
+				memPicked.current = true;
+				setMemP(p);
+				setMemM("");
+				if (!p) saveMemRoute("", "");
+			}
+			function onMemModelChange(ev) {
+				var m = (ev && ev.target && ev.target.value) || "";
+				memPicked.current = true;
+				setMemM(m);
+				if (m) saveMemRoute(memP, m);
+			}
+			function pull() {
+				var q = sid ? "?sessionId=" + encodeURIComponent(sid) : "";
+				return fetch("/api/memory/status" + q, { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (s) { setData(s); setErr(null); return s; })
+					.catch(function (x) { setErr(x); return null; });
+			}
+			useEffect(function () {
+				// 页面不可见时停轮询；切回来立即补一帧（5s 固定间隔在后台纯属浪费）
+				function tick() { if (typeof document !== "undefined" && document.hidden) return; pull(); }
+				function onVis() { if (!document.hidden) pull(); }
+				var iv = setInterval(tick, 5000);
+				pull();
+				if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVis);
+				return function () {
+					clearInterval(iv);
+					if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVis);
+				};
+			}, [sid]);
+			// 首次拿到快照 / 服务端路由变化时同步选择器；用户手动改过后不再覆盖。
+			var memRouteP = data && data.llmRoute ? (data.llmRoute.provider || "") : "";
+			var memRouteM = data && data.llmRoute ? (data.llmRoute.model || "") : "";
+			useEffect(function () {
+				if (memPicked.current) return;
+				setMemP(memRouteP);
+				setMemM(memRouteM);
+			}, [memRouteP, memRouteM]);
+			useEffect(function () { loadMemModels(memP); }, [memP]);
+			function applyFlag(key, value) {
+				if (busy) return;
+				setBusy(true);
+				var body = {}; body[key] = value;
+				fetch("/api/memory/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+					.then(function (r) { return r.json(); })
+					.then(function (s) {
+						if (!s || !s.ok) setErr(new Error((s && s.error) || "config failed"));
+						else setErr(null);
+					})
+					.catch(function (x) { setErr(x); })
+					.then(function () { setBusy(false); pull(); });
+			}
+			if (!data) {
+				return e("div", { className: "ci-root" },
+					e("div", { className: "ci-hd" },
+						e("span", { className: "ci-badge ci-off" }),
+						e("div", null,
+							e("div", { className: "ci-title" }, "外部记忆"),
+							e("div", { className: "ci-sub" }, err ? ("读取失败：" + String(err.message || err)) : "读取中…")),
+						e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: pull }, "重试")));
+			}
+			var f = data.flags || {};
+			var t = data.totals || {};
+			var db = data.db || {};
+			var lock = data.envLocked || {};
+			var lockN = ["enabled", "llmEnabled", "injectCatalog"].filter(function (k) { return lock[k] === true; }).length;
+			var armed = data.armed === true;
+			// 三种真实状态：运行中（本进程已武装）/ 待重启（配置已开但启动时未加载）/ 未启用（已热停写或配置关闭）
+			var st = !f.enabled ? "off" : (armed ? "on" : "pending");
+			var stText = st === "on" ? "运行中" : st === "pending" ? "待重启" : "未启用";
+			var banner = !armed && !f.enabled
+				? "记忆层未启用：不写入、不注册工具、不注入目录。启用后需重启 dsh web。"
+				: (!armed && f.enabled
+					? "配置已启用，但当前进程启动时未加载记忆插件：重启 dsh web 后生效。"
+					: (!f.enabled ? "已停止写入：不新增记录、不编译、不注入；memory_* 仍可读取既有记忆。重新开启即时恢复。" : null));
+			var maxKind = 1;
+			(data.kinds || []).forEach(function (k) { if (k.n > maxKind) maxKind = k.n; });
+			function kpi(label, value, warn, title) {
+				return e("div", { className: "mem-kpi" + (warn ? " mem-warn" : ""), title: title || null },
+					e("b", null, value), e("span", null, label));
+			}
+			function flagRow(key, label, hint, on) {
+				var locked = lock[MEM_LOCK[key]] === true;
+				var dis = busy || locked;
+				return e("div", { key: key, className: "mem-flag" },
+					e("div", { className: "mem-flag-t" },
+						e("div", { className: "ci-title", style: { fontSize: 12 } }, label),
+						e("div", { className: "ci-sub" }, hint + (locked ? " · 由 " + MEM_ENV[key] + " 锁定" : ""))),
+					e("div", {
+						className: "ci-toggle" + (on ? " mem-on" : "") + (dis ? " mem-dis" : ""),
+						role: "switch",
+						"aria-checked": on === true,
+						"aria-label": label,
+						"aria-disabled": dis,
+						tabIndex: dis ? -1 : 0,
+						title: locked ? ("环境变量 " + MEM_ENV[key] + " 覆盖此开关，面板写入无效")
+							: (busy ? "正在保存…" : "点击切换（运行时生效）"),
+						onClick: function () { if (!dis) applyFlag(key, !on); },
+						onKeyDown: function (ev) {
+							if (dis) return;
+							if (ev.key === "Enter" || ev.key === " " || ev.key === "Spacebar") {
+								ev.preventDefault();
+								applyFlag(key, !on);
+							}
+						},
+					},
+						e("span", { className: "ci-switch" }),
+						e("span", { className: "mem-flag-state" }, locked ? "锁定" : (on ? "开" : "关"))));
+			}
+			return e("div", { className: "ci-root" },
+				e("div", { className: "ci-hd" },
+					e("span", { className: "ci-badge " + (st === "on" ? "ci-on" : st === "pending" ? "mem-dot-pending" : "ci-off") }),
+					e("div", null,
+						e("div", { className: "mem-hd-t" },
+							e("div", { className: "ci-title" }, "外部记忆"),
+							e("span", { className: "mem-state " + st }, stText),
+							(lockN ? e("span", { className: "mem-evidence", title: "环境变量优先级高于面板：被锁定的开关不可点击" }, "env 锁定 " + lockN + " 项") : null)),
+						e("div", { className: "ci-sub" }, "SQLite · 工作区共享事实 · 只读工具 memory_catalog / search / get")),
+					e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: pull }, "刷新")),
+				banner ? e("div", { className: "mem-off" }, banner) : null,
+				err ? e("div", { className: "ci-err" }, "读取失败：" + String(err.message || err)) : null,
+				e("div", { className: "ci-sec" },
+					e("div", { className: "ci-sech" }, "开关"),
+					flagRow("memoryEnabled", "记忆层", "订阅事件流，写入 SQLite，注册 memory_* 工具", f.enabled),
+					flagRow("memoryLlmEnabled", "轻 LLM 编译", "每轮结束把新事件编译为 insight（模型见下方「编译模型」）", f.llmEnabled),
+					flagRow("memoryInjectCatalog", "目录注入", "会话首次 pre-step 注入一次记忆目录（每步重读开关）", f.injectCatalog),
+					e("div", { className: "ci-sub", style: { marginTop: 6 } }, "已武装进程内，未被环境变量锁定的开关即时生效；启动时未加载记忆层则需重启。环境变量（DSH_MEMORY / DSH_MEMORY_LLM / DSH_MEMORY_INJECT）优先级高于此面板。")),
+				e("div", { className: "ci-sec" },
+					e("div", { className: "ci-sech" }, "编译模型"),
+					e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "轻 LLM 编译使用的模型；留空 = 跟随会话当前模型。可选本地轻模型（如 qwen3:4b）。"),
+					(memMdlErr ? e("div", { className: "ci-err" }, "⚠ " + memMdlErr) : null),
+					e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
+						e("select", { className: "ci-sel", value: memP, disabled: busy, onChange: onMemProviderChange,
+							title: "记忆编译用 provider；「跟随会话模型」= 清除覆盖" },
+							e("option", { value: "" }, "跟随会话模型"),
+							memProviders.map(function (p) { return e("option", { key: p.id, value: p.id }, (p.name || p.id)); })),
+						e("select", { className: "ci-sel", value: memM, disabled: busy || !memP, onChange: onMemModelChange,
+							title: "选定即保存 provider/model 成对覆盖；清除 provider 即恢复跟随会话" },
+							e("option", { value: "" }, memP ? "选择模型…" : "—"),
+							memModels.map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
+					e("div", { className: "ci-sub", style: { marginTop: 6 } },
+						(data.llmRoute && data.llmRoute.provider)
+							? "当前覆盖：" + data.llmRoute.provider + " / " + (data.llmRoute.model || "—")
+							: "当前：跟随会话模型（每轮重新读取 control.json）")),
+				e("div", { className: "mem-kpis" },
+					kpi("活跃记录", t.active || 0, false, "另有已解决 " + (t.resolved || 0) + " 条"),
+					kpi("知识洞察", t.insights || 0, false, "轻 LLM 提炼的持久事实"),
+					kpi("工作区", t.workspaces || 0, false, "按 cwd 共享的 ws:* 作用域数"),
+					kpi("待处理错误", t.errors || 0, (t.errors || 0) > 0, "status=active 的 error 记录")),
+				data.session ? e("div", { className: "ci-sec" },
+					e("div", { className: "ci-sech" }, "当前会话",
+						data.inflight ? e("span", { className: "ci-fin", style: { fontWeight: 400, letterSpacing: 0, textTransform: "none" },
+							title: "轻 LLM 正在编译本会话的新事件；完成后写入 memory.sqlite" },
+							e("span", { className: "ci-pulse" }),
+							"记忆编译中" + (Number.isFinite(data.inflight.startedAt)
+								? " " + Math.max(0, Math.round((Date.now() - data.inflight.startedAt) / 1000)) + "s" : "")) : null),
+					e("div", { className: "ci-metrics" },
+						e("span", null, "记录 ", e("b", null, data.session.records)),
+						e("span", null, "真人轮 ", e("b", null, data.session.turns)),
+						e("span", { title: "目录注入是一次性：成功后本会话不再注入" }, "已注目录 ", e("b", null, data.session.injected ? "是" : "否")),
+						e("span", { title: "compiledThrough：本会话已归并进 records 的最大事件序号" }, "写入游标 ", e("b", null, memCursor(data.session.compiledThrough))),
+						e("span", { title: "llmThrough：轻 LLM 已编译到的最大事件序号" }, "编译游标 ", e("b", null, memCursor(data.session.llmThrough))))) : null,
+				e("div", { className: "ci-sec" },
+					e("div", { className: "ci-sech" }, "记录构成"),
+					(data.kinds && data.kinds.length) ? e("div", { className: "mem-bars" }, data.kinds.map(function (k) {
+						return e("div", { key: k.kind, className: "mem-bar" },
+							e("span", { className: "k", title: k.kind }, k.kind),
+							e("span", { className: "mem-track" }, e("span", { className: "mem-fill", style: { width: Math.max(2, Math.round(100 * k.n / maxKind)) + "%" } })),
+							e("span", { className: "n" }, k.n));
+					})) : e("div", { className: "mem-empty" }, "还没有记录。开启记忆层并正常对话后，工具结果与真人轮会落库。")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "作用域分布",
+							e("span", { className: "ci-sub", style: { fontWeight: 400, letterSpacing: 0, textTransform: "none" } }, "ws = 跨会话共享 · sess = 本会话私有")),
+						(data.workspaces && data.workspaces.length) ? e("div", { className: "mem-ws" }, data.workspaces.map(function (w) {
+							return e("div", { key: w.scope, className: "mem-ws-row", title: w.scope },
+								e("span", { className: "k" }, memScope(w.scope)),
+								e("span", { className: "n" }, w.n),
+								e("span", { className: "t" }, memAgo(w.last)));
+						})) : e("div", { className: "mem-empty" }, "—")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "知识洞察"),
+						(data.insights && data.insights.length) ? e("div", { className: "mem-ins" }, data.insights.map(function (x) {
+							return e("div", { key: x.key, className: "mem-card" },
+								e("div", { className: "mem-card-h" },
+									e("span", { className: "mem-key" }, x.key),
+									e("span", { className: "mem-conf" + ((x.confidence || 0) < 0.6 ? " low" : "") }, "置信 " + Math.round((x.confidence || 0) * 100) + "%"),
+									x.evidence ? e("span", { className: "mem-evidence", title: "证据事件行号 #" + (x.evidenceIds || []).join(", #") }, "证据 " + x.evidence) : null),
+								e("div", { className: "mem-summary" }, x.summary || "(无摘要)"),
+								e("div", { className: "mem-meta", title: x.scope }, memScope(x.scope) + " · " + memAgo(x.updated_ts) + (x.model ? " · " + x.model : "")));
+						})) : e("div", { className: "mem-empty" }, "还没有洞察。开启轻 LLM 编译后，每轮结束会提炼最多 4 条持久事实。")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "最近记录"),
+						(data.recent && data.recent.length) ? e("div", { className: "mem-recent" },
+							e("div", { className: "mem-row mem-head" },
+								e("span", null, "类型"), e("span", null, "键"), e("span", { className: "mem-scope" }, "作用域"),
+								e("span", null, "状态"), e("span", { style: { textAlign: "right" } }, "更新")),
+							data.recent.map(function (r, i) {
+								return e("div", { key: i, className: "mem-row" },
+									e("span", null, r.kind),
+									e("span", { className: "k", title: r.key }, r.key),
+									e("span", { className: "mem-scope", title: r.scope }, memScope(r.scope)),
+									e("span", { className: "mem-st " + r.status }, r.status),
+									e("span", { className: "mem-time" }, memAgo(r.updated_ts)));
+							})) : e("div", { className: "mem-empty" }, "—")),
+					e("div", { className: "mem-foot" },
+						e("span", { title: db.path }, "DB " + (db.exists ? memBytes(db.bytes) : "未创建") + " · " + (db.path || "")),
+						e("span", null, "已编译会话 " + ((data.compile && data.compile.cursors) || 0)),
+						data.compile && data.compile.last ? e("span", { title: data.compile.last.sid }, "最近编译 " + String(data.compile.last.sid).slice(0, 8) + "… @ " + data.compile.last.through) : null,
+						e("span", null, "只读快照 · 5s 轮询"),
+						data.error ? e("span", { className: "ci-err" }, "读取异常：" + data.error) : null,
+						(db.exists && data.sqlite === false) ? e("span", { className: "ci-err" }, "Node 缺少 node:sqlite，面板无法读取") : null));
+		}
 		var inject = ["slots"];
 		function apply(ctx) {
 			var slots = ctx.get("slots");
@@ -1026,6 +1429,12 @@ window.__ModuleLoader__.load({
 					{ name: "conversation.view", id: "contextinjector", order: 20, label: function () { return "\u6CE8\u5165"; },
 						inject: function (sessionId) { return { sessionId: sessionId || null }; } },
 					function (props) { return React.createElement(InjectView, props || {}); });
+			});
+			ctx.slots.inject("conversation.view", function () {
+				return ctx.slots.register(
+					{ name: "conversation.view", id: "memory", order: 21, label: function () { return "记忆"; },
+						inject: function (sessionId) { return { sessionId: sessionId || null }; } },
+					function (props) { return React.createElement(MemoryView, props || {}); });
 			});
 			ctx.slots.inject("conversation.input.dock", function () {
 				return ctx.slots.register(

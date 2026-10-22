@@ -38,7 +38,7 @@ import { foldOne as foldToolResult } from '../toolfold/toolfold.mjs'
 // §13 消息来源分型（condense/ 共享纯模块，仿 ../toolfold 顶层兄弟目录惯例）：
 //   注入器侧转录 ROUND 仅计真人轮（source.kind==='user'），subagent 回传等不再漏进 [U]。
 //   与 LOGcompiler §13 修复对仗。设计见 docs/v2-优化设计.md §13。
-import { classifyMessageSource, subagentIdOf, snapshotSummary, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES, pluginIdOf } from '../condense/chunk.mjs'
+import { classifyMessageSource, subagentIdOf, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES, pluginIdOf } from '../condense/chunk.mjs'
 import { ivrLoad, ivrRecord } from '../condense/ivr.mjs' // #5 IVR 注入经济计量簿记（仅 node:fs）
 
 const ENABLED = process.env.DSH_CONTEXTINJECTOR_ENABLED === '1'
@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留)'
+const PLUGIN_VERSION = 'v1.10.39 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -141,21 +141,23 @@ mkdirSync(LAST_FOLD_PER, { recursive: true })
 // 【在飞折叠标记】面板「上一轮输出压缩中…」的数据源（用户报：后台折叠期间面板一片空白，以为没折）。
 //   目录/命名与上面 per-session 副本**同款口径**（bare sid → 非法字符换 _ → 截断 120），
 //   内容 { sessionId, trigger, startedAt, step, round? }。
-//   【v1.10.2 修复 2026-09-10（用户实测报障）】旧实现只在 scheduleFold（= agent/turn-stopping 的排队路径）
-//   写标记、在它那个 Promise 落定时删；而 pre-step 路径是**直接调用 foldAttempt**、完全绕过 scheduleFold
-//   ⇒ 只有 turn-stopping 折才有标记。用户会话实际走 pre-step（last-fold.json: trigger=pre-step）⇒
+//   【v1.10.2 修复 2026-09-10（用户实测报障）】旧实现只在 scheduleFold 的排队路径写标记、
+//   在它那个 Promise 落定时删；而当时的 pre-step 路径是**直接调用 foldAttempt**、完全绕过 scheduleFold
+//   ⇒ 只有排队折才有标记。用户会话实际走 pre-step（last-fold.json: trigger=pre-step）⇒
 //   /status.foldInflight 恒为 null ⇒ 会话页「压缩中」小标真机上永不出现。槽位/位置/CSS 都是对的
 //   （localStorage.ciFoldChipForce='1' 强制可见即证），坏的是数据侧——本文件。
-//   现在生命周期搬进**折叠主体**：foldAttempt 入口写、finally 删 ⇒ pre-step / turn-stopping / 将来任何
-//   新触发点一律自动覆盖，不存在"某条触发路径忘了写"的余地（单点收口，不再依赖调用方自觉）。
+//   现在生命周期搬进**折叠主体**：foldAttempt 入口写、finally 删 ⇒ 任何调用点（轮末后台 / 回归直折）
+//   一律自动覆盖，不存在"某条触发路径忘了写"的余地（单点收口，不再依赖调用方自觉）。
 //   UX（本修复的重点，不是副作用）：pre-step 折叠的"压缩中"窗口 = **下一轮已开始、模型还没开始流式
-//   输出的那几秒**——这正是用户盯着屏幕等回复的时刻，是最该显示小标的位置；而旧实现只在 turn-stopping
+//   输出的那几秒**——这正是用户盯着屏幕等回复的时刻，是最该显示小标的位置；而旧实现只在轮末排队折
 //   显示，那一刻用户正在读上一条回复、并不在等，等于把指示器放在没人看的窗口里。
 //   per-sid 语义：一会话一枚标记；同 sid 重入/并发（如 join 超时后 pre-step 又自折一次）用计数只清最后一次。
 //   陈旧标记（进程崩溃残留）不由本侧清理——host /status 有 10 分钟陈旧闸兜底（见 webui/lib/index.mjs）。
 //   ⚠ 读写全部 try/catch：标记只是观测面，**绝不允许**影响折叠本身。
 const FOLD_INFLIGHT_DIR = join(STATE_DIR, '.ctxinjector', 'fold-inflight')
 mkdirSync(FOLD_INFLIGHT_DIR, { recursive: true })
+// v1.10.39：宿主原生 compaction 的在飞标记（WebUI 自绘「原生压缩中」脉冲；宿主自带的压缩行已被插件隐藏）。
+const NATIVE_COMPACTION_DIR = join(STATE_DIR, '.ctxinjector', 'native-compaction')
 // 【v1.10.5 ★必须-1（协作：TESTBRANCH 规格方 LogCompiler K）】折叠索引：seq 区间 ↔ 转录**累计行号**。
 //   为什么不用 last-fold.json：它会被后续折叠覆盖，不能做溯源锚点。本文件**只追加**（NDJSON）。
 //   为什么用累计行号而不是段内行号：转录是单调前缀（foldText 只追加），段内行号在 1MB 轮转下
@@ -178,8 +180,8 @@ function writeFoldIndex(rec) {
     mkdirSync(FOLD_INDEX_DIR, { recursive: true })
     const bare = String(rec.sid ?? '').replace(/^session-?/i, '').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)
     const fp = join(FOLD_INDEX_DIR, bare + '.jsonl')
-    // 【v1.10.32 · 幂等记账】turn-stopping 与 turn/end 兜底是**两个独立触发点**，同一区间可能各提交一次
-    //   折叠（实测：0.2 真机上每笔折叠被写两行，除时间戳外逐字相同，间隔 1.7–1.9s）。
+    // 【v1.10.32 · 幂等记账】同一区间可能因重试/并发被提交两次（0.2 真机曾因两个触发点各折一次，
+    //   每笔折叠被写两行，除时间戳外逐字相同，间隔 1.7–1.9s）。
     //   旧实现各写一行 ⇒ 任何「按行求和」的总账（raw / appended / 压缩倍数）翻倍。
     //   这里比对最后一行：同一 foldSeq 再来一次即视为同一笔，跳过记账（读数以先到的那次为准）。
     try {
@@ -302,7 +304,8 @@ function keepInjectOn(gate, ctrl) {
 // 面板上的「最近一次折叠」与 last-fold.json 永远慢一拍。现增加 turn 结束即折（后台），
 // pre-step 只做 join，保证下一轮请求看到的仍是已折叠 surface（语义与旧实现等价）。
 const FOLD_AT_TURN_END_ENV = process.env.DSH_CONTEXTINJECTOR_FOLD_AT_TURN_END
-// 默认**开**（用户明确要求）；显式 control.foldAtTurnEnd=false 或 env=0 关闭 → 恢复"只 pre-step 折"的旧行为
+// 默认**开**（用户明确要求）。turn/end 是唯一的生产折叠触发点，故显式 control.foldAtTurnEnd=false
+// 或 env=0 ⇒ **完全不折**（应急闸）；pre-step 只剩 join，没有别的触发点可回退。
 function foldAtTurnEndOn(ctrl, env = FOLD_AT_TURN_END_ENV) {
   const e = String(env ?? '').trim()
   if (e === '0') return false
@@ -319,6 +322,15 @@ function foldJoinTimeoutMs(ctrl, fallback = FOLD_JOIN_TIMEOUT_MS) {
   const n = ctrl?.foldJoinTimeoutMs
   if (typeof n === 'number' && Number.isFinite(n) && n > 0) return Math.floor(n)
   return fb
+}
+// 微折门槛（v1.10.38）：新原料不足此字节就不折，等后续轮累积。缺省 2048，control=0 关闭。
+// 动机：turn-end 成为唯一触发点后，每轮（包括只发一句“wtf”的微轮）都会提交一个检查点，
+// 聊天区会不断出现「上下文已压缩」标记；小轮折了也省不了多少，反而刷屏 + 可能触发一次浓缩调用。
+const FOLD_MIN_SHADOW_BYTES = 2048
+function foldMinShadowBytesOf(ctrl) {
+  const n = ctrl?.foldMinShadowBytes
+  if (typeof n === 'number' && Number.isFinite(n) && n >= 0) return Math.floor(n)
+  return FOLD_MIN_SHADOW_BYTES
 }
 // 折叠门控（env 为最高优先，与 keepInject 同款语义）：
 //   env=1 强制（无视白名单，供真机实验）> env=0 强制关 > gate !== 'off'（白名单/回归通道）
@@ -761,25 +773,53 @@ function callIndexFromEvents(session) {
   } catch { /* best-effort：索引失败退回旧行为 */ }
   return map
 }
-function seedFoldState(session, surface, st) {
+// 累计原料字节：从折叠账本（只追加）求和，用于面板/检查点的“累计压缩比”。
+// 账本里的 raw 是每次真正被转写的新原料字节（排除自身旧转录节点）；同一 foldSeq 只算一次。
+function seedCumulativeRaw(sid) {
+  try {
+    const bare = String(sid ?? '').replace(/^session-?/i, '').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)
+    const fp = join(FOLD_INDEX_DIR, bare + '.jsonl')
+    if (!existsSync(fp)) return 0
+    const seen = new Set()
+    let sum = 0
+    for (const line of readFileSync(fp, 'utf8').split('\n')) {
+      if (!line.trim()) continue
+      let r = null
+      try { r = JSON.parse(line) } catch { continue }
+      const n = Number(r?.raw)
+      if (!Number.isFinite(n) || n < 0) continue
+      if (r?.foldSeq !== undefined) {
+        if (seen.has(r.foldSeq)) continue
+        seen.add(r.foldSeq)
+      }
+      sum += n
+    }
+    return sum
+  } catch { return 0 }
+}
+function seedFoldState(session, surface, st, sid) {
   try {
     const nodes = [...(surface?.nodes ?? [])]
     const entries = nodes.map((seq) => ({ seq, msg: session.deriveEventMessage(evAt(session, seq)) }))
     const own = []
+    let lastCompactionId = null
     for (const e of entries) {
       if (!e.msg || !isOwnTranscript(e.msg)) continue
       const text = blocksOf(e.msg).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('')
       if (text) own.push({ seq: e.seq, text })
+      if (typeof e.msg.source?.compactionId === 'string' && e.msg.source.compactionId) lastCompactionId = e.msg.source.compactionId
     }
     if (own.length === 0) return false
     const merged = mergeOwnSegments(own) // v1.10.13：拼接全部段（旧版只取最后一个 ⇒ 多段会丢前面的段）
-    st.foldText = merged.text
+    st.foldText = stripSnapshotRows(merged.text)
     st.foldSeq = merged.seq
     st.foldRound = merged.round
     st.segCount = merged.segCount
     st.lastSegSeq = merged.seq
+    if (lastCompactionId) st.compactionId = lastCompactionId // 复用同一个 UI 标记（不每轮新增一行）
+    st.cumRawBytes = seedCumulativeRaw(sid)
     st.seeded = true
-    console.log(`[contextinjector] resume-seed seq=${merged.seq} round=${st.foldRound} segments=${merged.segCount} foldBytes=${merged.text.length} (process-restart resume)`)
+    console.log(`[contextinjector] resume-seed seq=${merged.seq} round=${st.foldRound} segments=${merged.segCount} foldBytes=${merged.text.length} cumRaw=${st.cumRawBytes} (process-restart resume)`)
     return true
   } catch (err) {
     console.error('[contextinjector] resume-seed failed:', err?.message ?? err)
@@ -818,22 +858,59 @@ function isToolResultMsg(m) {
 function toolResultCallId(m, block) {
   return String(block?.toolCallId ?? block?.callId ?? m?.toolCallId ?? m?.callId ?? m?.source?.callId ?? '')
 }
+// 历史转录里可能残留旧版写入的 [S] 快照摘要行。快照每 step 重注入、内容只是 section 名，
+// 进入折叠转录只会逐轮累积噪声；新写入已不再产生 [S]，读取/续传时再清一次旧残留。
+export function stripSnapshotRows(text) {
+  const s = String(text ?? '')
+  if (!s.includes('[S] ')) return s
+  return s.split('\n').filter((line) => !line.startsWith('[S] ')).join('\n')
+}
+function seqMapOf(entries) {  const map = new Map()
+  for (const e of entries ?? []) {
+    const n = Number(e?.seq)
+    if (e?.msg && Number.isFinite(n)) map.set(e.msg, n)
+  }
+  return map
+}
 function transcribeIncremental(msgs, roundState, opts = {}) {
   const rows = []
   const pending = new Map() // callId -> {op, path, args}
   const structured = !!(opts && opts.structured)
   const calls = (opts && opts.calls) instanceof Map ? opts.calls : null // 漂移 #11：事件层索引
+  const seqOf = (() => {
+    const s = opts && opts.seqOf
+    if (s instanceof Map) return (m) => s.get(m)
+    if (typeof s === 'function') return s
+    return (m) => m?.seq
+  })()
+  // 旧宿主把 tool-call 放在助手消息块里：记住 callId → 该消息 seq，
+  // 供 write/edit/str_replace 行输出 call=<seq>（展开即得实际 patch 参数）。
+  const callSeq = new Map()
+  for (const m of msgs) {
+    const n = Number(seqOf(m))
+    if (!Number.isFinite(n)) continue
+    for (const b of blocksOf(m)) {
+      if (b?.type !== 'tool-call') continue
+      const id = b.id ?? b.toolCallId ?? b.callId
+      if (id != null && id !== '') callSeq.set(String(id), n)
+    }
+  }
   // 一行工具记录（块级与消息级两条路径共用，保证输出逐字同形）
   function emitToolRow(callId, isErr, m, block) {
     const rec = pending.get(String(callId)) ?? calls?.get(String(callId))
       ?? { op: block?.name ?? m?.toolName ?? '?', path: '-', args: {} }
+    const rawSeq = Number(seqOf(m))
+    const callSq = callSeq.get(String(callId))
+    const extra = []
+    if (Number.isFinite(rawSeq)) extra.push('raw=' + rawSeq)
+    if (Number.isFinite(callSq) && /^(?:write|edit|str_replace|str_replace_editor)$/.test(rec.op)) extra.push('call=' + callSq)
     if (structured) {
       const text = toolResultText(m, block)
       const { t, vs } = foldToolResult({ action: rec.op, args: rec.args || {}, text, isError: isErr, fs: { readFileSync }, tool: toolDomainOf(rec.op) })
       for (const v of vs) rows.push(v)
-      rows.push(t)
+      rows.push(t + extra.map((x) => '|' + x).join(''))
     } else {
-      rows.push(`[T] ${rec.op} | ${rec.path} | ${isErr ? 'ERR' : 'OK'}`)
+      rows.push(`[T] ${rec.op} | ${rec.path} | ${isErr ? 'ERR' : 'OK'}${extra.map((x) => ' | ' + x).join('')}`)
     }
   }
   for (const m of msgs) {
@@ -872,8 +949,9 @@ function transcribeIncremental(msgs, roundState, opts = {}) {
             case 'catalog': // skill 目录，不计 ROUND
               rows.push(`[C] ${txt}`)
               break
-            case 'snapshot': // runtime 快照，只存 sections 摘要防膨胀
-              rows.push(`[S] ${snapshotSummary(cls.sections)}`)
+            case 'snapshot': // runtime 快照每 step 重注入，且宿主始终把最新一份留在表面
+              // （keepInject 不遮蔽注入节点）⇒ 转录它们只会把同一行 section 名逐轮累积成噪声。
+              // 不写 [S]：模型侧仍有最新的运行时快照，历史快照本来就是易失信息。
               break
             case 'notice': // job 通知 / 审批变更 / subagent 结束，不计 ROUND
               rows.push(`[N] ${cls.sub} | ${txt}`)
@@ -936,7 +1014,7 @@ export function foldHeadTranscript(entries, hasPriorTranscript, roundState, opts
   if (lastInject < 0) return { head: [], tail: entries, hadInject: false, rows: [] } // 无注入节点 ⇒ 与旧版逐字同行为
   const head = hasPriorTranscript ? [] : entries.slice(0, lastInject) // 已存在转录 ⇒ 不补录（幂等）
   const tail = entries.slice(lastInject + 1)
-  const rows = head.length > 0 ? transcribeIncremental(head.map((e) => e.msg), roundState, opts) : []
+  const rows = head.length > 0 ? transcribeIncremental(head.map((e) => e.msg), roundState, { ...opts, seqOf: seqMapOf(head) }) : []
   return { head, tail, hadInject: true, rows }
 }
 
@@ -1253,7 +1331,7 @@ function kd(io, kind, extra) {
 }
 // v1.8：优先 DSH 已注册模型（io.route），其次显式配置的 Ollama 直连，都不行 → null（回退无损）
 // 【v1.10.19 · P3 修复】`io.llm` = 折叠开始时**固化**的 llm 服务句柄（见 foldBody）。为什么必须固化：
-//   后台折叠（turn-stopping 触发的异步任务）跑到一半时，请求作用域的 ctx 可能已被回收 ⇒
+//   后台折叠（turn/end 触发的异步任务）跑到一半时，请求作用域的 ctx 可能已被回收 ⇒
 //   每次调用都重新 `llmOf(ctx)` 会越跑越取不到服务（实测：single 每条 [A] 1 次调用 1/12 失败，
 //   double 每条 [A] 2 次调用 **12/12** 失败，且调用越慢失败率越高 —— 典型的"句柄在折叠进行中失效"）。
 //   固化后：优先用句柄；句柄为空才回退到实时解析（行为不变，只是不再随作用域回收而丢失）。
@@ -1562,10 +1640,174 @@ function rawAppend(sid, entries) {
   }
 }
 
+// ================= raw 回取（折叠的可逆面） =================
+// [T] 只保留有界摘要；被遮蔽的原文全量在 raw/<sid>.jsonl。模型看到 raw=<seq> 时可按需展开，
+// 避免"规则折叠 = 静默丢正文"。路径用 sanitizeSid 清洗，只读、不写库。
+function rawMessageText(m) {
+  const parts = []
+  for (const b of blocksOf(m)) {
+    if (b?.type === 'text') parts.push(b.text ?? '')
+    else if (b?.type === 'tool-result') parts.push(blockTextOf(b.content))
+    else if (b?.type === 'tool-call') parts.push(`[tool-call ${b.name ?? '?'}] ${b.arguments ?? ''}`)
+  }
+  if (!parts.length) parts.push(blockTextOf(m?.content))
+  return parts.filter(Boolean).join('\n')
+}
+
+export function readRawEntry(rawDir, sid, seq, maxChars = 4000) {
+  const n = Number(seq)
+  if (!Number.isFinite(n)) return { ok: false, error: 'bad-seq' }
+  const s = sanitizeSid(String(sid ?? '').replace(/^session-?/i, ''))
+  const candidates = [join(rawDir, 'session-' + s + '.jsonl'), join(rawDir, s + '.jsonl')]
+  const file = candidates.find((f) => existsSync(f))
+  if (!file) return { ok: false, error: 'no-raw-file', tried: candidates }
+  let rec = null
+  try {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!line.trim()) continue
+      let row = null
+      try { row = JSON.parse(line) } catch { continue }
+      if (Number(row?.seq) === n) { rec = row; break }
+    }
+  } catch (err) {
+    return { ok: false, error: 'read-failed', detail: String(err?.message ?? err) }
+  }
+  if (!rec) return { ok: false, error: 'seq-not-in-raw', file }
+  const text = rawMessageText(rec.msg)
+  const capN = Math.max(200, Math.min(20000, Number(maxChars) || 4000))
+  return {
+    ok: true, sid: s, seq: n, file,
+    bytes: text.length, truncated: text.length > capN,
+    text: text.length > capN ? text.slice(0, capN) : text,
+  }
+}
+
+function sidFromExec(exec) {
+  const s = exec?.agent?.session ?? exec?.session ?? exec?.agent ?? null
+  return s?.id ?? s?.sessionId ?? s?.goalId ?? s?.name ?? ''
+}
+
+const SELF_COMPACTION_IDS = new Set()
+export function isSelfCompactionId(id) { return SELF_COMPACTION_IDS.has(String(id ?? '')) }
+
+// 折叠提交：走宿主的 compaction 协议，而不是裸 surfaceOp replace。
+// 宿主的对话 UI 只把 append 来源当人类转录、把 replace 副本当模型专用；裸替换会让
+// 用户眼前的助手正文消失。compaction 检查点被 UI 识别为“上下文已压缩”标记，
+// 原始 append 消息仍留在人类转录里，模型侧只看到检查点 + 保留节点。
+export function appendFoldCheckpoint(session, {
+  transcript,
+  shadowedSeqs,
+  turn = null,
+  shadowedBytes = 0,
+  compactionId = randomUUID(),
+  summaryText = null,
+} = {}) {
+  if (!session || typeof session.append !== 'function') throw new Error('appendFoldCheckpoint: session.append required')
+  const seqs = [...new Set((shadowedSeqs ?? []).filter((s) => Number.isFinite(s)))]
+  if (seqs.length === 0) throw new Error('appendFoldCheckpoint: shadowedSeqs required')
+  const text = String(transcript ?? '')
+  const start = seqs[0]
+  const end = seqs[seqs.length - 1]
+  const lifecycle = { compactionId, turn: Number.isFinite(turn) ? turn : null }
+  SELF_COMPACTION_IDS.add(compactionId)
+  try {
+    const startEvent = session.append('compaction/start', lifecycle)
+    const shadowedTokenCount = Math.max(1, Math.ceil((Number(shadowedBytes) > 0 ? Number(shadowedBytes) : text.length) / 4))
+    const summary = summaryText ?? `规则折叠 ${seqs.length} 条历史（原文保留在会话日志，模型使用规则转录）。`
+    const summaryEvent = session.append('compaction/summary', {
+      compactionId,
+      summary: [{ type: 'text', text: summary }],
+      shadowedRange: { start, end },
+      shadowedSeqs: seqs,
+      shadowedTokenCount,
+      provider: 'CONTEXTinjector',
+      model: 'rule-fold',
+    })
+    const replacementEvent = session.append('user/message', {
+      id: randomUUID(),
+      role: 'user',
+      content: [{ type: 'text', text }],
+      // kind 必须是宿主认识的 compact-checkpoint；plugin 字段留给 RCS 自己识别“这是自身转录”。
+      source: { kind: 'compact-checkpoint', compactionId, plugin: 'CONTEXTinjector' },
+    }, {
+      surfaceOp: replaceOp(start, end),
+      sourceEventSeqs: [startEvent.seq, summaryEvent.seq, ...seqs],
+    })
+    const endEvent = session.append('compaction/end', lifecycle)
+    return {
+      compactionId,
+      startSeq: startEvent.seq,
+      summarySeq: summaryEvent.seq,
+      replaceSeq: replacementEvent.seq,
+      endSeq: endEvent.seq,
+      shadowedSeqs: seqs,
+      shadowedTokenCount,
+    }
+  } finally {
+    SELF_COMPACTION_IDS.delete(compactionId)
+  }
+}
+
+export function makeTranscriptExpandTool({ rawDir = RAW_DIR } = {}) {
+  return {
+    name: 'transcript_expand',
+    parameters: {
+      type: 'object',
+      properties: {
+        seq: { type: 'integer', description: 'The raw=<seq> value from a [T] row.' },
+        sid: { type: 'string', description: 'Session id; defaults to the current session.' },
+        maxChars: { type: 'integer', minimum: 200, maximum: 20000, description: 'Preview cap (default 4000).' },
+      },
+      required: ['seq'],
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'object', properties: { ok: { type: 'boolean' }, text: { type: 'string' } }, additionalProperties: true },
+      render(args, value) {
+        if (value?.ok) {
+          const head = `raw seq=${value.seq} bytes=${value.bytes}${value.truncated ? ' (truncated)' : ''}\n`
+          return [{ type: 'text', text: head + value.text }]
+        }
+        return [{ type: 'text', text: JSON.stringify(value) }]
+      },
+    },
+    timeoutMs: 5000,
+    isConcurrencySafe: () => true,
+    async execute(args, exec) {
+      const sid = sanitizeSid(String(args?.sid || sidFromExec(exec) || '').replace(/^session-?/i, ''))
+      if (!sid || sid === 'unknown') return { ok: false, error: 'no-session-scope' }
+      return readRawEntry(rawDir, sid, args?.seq, args?.maxChars)
+    },
+  }
+}
+
 export default {
   name: 'CONTEXTinjector',
   apply(ctx) {
     console.log(`[CONTEXTinjector] armed (${PLUGIN_VERSION}; threshold=${THRESHOLD}%; out=${OUT_FILE || '-'}; stateDir=${STATE_DIR})`)
+    // raw 回取工具：让 [T] 的 raw=<seq> 可展开为被遮蔽原文（只读）。
+    // tools 是可选宿主服务，必须走 ctx.inject 延迟挂载；直接 ctx.get('tools') 在服务尚未
+    // 注入时会被 cordis 拒绝（实测 “cannot get property "tools" without inject”）。
+    const armTranscriptExpand = (toolsCtx) => {
+      try {
+        const tools = toolsCtx?.tools ?? (typeof toolsCtx?.get === 'function' ? toolsCtx.get('tools') : null)
+        if (tools && typeof tools.register === 'function') {
+          const dispose = tools.register(makeTranscriptExpandTool())
+          console.log('[CONTEXTinjector] transcript_expand armed (raw seq lookup)')
+          try { if (typeof toolsCtx.effect === 'function') toolsCtx.effect(() => { try { dispose?.() } catch { /* ignore */ } }) } catch { /* ignore */ }
+        } else {
+          console.log('[CONTEXTinjector] transcript_expand unavailable: tools service absent')
+        }
+      } catch (err) {
+        console.error('[CONTEXTinjector] transcript_expand registration failed:', err?.message ?? err)
+      }
+    }
+    try {
+      if (typeof ctx.inject === 'function') ctx.inject(['tools'], armTranscriptExpand)
+      else armTranscriptExpand(ctx)
+    } catch (err) {
+      console.error('[CONTEXTinjector] transcript_expand registration failed:', err?.message ?? err)
+    }
     // 诊断行显示**生效值**而非原始字段（2026-09-10 默认翻转后，旧文案会谎报 "default OFF"）
     const _kiCtrl = readControl()
     const _kiEff = keepInjectOn('control', _kiCtrl)
@@ -1573,13 +1815,22 @@ export default {
     console.log(`[CONTEXTinjector] gate priority: test=${TEST_ROUND ? 1 : 0} env=${ENABLED ? 1 : 0} else ${CONTROL_FILE} whitelist (default OFF)`)
     // #6 折叠时机：**不缓存生效值**——与本模块其它 control 项（keepInject/condenseMinBytes/prompts）同规矩，
     //   每次触发现读 control.json，改档无需重启（生效值的时点在这里无法断言 gate，故不谎报 ON/OFF）。
-    console.log(`[CONTEXTinjector] fold timing(#6): turn-stopping(后台折，缺省 ON) + pre-step(join，超时 ${FOLD_JOIN_TIMEOUT_MS}ms) | env DSH_CONTEXTINJECTOR_FOLD_AT_TURN_END=${FOLD_AT_TURN_END_ENV ?? '-'} / DSH_CONTEXTINJECTOR_FOLD_JOIN_MS=${process.env.DSH_CONTEXTINJECTOR_FOLD_JOIN_MS ?? '-'} | control.foldAtTurnEnd / control.foldJoinTimeoutMs 热读（=false / env=0 恢复"仅 pre-step 折"）`)
+    console.log(`[CONTEXTinjector] fold timing(#6): turn-end(唯一后台折叠触发点，缺省 ON) + pre-step(仅 join，超时 ${FOLD_JOIN_TIMEOUT_MS}ms) | env DSH_CONTEXTINJECTOR_FOLD_AT_TURN_END=${FOLD_AT_TURN_END_ENV ?? '-'} / DSH_CONTEXTINJECTOR_FOLD_JOIN_MS=${process.env.DSH_CONTEXTINJECTOR_FOLD_JOIN_MS ?? '-'} | control.foldAtTurnEnd=false / env=0 ⇒ 不折（应急闸） | control.foldJoinTimeoutMs 热读`)
     const ctrl0 = readControl()
     console.log(`[CONTEXTinjector] condense modes: off|single|double; env=${ENV_MODE || '-'} (v1.9: no global default — sessionModes authoritative; control-gated sessions without a mode do NOT fold); minBytes=${LOSSY_MIN_BYTES}(default; control.condenseMinBytes overrides live); rawDir=${RAW_DIR}`)
     // v1.8 浓缩模型通道自检（软取，不影响装载）：无 llm 服务时 single/double 自动回退无损折叠
-    const llm0 = llmOf(ctx)
     const forced0 = ctrl0?.condenseProvider && ctrl0?.condenseModel ? `${ctrl0.condenseProvider}/${ctrl0.condenseModel}` : '-'
-    console.log(`[CONTEXTinjector] condense model(v1.8): llm-service=${llm0 ? 'available' : 'ABSENT'} route=${forced0 === '-' ? 'follow-session' : forced0} ollama-direct=${LOSSY_OLLAMA ? 'on' : 'off'}`)
+    const logCondenseModel = (llmNow) => {
+      console.log(`[CONTEXTinjector] condense model(v1.8): llm-service=${llmNow ? 'available' : 'ABSENT'} route=${forced0 === '-' ? 'follow-session' : forced0} ollama-direct=${LOSSY_OLLAMA ? 'on' : 'off'}`)
+    }
+    const llm0 = llmOf(ctx)
+    if (llm0) logCondenseModel(llm0)
+    else {
+      // 0.2.1 起 llm 服务可能在本插件 apply 之后才挂载：1s 后复查，避免把"尚未挂载"误报成 ABSENT。
+      // 运行时每次折叠仍会重新 llmOf(ctx)（见 resolveCondenseRoute），此处只影响诊断行。
+      const t = setTimeout(() => { try { logCondenseModel(llmOf(ctx)) } catch { /* best-effort */ } }, 1000)
+      if (typeof t?.unref === 'function') t.unref()
+    }
     // 注意：不再提前 return——钩子始终注册，启停由运行时门控逐 step 判定（支持 WebUI 开关/session 白名单，无需重启）
 
     // 折叠状态必须按会话隔离：真实 WebUI 一个进程同时服务多个会话，
@@ -1589,20 +1840,17 @@ export default {
       const key = sid ?? '__unknown__'
       let s = sessionStates.get(key)
       // segCount/lastSegSeq（v1.10.13 多段转录）：段号与上一段起点 seq（段头据此编号、标明承接关系）
-      if (!s) { s = { foldSeq: -1, foldText: '', foldRound: 0, foldedOnce: false, segCount: 0, lastSegSeq: -1 }; sessionStates.set(key, s) }
+      if (!s) { s = { foldSeq: -1, foldText: '', foldRound: 0, foldedOnce: false, segCount: 0, lastSegSeq: -1, compactionId: null, cumRawBytes: 0 }; sessionStates.set(key, s) }
       return s
     }
 
-    // ── 折叠主体（pre-step 与 turn-stopping 共用）【#6 压缩时机提前，取自 RCS-0.1.0】─────
-    // 把原 pre-step 内联的折叠逻辑整体抽成函数，两个触发点复用同一套
-    //   边界计算（closedPrefixEnd）/ 注入避让（keepInject）/ pairSplitIds 跨界守卫 /
-    //   extreason 转录 / 浓缩调用。返回 {folded, reason, ...}。
+    // ── 折叠主体（turn/end 后台任务；TEST_ROUND 回归通道也会直接调用）───────────────
+    // 边界计算（closedPrefixEnd）/ 注入避让（keepInject）/ pairSplitIds 跨界守卫 /
+    // extreason 转录 / 浓缩调用都收在这里。返回 {folded, reason, ...}。
     // ⚠ 契约：本函数**绝不抛**（内部已 try/catch），调用方无需再包一层；**不调用** next()。
     //
     // 【在飞标记生命周期收口】外层 foldAttempt 只做一件事：入口写标记、finally 删标记，然后转交 foldBody。
-    //   为什么必须在这里而不是调用方：pre-step 是**直接调用**本函数的（见触发点 1），turn-stopping 才经
-    //   scheduleFold 排队——旧实现把写/删放在 scheduleFold 里 ⇒ pre-step 折（用户的实际路径）永无标记。
-    //   放这里则任何触发点、任何提前 return / 抛错 / 被 abort 都自动覆盖，调用方无需（也**不得**）自己写删。
+    //   放这里则任何调用点、任何提前 return / 抛错 / 被 abort 都自动覆盖，调用方无需（也**不得**）自己写删。
     //   标记始终是 best-effort：enterFoldInflight / exitFoldInflight 内部全 try/catch，绝不影响折叠本身。
     async function foldAttempt(args) {
       enterFoldInflight(args) // 入口即"压缩中"：含真实 trigger / step / startedAt
@@ -1610,7 +1858,7 @@ export default {
         return await foldBody(args)
       } catch (err) {
         // 【v1.10.7（协作 r9 ★必须-4 建议）】foldBody 抛错过去**只经 finally 冒泡**：既不落痕，又让两个
-        //   触发点（pre-step 直调 / turn-stopping 排队）同时全灭——v1.10.5 的 TDZ 正是这样让折叠静默停摆。
+        //   轮末折整体停摆——v1.10.5 的 TDZ 正是这样让折叠静默死掉。
         //   现在一律记账并降级为"本次不折"，绝不静默：reason=error 且带 err 文本。
         const msg = String(err?.message ?? err)
         console.error(`[contextinjector] fold-attempt-error trigger=${args?.trigger ?? '-'} sid=${args?.sid ?? '-'} err=${msg}`)
@@ -1626,7 +1874,7 @@ export default {
         exitFoldInflight(args?.sid) // 成功 / 失败 / 提前 return / 异常：一律在这里熄灭
       }
     }
-    // 折叠主体（pre-step 与 turn-stopping 共用，语义与旧 foldAttempt 逐字一致，仅改名以免与上面那层混）
+    // 折叠主体（语义与旧 foldAttempt 逐字一致，仅改名以免与上面那层混）
     async function foldBody({ session, surface, sid, ctrl, gate, stepNo, turn, claimed, trigger }) {
   // 仅测试：让 harness 能走一次真实异常路径（验证 ★必须-9 的错误账本确实落盘）
   if (process.env.DSH_CONTEXTINJECTOR_THROW_TEST === '1') throw new Error('harness-injected-fold-error')
@@ -1634,17 +1882,17 @@ export default {
       // v1.10 重启续传：本进程首见该会话且未折叠过 → 尝试从 surface 的自身折叠节点回填状态
       if (gate !== 'off' && st.foldText === '' && st.seedChecked !== true) {
         st.seedChecked = true
-        seedFoldState(session, surface, st)
+        seedFoldState(session, surface, st, sid)
       }
       // 【v1.10.6（协作 r7 §1 纠正）】本次折叠**前**的转录累计行数——必须
       //   ① 在 `st` 取到之后（此前引用 foldText 会落进 TDZ：`let foldText` 在下方几行才声明，
       //      抛 ReferenceError，而 node --check 只查语法、抓不到这类运行时错误；foldAttempt 只有
-      //      finally 没有 catch ⇒ 异常冒泡 ⇒ **每一次折叠都会死**，pre-step 与 turn-stopping 全灭）；
+      //      finally 没有 catch ⇒ 异常冒泡 ⇒ **每一次折叠都会死**，轮末折整体停摆）；
       //   ② 在 seedFoldState **之后**（seed 会改写 st.foldText；回填后的值才是本次折叠据以增量的基线，
       //      也才满足"foldText 是每会话单调前缀状态"的语义）；权威来源是 `st.foldText` 而不是局部 `foldText`。
       const cumLinesBeforeEntry = st.foldText === '' ? 0 : st.foldText.split('\n').length
       // handler 局部副本：每次触发从该会话状态载入；折叠成功后写回（多会话不串扰）
-      let foldSeq = st.foldSeq, foldText = st.foldText, foldRound = st.foldRound, foldedOnce = st.foldedOnce
+      let foldSeq = st.foldSeq, foldText = stripSnapshotRows(st.foldText), foldRound = st.foldRound, foldedOnce = st.foldedOnce
       if (TEST_ROUND && foldedOnce) return { folded: false, reason: 'test-once' } // 回归模式单次折叠（实证 P/S 同语义）
 
       // —— round 边界（或回归模式闭合前缀）：把已闭合前缀折叠为转录消息 ——
@@ -1658,7 +1906,8 @@ export default {
       const deadCalls = collectDeadCalls(entries, session)
       let end = closedPrefixEnd(entries.map((e) => e.msg), { deadCalls })
       if (end < 0) return { folded: false, reason: 'no-closed-prefix' } // 尚无闭合前缀（首轮未产生 assistant↔tool 闭合），留给下一轮
-      // 【当前轮保护】仍在飞的那一轮不进遮蔽集（否则表面尾部会变成 user 角色的转录 ⇒ 宿主再跑一步 ⇒ 重复回答）
+      // 【当前轮保护】仍在飞的那一轮不进遮蔽集（否则表面尾部会变成 user 角色的转录 ⇒ 宿主再跑一步 ⇒ 重复回答）。
+      // 轮末（turn/end）触发时，刚结束的轮已带 turn/end 事件 ⇒ 允许折叠；唯一的生产触发点就是它。
       {
         const clamped = openRoundClampEnd(entries, session, end)
         if (clamped !== end) {
@@ -1717,6 +1966,16 @@ export default {
         incremental = shadowed.slice(lastOwnIdx + 1) // 只覆盖"最后一个段节点之后"：既有段全部留在表面
       }
       if (shadowed.length === 0 || incremental.length === 0) return { folded: false, reason: 'no-increment' }
+      // 【v1.10.38 · 微折门槛】新原料不足门槛就留给后续轮，不提交检查点。
+      //   放在转录/浓缩之前：小轮不花模型调用，也不在聊天区新增/更新「上下文已压缩」标记。
+      //   回归通道（TEST_ROUND）不受限：headless 单轮测试的夹具本来就很小。
+      const rawNewBytes = incremental.reduce((a, e) => a + (isOwnTranscript(e.msg) ? 0 : messageBytes(e.msg).length), 0)
+      const minShadowBytes = foldMinShadowBytesOf(ctrl)
+      if (!TEST_ROUND && minShadowBytes > 0 && rawNewBytes < minShadowBytes) {
+        try { log('fold-skip', { trigger, step: stepNo, turn, sid, reason: 'below-min-shadow', raw: rawNewBytes, min: minShadowBytes }) } catch { /* ignore */ }
+        console.log(`[contextinjector] fold-skip trigger=${trigger} step=${stepNo} sid=${sid} reason=below-min-shadow raw=${rawNewBytes}B<${minShadowBytes}B（累积到门槛再折）`)
+        return { folded: false, reason: 'below-min-shadow', incrementalRawBytes: rawNewBytes, minShadowBytes }
+      }
       // 【#4 守卫（取自 RCS-0.1.0 返回包）】跨界配对检查：遮蔽集与尾部之间不得切分
       //   tool-call↔tool-result 配对，否则 surface 出现孤儿 tool 消息 → INVALID_REQUEST
       //   （与 §13 同源风险区）。不安全 → 延后本次折叠（下一轮再试），绝不提交切分配对。
@@ -1729,7 +1988,7 @@ export default {
         }
       } catch { /* 守卫失败不阻断主链 */ }
 
-      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx })
+      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, seqOf: seqMapOf(incremental) })
       if (newRows.length === 0) return { folded: false, reason: 'no-rows' }
       // 【覆盖守卫 · 漂移 #11 的教训】增量里每一个工具结果消息都必须在转录里留下一行 [T]。
       //   少一行 ⇒ 某一类节点被整类跳过（形状漂移的典型症状，真机表现为 205 节点折成 0 行工具记录）。
@@ -1758,8 +2017,8 @@ export default {
       let condenseErr = null // v1.9：浓缩模型调用失败原因（上浮 last-fold → WebUI 展示；质量性回退不在此列）
       let condenseErrKind = null // #9：对 condenseErr 分型（enum），供 WebUI 如实展示错误类别
       if (mode !== 'off') {
-        // 【v1.10.19 · P3 修复】在**最早的时刻**固化 llm 句柄（此刻 ctx 一定还活着：本函数由 turn-stopping
-        //   handler 同步起头，handler 返回后作用域才可能被回收）。后台折叠跑到一半时请求作用域可能已被
+        // 【v1.10.19 · P3 修复】在**最早的时刻**固化 llm 句柄（此刻 ctx 一定还活着：本函数由 turn/end
+        //   handler 起头，handler 返回后作用域才可能被回收）。后台折叠跑到一半时请求作用域可能已被
         //   回收 ⇒ 每次重新 llmOf(ctx) 会越跑越取不到服务（实证：double 每条 [A] 的第 2 次调用 12/12 失败，
         //   而第 1 次成功；调用越慢失败率越高）。固化后随 ioc 一路带下去，不再随作用域回收而丢失。
         const llmFixed = llmOf(ctx)
@@ -1872,15 +2131,7 @@ export default {
             ? headRows.concat(finalRows).join('\n')
             : (standaloneSeg ? finalRows.join('\n') : foldText + '\n' + finalRows.join('\n')))
 
-      const transcriptMsg = {
-        // id 必需：session 持久化校验要求 user/message 携带非空 message id
-        // （session.js assertMessageEventShape: "lacks an identified message" ——
-        //  此前缺失导致会话重启回放时 SessionPersistenceCorruptionError）
-        id: randomUUID(),
-        role: 'user',
-        content: [{ type: 'text', text: segmentsOn ? segNewText : transcript }],
-        source: { kind: 'plugin:CONTEXTinjector' }, // 纪律 4：防自转录
-      }
+      // 折叠检查点消息由 appendFoldCheckpoint 统一构造（compaction 生命周期的承载者）。
       // 【v1.10.13】多段转录：本段只承载"本次增量"，替换区间从"最后一个自身段节点之后"起算
       //   （旧段节点 seq === foldSeq ⇒ 不在增量内 ⇒ 不被覆盖、留在表面）。关闭时 = 旧行为（全部被遮蔽 seq）。
       const shadowedSeqs = segmentsOn ? incremental.map((e) => e.seq) : shadowed.map((e) => e.seq)
@@ -1908,7 +2159,7 @@ export default {
           if (t) ownTexts.push(t)
         }
       }
-      const ownNodeText = ownTexts.length > 0 ? ownTexts.join('\n') : null
+      const ownNodeText = ownTexts.length > 0 ? stripSnapshotRows(ownTexts.join('\n')) : null
       const head200 = foldText.slice(0, 200)
       const foldTextDrift = ownNodeText !== null && foldText !== '' &&
         !(ownNodeText === foldText || ownNodeText.startsWith(foldText) || foldText.startsWith(ownNodeText)) &&
@@ -1939,9 +2190,16 @@ export default {
       //   appendedBytes        本次追加进转录的字节（单段模式=全文重写，但新增只有这么多）
       //   foldRatio            appendedBytes / incrementalRawBytes（<1 才是省）
       const prevTranscriptBytes = (foldText === '' || standaloneSeg) ? 0 : foldText.length
-      const incrementalRawBytes = incremental.reduce((a, e) => a + (isOwnTranscript(e.msg) ? 0 : messageBytes(e.msg).length), 0)
+      const incrementalRawBytes = rawNewBytes // 与微折门槛同源，避免两处口径漂移
       const appendedBytes = Math.max(0, transcriptBytes - prevTranscriptBytes)
       const foldRatio = incrementalRawBytes > 0 ? Number((appendedBytes / incrementalRawBytes).toFixed(4)) : null
+      // 【v1.10.38】同一个会话复用同一个 compactionId：宿主聊天区按 id 建标记节点，
+      //   复用 ⇒ 只有一行「上下文已压缩」在原地更新，而不是每折一次追加一行。
+      //   摘要只放两个比值（<1 表示这次/累计真的省了），不再写“规则折叠 N 条…”的长句。
+      if (!st.compactionId) st.compactionId = randomUUID()
+      const cumRawAfter = (Number.isFinite(st.cumRawBytes) ? st.cumRawBytes : 0) + (segHeadPlan ? headShadowBytes : 0) + incrementalRawBytes
+      const cumRatio = cumRawAfter > 0 ? Number((transcriptBytes / cumRawAfter).toFixed(4)) : null
+      const foldSummary = `本折 ${foldRatio === null ? '—' : foldRatio.toFixed(2)} · 累计 ${cumRatio === null ? '—' : cumRatio.toFixed(2)}`
       // 【0.1.27 · 口径统一】`shrink` 改为**本折**口径（与 foldRatio 同源）：
       //   旧值 transcriptBytes/shadowedBytes 是"累计转录 ÷ 本折遮蔽"，首次折叠时二者同源才显得正常，
       //   增量折叠上结构性 >1（真机 5914%）——那是混合口径，不是压缩比。
@@ -1954,7 +2212,7 @@ export default {
         incrementalCount: incremental.length, shadowedBytes,
         transcriptBytes, shrink: foldShrink, foldShrinkScope: 'this-fold(appended/incrementalRaw)',
         // v1.10.25 经济性口径（见上方注释）：真实请求体量 / 本次新原料 / 本次新增转录 / 本折压缩比
-        prevTranscriptBytes, incrementalRawBytes, appendedBytes, foldRatio,
+        prevTranscriptBytes, incrementalRawBytes, appendedBytes, foldRatio, cumRawAfter: cumRawAfter, cumRatio,
         transcriptHash: hash256(transcript).slice(0, 16),
         monotonic: standaloneSeg ? 'segment' : (foldSeq >= 0 ? transcript.startsWith(foldText) : 'first'),
         lossy: mode !== 'off' ? 1 : 0, mode, aCount: stat?.a ?? 0, aFolded: stat?.folded ?? 0, aFallback: stat?.fallback ?? 0, aKeys: stat?.keys ?? 0,
@@ -1966,7 +2224,7 @@ export default {
         auxCalls: stat?.auxCalls, auxTokens: stat?.auxTokens, auxBilled: stat?.auxBilled,
         paybackHorizon: stat?.paybackHorizon, paybackEst: stat?.paybackEst, paybackMeasured: stat?.paybackMeasured, paybackSkipped: stat?.paybackSkipped,
       })
-      console.log(`[contextinjector] fold-attempt trigger=${trigger} step=${stepNo} turn=${turn} end=${end} shadowed=${shadowedSeqs.length} head=${headSeqs.length}${headSeqs.length ? '(' + headSeqs.join(',') + ')' : ''} +inc=${incremental.length} ${incrementalRawBytes}B->${appendedBytes}B shrink=${foldShrink.toFixed(3)}(this-fold) [累计转录 ${transcriptBytes}B] condense=${mode} monotonic=${foldSeq >= 0 ? transcript.startsWith(foldText) : 'first'}`)
+      console.log(`[contextinjector] fold-attempt trigger=${trigger} step=${stepNo} turn=${turn} end=${end} shadowed=${shadowedSeqs.length} head=${headSeqs.length}${headSeqs.length ? '(' + headSeqs.join(',') + ')' : ''} +inc=${incremental.length} ${incrementalRawBytes}B->${appendedBytes}B ratio=${foldRatio === null ? '-' : foldRatio.toFixed(2)}/${cumRatio === null ? '-' : cumRatio.toFixed(2)} [累计转录 ${transcriptBytes}B] condense=${mode} monotonic=${foldSeq >= 0 ? transcript.startsWith(foldText) : 'first'}`)
       // 【v1.10.20 · 真机事故】提交前的最后一道让路检查（覆盖**所有**触发路径：pre-step 直折不经 scheduleFold）：
       //   DSH compaction 在飞行中时提交 `surfaceOp replace` 会让它的总结作废
       //   （`compaction: session surface changed during summarization`）⇒ 本轮不折，下一轮再折，内容不丢。
@@ -1981,10 +2239,13 @@ export default {
         //   新段的区间从"最后一个段节点之后"起算（既有段留在表面 ⇒ 拼起来才是完整转录）。
         //   中间状态必须先写回 st：若第二段失败，catch 会清空状态强制重新 seed（从表面真值重建）。
         if (segHeadPlan) {
-          const headMsg = { id: randomUUID(), role: 'user', content: [{ type: 'text', text: segHeadPlan.text }], source: { kind: 'plugin:CONTEXTinjector' } }
-          session.append('user/message', headMsg, {
-            surfaceOp: replaceOp(segHeadPlan.startSeq, segHeadPlan.endSeq),
-            sourceEventSeqs: [...segHeadPlan.seqs],
+          appendFoldCheckpoint(session, {
+            transcript: segHeadPlan.text,
+            shadowedSeqs: segHeadPlan.seqs,
+            turn: trigger === 'pre-step' ? turn : null,
+            shadowedBytes: headShadowBytes,
+            compactionId: st.compactionId,
+            summaryText: foldSummary,
           })
           foldSeq = segHeadPlan.startSeq
           foldText = segHeadPlan.text
@@ -1992,12 +2253,15 @@ export default {
           st.lastSegSeq = foldSeq
           console.log(`[contextinjector] segments head 段已提交 seq=${segHeadPlan.startSeq}..${segHeadPlan.endSeq} ${segHeadPlan.text.length}B（首轮补录同时遮蔽 ⇒ 该段文本在请求里不再出现两遍）`)
         }
-        session.append('user/message', transcriptMsg, {
-          // start 必须是真实存在的首个被遮蔽 seq（surface 节点 seq 未必从 0 起）；
-          // 区间 [start..endSeq] 连续，sourceEventSeqs 覆盖每个被遮蔽 seq（实证 P1 同款参数）
-          surfaceOp: replaceOp(shadowedSeqs[0], shadowedSeqs[shadowedSeqs.length - 1]),
-          sourceEventSeqs: [...shadowedSeqs],
+        appendFoldCheckpoint(session, {
+          transcript: segmentsOn ? segNewText : transcript,
+          shadowedSeqs,
+          turn: trigger === 'pre-step' ? turn : null,
+          shadowedBytes,
+          compactionId: st.compactionId,
+          summaryText: foldSummary,
         })
+        st.cumRawBytes = cumRawAfter
         foldSeq = shadowedSeqs[0] // 折叠消息占据 start seq；其后 append 的节点归下次增量
         foldText = transcript
         foldRound = roundState.n
@@ -2016,7 +2280,7 @@ export default {
         //   本字段与 tools/measure-prompt-surface.mjs 的不变量判据互为交叉校验。
         const liveBytes = Array.isArray(after) ? after.reduce((a, e) => a + (Number(e.bytes) || 0), 0) : null
         rawAppend(sid, incremental) // raw 权威存证：每次成功折叠把被遮蔽增量原文全量落盘（无论是否 lossy）
-        log('fold-committed', { trigger, step: stepNo, after, liveBytes, incrementalRawBytes, appendedBytes, foldRatio })
+        log('fold-committed', { trigger, step: stepNo, after, liveBytes, incrementalRawBytes, appendedBytes, foldRatio, cumRatio })
         console.log(`[contextinjector] fold trigger=${trigger} @step${stepNo}: ${incrementalRawBytes}->${appendedBytes} B (${(1 / Math.max(1e-9, foldShrink)).toFixed(2)}x), round=${foldRound}${mode !== 'off' ? ` condense[${mode}]:[A]${stat?.folded ?? 0}/${stat?.a ?? 0}` : ''}`)
         // 【v1.10.5 ★必须-1】折叠索引（只追加，供 LogCompiler K 做 seq ↔ 转录累计行号双向溯源）
         
@@ -2034,7 +2298,7 @@ try {
           shadowedBytes, transcriptBytes, shrink: foldShrink, foldShrinkScope: 'this-fold(appended/incrementalRaw)',
           // 【v1.10.25】`shrink` 保留（面板/历史消费方零改动），但它**不是收益指标**：单段模式下
           //   被替换集含上一版转录节点本身 ⇒ 结构上恒 ≈1（实测 0.998）。真正的收益看下面四个量：
-          liveBytes, incrementalRawBytes, appendedBytes, foldRatio,
+          liveBytes, incrementalRawBytes, appendedBytes, foldRatio, cumRatio,
           headSeqs, headBytes, // v1.10.1：本次折叠补录的头部节点；v1.10.13 起多段转录下该段**同时被遮蔽**（不再重复）
           transcriptHash: hash256(transcript).slice(0, 16),
           // v1.10.13 多段转录：新增 `segments`/`segCount`（`full` 仍 = 全部段按序拼接 ⇒ 面板与协作方零改动）
@@ -2066,7 +2330,7 @@ try {
         //   处理：清空本会话状态并允许重新 seed —— seed 按 seq 拼接**全部**段节点（表面真值）⇒ 下轮自动重建。
         //   绝不留"foldText 指向表面已不存在的文本"这种静默错误状态。
         if (segmentsOn) {
-          try { st.foldText = ''; st.foldSeq = -1; st.seedChecked = false; st.segCount = 0; st.lastSegSeq = -1 } catch { /* ignore */ }
+          try { st.foldText = ''; st.foldSeq = -1; st.seedChecked = false; st.segCount = 0; st.lastSegSeq = -1; st.cumRawBytes = 0 } catch { /* ignore */ }
           console.log('[contextinjector] segments 提交失败 ⇒ 已清空会话状态，下次折叠重新 seed（从表面真值重建 foldText）')
         }
         return { folded: false, reason: 'append-failed' }
@@ -2074,10 +2338,9 @@ try {
       return { folded: true, mode, trigger, round: foldRound, shadowedBytes, transcriptBytes, stat }
     }
 
-    // ── 在飞折叠登记（【#6】turn-stopping 排队 → pre-step join）【取自 RCS-0.1.0】──────
-    // 为什么后台折：agent/turn-stopping 是 serial 派发（DSH 会 await 全部 handler），若在钩子里同步等
-    //   浓缩模型（本地 4B 约 7–18s）会拖住"本轮结束"。故这里只登记后台任务，
-    //   pre-step 在真正发请求前 join（**带超时**，见 joinFoldInFlight），
+    // ── 在飞折叠登记（turn/end 排队 → pre-step join）【取自 RCS-0.1.0】──────────────
+    // 为什么后台折：浓缩模型（本地 4B 约 7–18s，实测一次 60.1s）绝不能挡在用户下一轮前面。
+    //   故轮末只登记后台任务，pre-step 在真正发请求前 join（**带超时**，见 joinFoldInFlight），
     //   保证请求看到的一定是已折叠 surface，且永不被慢模型卡住。
     const foldInFlight = new Map() // sid -> Promise
     // 同一会话已有折叠在飞 → 复用（不重复排队；下一轮/下一轮结束会再试）
@@ -2091,7 +2354,7 @@ try {
         return null
       }
       // 【在飞标记】不在这里写/删了（v1.10.2）：改由 foldAttempt 入口写、finally 删 —— 那条路径覆盖
-      //   pre-step 直折 / turn-stopping 排队 / 将来任何新触发点，而本函数只覆盖后者（这正是真机 bug）。
+      //   所有调用点（轮末排队 / TEST_ROUND 直折），而本函数只覆盖前者（这正是真机 bug）。
       //   本处也不再需要"落定即删"：foldAttempt 的 finally 就是唯一的删除点；而上面 prev 去重分支**不会**
       //   写标记（它复用别人已登记的 Promise，那个折叠自己的 finally 负责删）⇒ 不存在留下"永久压缩中"的路径。
       const p = (async () => {
@@ -2124,7 +2387,7 @@ try {
       if (out.timedOut) console.log(`[contextinjector] fold-join-timeout step=${stepNo} sid=${sid} wait=${out.waitMs}ms>=${ms}ms (后台折叠仍在飞；本轮用当前 surface，折叠结果稍后落地)`)
       return out
     }
-    // turn-stopping 的廉价预检：surface 上还有"上次折叠之后"的节点才值得排队（否则纯属浪费一次调度）
+    // 轮末的廉价预检：surface 上还有"上次折叠之后"的节点才值得排队（否则纯属浪费一次调度）
     function hasFoldCandidate(session, surface, sid) {
       try {
         const st = stateOf(sid)
@@ -2137,51 +2400,7 @@ try {
     // #6 折叠时机**不缓存生效值**：与本模块其它 control 项（keepInject / condenseMinBytes / prompts）同规矩，
     //   每次触发现读 control.json（改档无需重启）；gate 在时点未知，故此处不对 ON/OFF 作断言。
 
-    // ── 触发点 1：round 边界（原有行为 + 【#6】join 在飞折叠）────────────────────
-    ctx.on('agent/pre-step', async ({ agent, messages, turn, step: stepNo, signal }, next) => {
-      const claimed = messages?.length ?? 0
-      try {
-        const session = agent?.session
-        const surface = session?.surface
-        if (!session || !surface) { logFoldSkip('turn-end', 'no-session-or-surface', session ? sessionIdOf(session) : null); return } next()
-        const sid = sessionIdOf(session)
-        const ctrl = readControl()
-        const gate = gateFor(sid, ctrl, session).gate
-        // 轮级诊断（claimed>0 每轮一条）：web 终端可见 —— 用于定位 pre-step 是否到达 / sid 与白名单是否匹配
-        if (claimed > 0) console.log(`[contextinjector] round step=${stepNo} turn=${turn} sid=${sid} gate=${gate} enabled=${ctrl?.enabled === true} whitelist=${JSON.stringify(ctrl?.sessions ?? [])}`)
-        if (gate === 'off') return next() // 未启用：完全旁路（默认；仅被 WebUI 白名单选中的 session 才会折叠）
-        if (TRACE) {
-          try { log('trace', { step: stepNo, turn, claimed, transcript: transcriptNodesOf(session.deriveMessages()) }) } catch { /* best-effort */ }
-        }
-        // 【#6】先 join"上一轮结束即折"的在飞折叠（**带超时**，绝不阻塞本轮）：保证本次请求看到已折叠 surface。
-        //   放在 next() 之前：next() 就拿当前 surface 组装请求，join 得越早越好。
-        //   关闭 turn-end 折时跳过 join（无在飞任务可言）；超时值每次现读 control（热改生效）。
-        if (foldAtTurnEndOn(ctrl)) await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
-        const decision = await next()
-        if (claimed === 0 && !TEST_ROUND) return decision // 纪律 3：round 边界才折；TEST_ROUND 供 headless 回归
-        // TEST_ROUND 单次折叠由 foldAttempt 内 `TEST_ROUND && foldedOnce` 守卫（两个触发点共用同一守卫）
-        // 注意：这里是**直接调用**（不经 scheduleFold）⇒ 「压缩中」在飞标记已收口在 foldAttempt 内部，
-        //   否则本路径（用户实际走的 pre-step 折）在面板上永远没有指示（v1.10.2 修复）。
-        await foldAttempt({ session, surface, sid, ctrl, gate, stepNo, turn, claimed, trigger: 'pre-step' })
-        return decision
-      } catch (err) {
-        log('handler-error', { error: String(err?.message ?? err) })
-        return next()
-      }
-    })
-
-    // ── 触发点 2：【#6 压缩时机提前】本轮 AI 输出结束即压（后台）───────────────────
-    // 语义：DSH 在"本轮真正结束且无待处理 next-step"时派发 agent/turn-stopping
-    //   （payload `{agent, turn, signal}`，dispatch.serial 派发，无 next —— 见本机验证
-    //   dsh-agent-loop/lib/index.js:565 + dsh-agent runtime-types.d.ts:301 + dsh-scope/invariant.js:21）。
-    //   此刻本轮的 assistant/tool 内容已闭合，可安全折叠；把浓缩模型调用挪到"用户读回复"的间隙，
-    //   折叠结果当场落 last-fold.json → 面板与 LOG 立即刷新（用户诉求："压缩完成就先进入 LOG 并渲染在 WEB"），
-    //   下一轮 pre-step 几乎零成本（只需 join，且 join 有超时）。
-    // 安全性：与 pre-step 完全同一套边界钳制 + pairSplitIds 跨界守卫；且只在"确实有可折内容"时才排队，
-    //   避免与紧随其后的 pre-step 重复排队一次无意义的折叠。
-    // 【v1.10.4】turn-stopping 的每个静默 return 都改成可诊断（同一 sid+原因只记一次，不刷屏）：
-//   实测用户会话最近 8 次折叠全是 pre-step、turn-stopping 0 次，而旧实现 5 处 return 全是静默，
-//   无法判断"钩子没被派发"还是"被预检挡下"。现在每次挡下都留一行 turn-stopping-skip reason=…
+    // 触发点被挡下时留一行可诊断日志（同一 sid+原因只记一次，不刷屏）。
     const _foldSkipLogged = new Set()
     const logFoldSkip = (where, reason, sid, extra) => {
       try {
@@ -2191,30 +2410,53 @@ try {
         console.log(`[contextinjector] ${where}-skip reason=${reason} sid=${sid ?? '-'}${extra ? ' ' + extra : ''}`)
       } catch { /* 诊断失败绝不影响折叠 */ }
     }
-    ctx.on('agent/turn-stopping', ({ agent, turn, signal }) => {
-      let sid = null
+
+    // ── 触发点 1：round 边界 —— **只 join，绝不折叠** ────────────────────────────
+    // 实测（2026-10-22 session-3655c2fe）：旧实现在 next() 之后同步 await foldAttempt，
+    // 一次 748B 的浓缩跑了 60.1s，用户发消息后要等它结束才开始回答。折叠的唯一生产者是
+    // 轮末（turn/end）后台任务；这里只做两件事：join 在飞折叠（带超时）、原样放行请求。
+    // next() 必须在**所有路径**上恰好调用一次（包括 join 抛错）——故放到 try 之外。
+    ctx.on('agent/pre-step', async ({ agent, messages, turn, step: stepNo }, next) => {
+      const claimed = messages?.length ?? 0
+      let testFold = null
       try {
-        if (signal?.aborted) { logFoldSkip('turn-stopping', 'aborted', sid); return }
         const session = agent?.session
         const surface = session?.surface
-        if (!session || !surface) { logFoldSkip('turn-stopping', 'no-session-or-surface', sid); return }
-        sid = sessionIdOf(session)
-        const ctrl = readControl()
-        if (!foldAtTurnEndOn(ctrl)) { logFoldSkip('turn-stopping', 'switch-off', sid); return } // control.foldAtTurnEnd=false 或 env=0
-        const gate = gateFor(sid, ctrl, session).gate
-        if (!foldGateOpen(ctrl, gate)) { logFoldSkip('turn-stopping', 'gate-' + gate, sid); return } // 子代理(gate=off)/未门控
-        if (!hasFoldCandidate(session, surface, sid)) { logFoldSkip('turn-stopping', 'no-candidate', sid); return }
-        void scheduleFold({ session, surface, sid, ctrl, gate, stepNo: 0, turn, claimed: 0, trigger: 'turn-stopping' })
+        if (!session || !surface) {
+          logFoldSkip('pre-step', 'no-session-or-surface', session ? sessionIdOf(session) : null)
+        } else {
+          const sid = sessionIdOf(session)
+          const ctrl = readControl()
+          const gate = gateFor(sid, ctrl, session).gate
+          // 轮级诊断（claimed>0 每轮一条）：web 终端可见 —— 用于定位 pre-step 是否到达 / sid 与白名单是否匹配
+          if (claimed > 0) console.log(`[contextinjector] round step=${stepNo} turn=${turn} sid=${sid} gate=${gate} enabled=${ctrl?.enabled === true} whitelist=${JSON.stringify(ctrl?.sessions ?? [])}`)
+          if (gate !== 'off') {
+            if (TRACE) {
+              try { log('trace', { step: stepNo, turn, claimed, transcript: transcriptNodesOf(session.deriveMessages()) }) } catch { /* best-effort */ }
+            }
+            // 放在 next() 之前：next() 就拿当前 surface 组装请求，join 得越早越好。
+            // 超时上限由 foldJoinTimeoutMs 钉死（缺省 3s）——后台折叠再慢也拖不住本轮。
+            await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
+            // 回归通道（缺省关）：headless 单轮没有 turn/end 事件，仍允许在 pre-step 同步折一次。
+            // 必须在 next() **之后**折（那时本轮 [A] 才在 surface 上）；生产路径不会走到这里。
+            if (TEST_ROUND) testFold = { session, surface, sid, ctrl, gate, stepNo, turn, claimed }
+          }
+        }
       } catch (err) {
-        console.error('[contextinjector] turn-stopping schedule failed:', err?.message ?? err)
+        log('handler-error', { error: String(err?.message ?? err) })
       }
+      const decision = await next()
+      if (testFold) {
+        try { await foldAttempt({ ...testFold, trigger: 'pre-step' }) } catch (err) { log('handler-error', { error: String(err?.message ?? err) }) }
+      }
+      return decision
     })
 
-    // ── 触发点 3：【v1.10.4】turn/end 兜底后台折（不依赖 turn-stopping 是否被派发）──────────
-    // agent/turn-stopping 只在"本轮真正结束且 inbox 无待处理 next-step"时由 DSH 派发；实测本机流程
-    // （EXTREASON 会往父会话塞 settled/steer，形成 next-step）几乎不触发 ⇒ 压缩全部退回 pre-step 同步等待。
-    // turn/end 是**必然发生**的会话事件，这里 debounce 400ms 等 surface 落定后登记后台折叠；
-    // 与 turn-stopping 共用同一 scheduleFold / gate / foldAttempt，只是 trigger 名字不同。
+    // ── 触发点 2：turn/end 后台折（**唯一的生产折叠触发点**）──────────────────────
+    // turn/end 是必然发生的会话事件。debounce 400ms 等 surface 落定后登记后台折叠；
+    // 折叠结果落 last-fold.json → 面板与 LOG 立即刷新，下一轮 pre-step 只需 join。
+    // 旧的 agent/turn-stopping 触发点已删除：本栈实测它 0 次有效折叠（EXTREASON 的 next-step
+    // 让它几乎不派发），留着只会制造第二套并行状态。现在同一时刻最多一个后台折叠。
     const _turnEndTimers = new Map() // sid -> timer
     // 【v1.10.20 · 真机事故 2026-09-12（session-0cea2d8f，会话被撑到 830K token 后 DSH 触发自带 compaction）】
     //   DSH 的 compaction 会先 snapshot surface、再让模型总结，结束时校验"surface 没变"；而我们的折叠
@@ -2230,14 +2472,22 @@ try {
           : (a && typeof a === 'object' && typeof a.type === 'string' ? a : null)
         if (!ev) return
         if (ev.type !== 'compaction/start' && ev.type !== 'compaction/end') return
+        if (isSelfCompactionId(ev?.data?.compactionId)) return // 自己提交的折叠生命周期，不需要让路
         const session = (a && (a.id || a.sessionId || a.surface)) ? a : (ev.session ?? a?.session ?? null)
         const sid = sessionIdOf(session) ?? ev?.data?.sessionId ?? null
         if (!sid) return
+        const bare = sanitizeSid(String(sid).replace(/^session-?/i, ''))
+        const nativeFile = join(NATIVE_COMPACTION_DIR, bare + '.json')
         if (ev.type === 'compaction/start') {
           _compacting.add(sid)
+          try {
+            mkdirSync(NATIVE_COMPACTION_DIR, { recursive: true })
+            writeFileSync(nativeFile, JSON.stringify({ sessionId: sid, startedAt: Date.now() }) + '\n', 'utf8')
+          } catch { /* 观测面 */ }
           console.log(`[contextinjector] DSH compaction 开始（sid=${sid}）⇒ 让路：本次不提交折叠，避免 "surface changed during summarization"`)
         } else {
           _compacting.delete(sid)
+          try { rmSync(nativeFile, { force: true }) } catch { /* 观测面 */ }
           console.log(`[contextinjector] DSH compaction 结束（sid=${sid}${ev?.data?.error ? ' err=' + String(ev.data.error).slice(0, 80) : ''}）`)
         }
       } catch { /* 观测面永不抛 */ }
@@ -2274,4 +2524,4 @@ try {
   },
 }
 // 测试/诊断句柄（named export 不影响 cordis 按 default 加载插件）
-export { writeFoldIndex, condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
+export { writeFoldIndex, condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, foldMinShadowBytesOf, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }

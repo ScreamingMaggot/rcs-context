@@ -12,7 +12,7 @@ contextinjector-webui（「注入」面板）** 一起装进 DeepSeek Harness（
 > 本包版本 / 来源提交 / 构建时间见同目录 **`version.json`**；本版改动与保留项见
 > **`RCS-0.1.27-改进与保留项.txt`**（历史各版同目录）。
 
-> **兼容性（dshTarget: 0.2.0-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` 三代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名，宿主装载与真实会话使用均已验证。安装方式见下节：**包安装**（`dsh plugin add`，0.1.25 起支持）或 **install.ps1**（离线 / 无 pnpm 环境）。
+> **兼容性（dshTarget: 0.2.1-rc.2）**：插件含**多代兼容层**——同一份文件同时适配 `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.2` 四代宿主接口（消息来源标记 / 事件枚举 / 子代理接口 / 工具结果形状四族差异均为双形态实现）。对 0.2.0-rc.2 的核验：14 个关键宿主包中 10 个逐字节相同（含 `dsh-session-format`、`dsh-session-projection`、`dsh-tool-subagent*`），插件侧依赖的 16 条接缝 0 条消失、0 条改名。0.2.1-rc.2 已实测：五插件全部装载；`session/event`（含独立 `tool/call`/`tool/result`）、`agent/pre-step`、`ctx.tools`、`ctx.slots`、`webServer`、`requestHeader`、`ownEvents` 均正常；记忆目录注入、`memory_catalog` 调用、轻 LLM 编译、真实折叠（`3714B → 186B`）与 LOGcompiler 转录均通过。0.2.1 的 `llm` 服务可能在本插件 `apply` 之后才挂载，诊断行已改为 1s 复查（运行时本就每轮惰性解析，折叠实测 `via=ollama/qwen3`）。安装方式见下节：**包安装**（`dsh plugin add`，0.1.25 起支持）或 **install.ps1**（离线 / 无 pnpm 环境）。
 > 已验证：`0.1.7-rc.2`（session-format v4 全链路，含折叠提交与审计）。
 - 折叠的**内容完整性**由提交前守卫保证：其中一条专门比对"被折叠的工具结果数 ↔ 转录里留下的工具记录数"，少一行就整次拒绝、本轮按原文发送（0.1.23 起；动机见 `RCS-0.1.23-改进与保留项.txt`）。
 > 注意：新宿主的 `dsh_plugin_packages` 请求扩展与『改写历史』的折叠互斥，折叠档位需按 `RCS-0.1.21-改进与保留项.txt` 的 09-27 补录在 profile 层关闭该扩展（安装脚本已处理）。
@@ -22,7 +22,8 @@ contextinjector-webui（「注入」面板）** 一起装进 DeepSeek Harness（
 ├── web/                        插件本体（进 profiles/web/）
 │   ├── contextinjector.mjs     注入折叠插件
 │   ├── logcompiler.mjs         转录日志插件
-│   └── extreason.mjs           外置推理插件（EXTREASON）
+│   ├── extreason.mjs           外置推理插件（EXTREASON）
+│   └── memory.mjs              外部记忆（实验，默认关）
 ├── condense/chunk.mjs,ivr.mjs  共享纯模块（转录分型 / 压缩器 IO 比）
 ├── toolfold/toolfold.mjs       工具结果折叠（被上面两个 import）
 ├── contextinjector-webui/      WebUI 面板 npm 包（host /api + client 注入）
@@ -52,8 +53,9 @@ dsh plugin --profile web add github:ScreamingMaggot/rcs-context
 # 最后重启 dsh web
 ```
 
-装成功并激活后，启动日志里应出现四条装载行（`[CONTEXTinjector] armed …` / `[logcompiler] v3 …`
-/ `[EXTREASON] armed …` / `[contextinjector-webui] … ready`）。没有这四行 = 层没被选中。
+装成功并激活后，启动日志里应出现四条基础装载行（`[CONTEXTinjector] armed …` / `[logcompiler] v3 …`
+/ `[EXTREASON] armed …` / `[contextinjector-webui] … ready`）；另有一条 `[MEMORY] armed|disabled`（默认关）。
+没有这些行 = 层没被选中。
 
 **方式二：install.ps1 直装（离线 / 无 pnpm 环境）**
 
@@ -179,10 +181,66 @@ llm-pi-ai:
 > 实验功能，默认 **OFF**，不影响既有行为。开启后，折叠历史里的工具结果会从 `[T] tool|path|OK`
 > 升级为结构化短行 `[T] <域>|<action>|<target>|OK|P0–P3|<k=v>…` 并追加值保真链 `[V]`：
 > read 保留 `size/sha8/lines`、edit/write 失败把 err 原文入 [V]、glob/grep 留 `pattern/count/matches≤K`、
-> bash 留 `head/tail/tee`、**ask_user 答复 P3 逐字入 [V]**（不可重建）。
+> bash 留 `head/tail/tee`、`working_directory` 留 `cd=` 与返回的 `cwd=`、**ask_user 答复 P3 逐字入 [V]**（不可重建）。
 > 开启方法：装好后在会话「注入」tab → 右栏「当前会话」卡 → 先为本会话选一个压缩档
 > （工具折叠/单压缩/双压缩，让它进入折叠），再打开下方 **「工具结果结构化折叠（实验）」** 开关。
 > 纯规则、无 LLM；有 token 成本，仅在你开启的会话生效。若内测发现问题，把现象/转录反馈即可。
+>
+> **可逆性（v1.10.33+）**：每条 `[T]` 末尾带 `raw=<seq>`，指向被遮蔽事件在 `.ctxinjector/raw/<sid>.jsonl`
+> 中的序号；`write` / `edit` / `str_replace_editor` 另带 `call=<seq>`（工具调用消息），展开即得实际 patch 参数。
+> 模型可用只读工具 `transcript_expand { seq, maxChars? }` 取回原文（默认 4000 字符，上限 20000）。
+> 未命中专用规则的工具（`web_fetch` / `web_search` / `skill` / `present` 等）不再只留 status，而是保留
+> `out_n` + 有界 `head/tail`（超过 200 字符标 `trunc=mid`）；`read` 折叠保留**有界正文预览**：首 24 行 /
+> 800 字 + 末 8 行 / 280 字 + 代码结构大纲（函数/类/标题，≤320 字），超长时标 `trunc=mid`，
+> 完整原文仍可经 `raw` 精确展开；`edit`/`write` 另记 `del`/`ins` 行数（有界统计，不回流 patch 正文）。
+> 预览与统计均为纯规则、不调用模型；实测 `尸检.py`（8365B）折叠后 1141B 且保留结构。
+> 大纲是行级词法抽取而非 AST：按扩展名分规则，支持多行签名拼接、箭头函数与 IIFE 区分、类/impl
+> 上下文前缀（`Class.method`），剔除注释与单行函数体；仍受 8 项 / 320 字上限。真机 10 个文件、
+> 388 个声明的复算：74 个输出项全部对应真实声明（precision 100%），前 8 项覆盖 72/74（其余两项是
+> 第 9 个之后的声明，受上限所限）；大文件单次约 2.5–10ms。漏报/误报只影响“目录页”，正文仍在
+> `head/tail` 与 `raw=<seq>`。
+>
+> **WebUI 可见性（0.1.33 起）**：DSH 聊天页只把 `surfaceOp="append"` 的消息当人类转录、把 `replace`
+> 副本当模型专用。折叠因此改用宿主 compaction 协议提交：`compaction/start` → `compaction/summary`
+> → `source.kind="compact-checkpoint"` 的替换消息 → `compaction/end`。**宿主自带的「上下文已压缩」行
+> 已由插件 CSS 隐藏**，改由输入框左侧状态胶囊自绘：
+> - 折叠完成后一行中性文字 **「本折 98% · 累计 62%」**（`<1` = 省；悬停显示小数口径）；
+> - 折叠在飞：琥珀脉冲 **「压缩中 Ns」**；宿主原生 compaction 在飞：**「原生压缩中」**；
+> - 记忆编译在飞：**「记忆编译中」**；成功后 30s 内 **「记忆 +N」**。
+>
+> 胶囊只在有状态时渲染，同一事件的状态原地更新，不追加行。被折叠轮的**原始助手正文仍在人类转录里
+> 可见**；模型侧只看到检查点消息与保留节点。**同一会话复用同一个 `compactionId`**，聊天区只维护
+> 一条检查点（原地更新）。`[S]` 快照行不再进入折叠转录，续传时会清掉旧残留。
+> 0.1.28 之前已折叠过的轮次仍带着旧的裸 `replace` 副本（日志不可改写），新发生的折叠不受影响。
+> 原文始终在 `.ctxinjector/raw/`，压缩转录可在 `transcripts/` 或「注入」面板查看。
+
+## 外部记忆（实验，默认关）
+
+订阅 `session/event`，把工具结果、真人用户轮和任务锚点确定性抽取成 SQLite 记录；不调用任何模型。
+**启用**：`DSH_MEMORY=1`，或在 `$DSH_HOME/state-compiler/control.json` 写 `"memoryEnabled": true`，然后重启 `dsh web`。
+数据：`$DSH_HOME/state-compiler/memory/memory.sqlite`（`events` 追加、`records` 当前视图、`meta` 游标）。
+模型可见的只读工具：
+
+- `memory_catalog` — 当前会话有哪些记录种类/键；
+- `memory_search` — 按文本、精确键或种类检索；
+- `memory_get` — 取一条记录；`includeRaw=true` 时按 `(sid, seq)` 回解 raw 原文预览。
+
+记录种类：`file_state` / `command` / `search` / `error` / `user_answer` / `job` / `task` / `user_turn` / `insight` / `tool_unknown`。
+每条记录带 `(sid, seq, callId)` 源指针；同一 `(sid, seq, kind, key)` 只写一次（重放幂等）。
+**生命周期**：同类调用成功后，之前同一主键的 `error` 自动转为 `resolved`（记录保留、带 `resolvedBy`，默认检索隐藏，`status:'all'` 可查）；Windows 下 `type` 等命令即使 `exit=0` 也会把"找不到路径"打在输出里，按输出强特征额外记 `error`；`memory_get` 对 `file_state` 现场 stat 并返回 `fresh.changed`。
+**作用域**：项目事实（文件、命令、检索、错误、任务、答复）按工作区（会话 `cwd`）共享——同一目录下的多个会话看到同一份当前视图，后写覆盖前写；`user_turn` 仍按会话隔离。三个工具都接受 `scope: project|session`，默认 `project`（本工作区事实 ∪ 本会话轮次），`session` 只看本会话。没有 `cwd` 时自动退化为会话级。旧版数据库在启动时自动迁移（`scope` 列回填为 `sess:<sid>`）。
+
+**轻 LLM 编译层（实验，默认关）**：`DSH_MEMORY_LLM=1` 或 `control.json { "memoryLlmEnabled": true }`（依赖 `memoryEnabled`）。
+在每个**活轮结束**（`turn/end`）时，把上次编译之后的新事件（最多 40 条、预算 4000 字符，含一条真人轮即可触发）交给会话当前模型做一次小上下文调用，产出 `kind='insight'` 记录（稳定 key + 摘要 + 证据事件 id + 置信度），写入工作区作用域。
+纪律：只在模型正常结束且 JSON 可解析时推进 `llmThrough:<sid>` 游标；失败进入 60s 冷却且候选保留；补课（历史会话首次装载）不触发编译；最多 4 条/次。默认跟随会话当前模型；可在「记忆」面板的「编译模型」里选任意 provider/model（写入 `control.memoryLlmProvider` / `control.memoryLlmModel`，选择「跟随会话模型」即清除），也可用旧版配置键固定。本地轻模型（如 `ollama-local / qwen3:4b`）可显著降低费用，但 4B 的 JSON 纪律弱于会话模型。
+准入与归并：`pwsh-*` / `cmd:*` / `session-*` 等瞬时执行型 key 直接丢弃；摘要中 ≥3 位数字必须逐字出现在候选原文或现存摘要里（防止小模型把 8848 抄成 8840）；同批近重复与跨 key 近重复归并到一条当前视图（保留较长摘要与较高置信度），归并数写入 `[MEMORY] compiled … merged=` 日志；归一化文本相似但数字集合不同的摘要**不**归并（仅端口号不同也是两条事实）。小模型把 JSON 写成 `{"insights:[]}` 这类缺引号形式时做一次最小修复；用户明确说「记住 / add this into memory」时，把原话逐字落成 `user-memo:*` insight，不依赖模型是否判定为"闲聊"。
+**目录注入（默认开，随记忆层）**：会话第一次 `pre-step` 时把已编译的 **insight 语义摘要**（最多 8 条、每条 ≤100 字）作为 `plugin:MEMORY` 消息追加到决策末尾，模型无需先调用工具即可知道记忆里有什么；注入文本**不出现** kind、计数或 key（`user_turn` 与对话本身重复，也不注入），没有 insight 时不注入。空库不注入、子代理不注入、每会话只注一次（`meta.injected:<sid>`）。关闭：`DSH_MEMORY_INJECT=0` 或 `control.memoryInjectCatalog=false`。该消息被转录分类器判为注入（不计真人轮），折叠侧按注入节点避让。
+语义编译目前是"每轮一次"的最小实现。`node:sqlite` 不可用、写库失败或工具注册失败时整层自动关闭，不影响主会话与折叠。
+**WebUI 观测（会话页「记忆」tab）**：只读快照每 5s 刷新（后台标签页暂停），展示运行状态（运行中/待重启/未启用）、三项开关、**编译模型选择器**（provider + model，留空跟随会话）、活跃/已解决记录、知识洞察（含置信度与证据条数）、作用域分布、当前会话的写入/编译游标、记录构成与最近记录。编译在飞时面板「当前会话」标题旁显示琥珀脉冲「记忆编译中 Ns」（状态标记在 `$STATE_DIR/.memory/compile-inflight/`，结束时删除；最近一次结果留在 `compile-last/`）。三个开关可直接写 `control.json`：
+- 已武装进程内，关掉「记忆层」立即停写（工具仍可读取既有记忆），重新开启后下一事件自动补课停写期间错过的事件；
+- 「轻 LLM 编译」与「目录注入」每轮/每步重读，即时生效；
+- 启动时未加载记忆层（启动前未启用）只能重启后启用；`DSH_MEMORY` / `DSH_MEMORY_LLM` / `DSH_MEMORY_INJECT` 仍然硬覆盖，被锁定的开关在面板中显示「锁定」且不可点击。
+回归：`node tests/memory-extract-store.test.mjs`。
 
 ## 说明 / 数据位置
 - 运行时配置与控制：`$DSH_HOME/state-compiler/`（`control.json`、`logcompiler.control.json`、`last-fold.json`、`transcripts/`、`.ctxinjector/raw/`）。
@@ -209,6 +267,8 @@ powershell -ExecutionPolicy Bypass -File StateCompiler\packaging\smoke-install.p
 | `condenseMinBytes` | 240 | 单条 `[A]` 低于此字节不送浓缩（0 = 全送，注意小值会让折叠变慢：实测 15 曾导致 243s 一次折叠） |
 | `condenseMaxTokens` | 700 | 单条浓缩输出上限 |
 | `condenseBudgetMs` / `condenseMaxCallsPerFold` | 15000 / 12 | 一次折叠的硬预算（时间长/调用多即止损回退） |
+| `foldAtTurnEnd` | **ON** | 轮末（`turn/end`）后台折叠，唯一的生产触发点；关掉 ⇒ 完全不折（`pre-step` 只 join） |
+| `foldMinShadowBytes` | 2048 | 新原料低于此值不折，等后续轮累积（`0` = 关闭门槛）；避免微轮每轮都刷检查点 |
 | `foldJoinTimeoutMs` | 3000 | 下一轮发请求前等待后台折叠的上限；超时就先发请求，绝不拖住对话 |
 | `segments` | **OFF** | 多段转录（head 独立成段零重复 + 各段独立留面）。真机已验证，默认关；开启前建议按 NOTES 的样本门槛评估 |
 | `standalone` | **OFF** | 遗留开关（新段不带旧前缀）。其目的已被多段转录覆盖，暂不推荐单开 |

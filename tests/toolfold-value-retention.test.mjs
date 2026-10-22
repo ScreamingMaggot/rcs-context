@@ -85,8 +85,112 @@ check('③ size/lines/sha8 与真实文件一致（不采信正文）',
   fields(r4.t).filter((x) => /^(size|lines|sha8)=/.test(x)).join(' '))
 const r5 = foldOne({ action: 'write', args: { path: realPath }, text: 'ok', fs: fsStub })
 check('③ write 也带 size 与 sha8（写后可核）', /size=\d+/.test(r5.t) && /sha8=[0-9a-f]{8}/.test(r5.t), r5.t.slice(0, 110))
+const rEdit = foldOne({ action: 'edit', args: { path: realPath, old_string: 'a\nb\nc', new_string: 'a\nB\nc\nd\ne' }, text: 'ok', fs: fsStub })
+check('③ edit 带精确行数增减（del/ins），不摘写正文',
+  rEdit.t.includes('del=3') && rEdit.t.includes('ins=5') && !rEdit.t.includes('old_string'),
+  rEdit.t)
+const rWrite = foldOne({ action: 'write', args: { path: realPath, content: '1\n2\n3\n4' }, text: 'ok', fs: fsStub })
+check('③ write 带写入行数（ins），不回流全文',
+  rWrite.t.includes('ins=4') && !rWrite.t.includes('1\\n2\\n3\\n4'), rWrite.t)
 const r6 = foldOne({ action: 'read', args: { path: realPath }, text: 'x'.repeat(321) })   // 无 fs ⇒ 退回 chars
 check('③ 无 fs 时退回 chars=正文长度（不编 size）', r6.t.includes('chars=321'), r6.t)
+
+/* ── ③b read 预览：8KB 源码不再只剩一行 chars ───────────────────────── */
+const pyLines = []
+for (let i = 0; i < 60; i++) {
+  if (i === 0) pyLines.push('"""module docstring：这一行必须出现在 head"""')
+  else if (i === 8) pyLines.push('class Analyzer:')
+  else if (i === 10) pyLines.push('    def run(self, path):')
+  else if (i === 40) pyLines.push('def main(argv):')
+  else if (i === 45) pyLines.push('def later_one(x):')
+  else if (i === 50) pyLines.push('class LaterTwo:')
+  else pyLines.push(`# filler line ${i} ` + 'x'.repeat(90))
+}
+const bigPy = pyLines.join('\n')
+const rBig = foldOne({ action: 'read', args: { path: 'src/analyzer.py' }, text: bigPy })
+check('③b read 保留 head（开头正文可在折叠行里直接读）',
+  rBig.t.includes('head=') && unesc(fields(rBig.t).find((x) => x.startsWith('head=')).replace(/^head=/, '')).includes('module docstring'), rBig.t.slice(0, 180))
+check('③b read 保留 tail（结尾正文）',
+  rBig.t.includes('tail=') && unesc(fields(rBig.t).find((x) => x.startsWith('tail=')).replace(/^tail=/, '')).includes('filler line 59'),
+  fields(rBig.t).find((x) => x.startsWith('tail=')))
+check('③b 代码文件带结构大纲（class/def）',
+  rBig.t.includes('outline=') && /class Analyzer/.test(rBig.t) && /def main/.test(rBig.t),
+  fields(rBig.t).find((x) => x.startsWith('outline=')))
+check('③b 长正文标 trunc=mid（明示中间被折叠）', rBig.t.includes('trunc=mid'))
+check('③b 预览有界：整行仍远小于原文', rBig.t.length < 2400, 'row=' + rBig.t.length + 'B raw=' + bigPy.length + 'B')
+check('③b 预览行仍是单行（无裸 CR/LF）', !/[\r\n]/.test(rBig.t))
+const rSmall = foldOne({ action: 'read', args: { path: 'src/tiny.py' }, text: 'a=1\nb=2' })
+check('③b 小文件不标截断', !rSmall.t.includes('trunc=mid') && rSmall.t.includes('head='), rSmall.t)
+const hostStyle = ['<path>/x/a.py</path>', '<content>', ...[...Array(40)].map((_, i) => `${i + 1}: ${i === 30 ? 'def run(x):' : i === 35 ? 'class A:' : '# line ' + i}`), '</content>'].join('\n')
+const rHost = foldOne({ action: 'read', args: { path: '/x/a.py' }, text: hostStyle })
+check('③b 宿主 `N: ` 行号前缀不阻断结构大纲',
+  rHost.t.includes('outline=') && /def run/.test(rHost.t) && /class A/.test(rHost.t),
+  fields(rHost.t).find((x) => x.startsWith('outline=')))
+
+/* ── ③c 大纲质量：多行签名、箭头函数、类上下文、按语言分规则 ───────── */
+const outlineOf = (row) => unesc(fields(row.t).find((x) => x.startsWith('outline='))?.replace(/^outline=/, '') ?? '')
+const filler = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} filler ${i} ` + 'y'.repeat(45))
+
+const jsLines = filler(30, 'js')
+jsLines.push('export function alpha(a, b) {', '  return a + b')
+jsLines.push(...filler(8, 'mid'))
+jsLines.push('const beta = (x) =>', '  x * 2')
+jsLines.push(...filler(8, 'mid2'))
+jsLines.push('const notFn = (/x/.exec(s) || []).length')
+jsLines.push(...filler(4, 'mid3'))
+jsLines.push('class Engine {')
+jsLines.push('  run(task, opts) {', '  }', '  stop() {', '  }', '}')
+const rJs = foldOne({ action: 'read', args: { path: 'src/a.mjs' }, text: jsLines.join('\n') })
+const outJs = outlineOf(rJs)
+check('③c 箭头函数进入大纲', /const beta = \(x\) =>/.test(outJs), outJs)
+check('③c 括号表达式常量不误判为函数', !/notFn/.test(outJs), outJs)
+check('③c 多行签名合并为一条', /export function alpha\(a, b\)/.test(outJs), outJs)
+check('③c 类方法带类名前缀', /Engine\.run\(task, opts\)/.test(outJs) && /Engine\.stop\(\)/.test(outJs), outJs)
+
+const pyFiller = (n, tag) => Array.from({ length: n }, (_, i) => `# ${tag} filler ${i} ` + 'y'.repeat(45))
+const pyMultiLines = pyFiller(30, 'py')
+pyMultiLines.push('class Holder:', '    def long_sig(', '        self,', '        a,', '        b,', '    ):')
+pyMultiLines.push(...pyFiller(4, 'pymid'))
+pyMultiLines.push('    def short(self):')
+pyMultiLines.push(...pyFiller(4, 'pymid2'))
+pyMultiLines.push('def top(x,', '        y):')
+const rPyMulti = foldOne({ action: 'read', args: { path: 'src/a.py' }, text: pyMultiLines.join('\n') })
+const outPy = outlineOf(rPyMulti)
+check('③c Python 多行 def 合并并保留类前缀',
+  /Holder\.long_sig\(self, a, b\)/.test(outPy) && /def top\(x, y\)/.test(outPy), outPy)
+check('③c Python 类方法不重复写 def', !/def Holder\./.test(outPy) && /Holder\.short\(self\)/.test(outPy), outPy)
+
+const advLines = filler(30, 'adv')
+advLines.push('const NOT_A_FN = (() => { return 1 })()')
+advLines.push('export function f(a, opts = {}) { return a }')
+advLines.push('class Box {', '  ping() { return 1 }', '}')
+const rAdv = foldOne({ action: 'read', args: { path: 'src/adv.mjs' }, text: advLines.join('\n') })
+const outAdv = outlineOf(rAdv)
+check('③c IIFE 不误判为命名函数', !/NOT_A_FN/.test(outAdv), outAdv)
+check('③c 参数默认对象不被当函数体截断', /export function f\(a, opts = \{\}\)/.test(outAdv), outAdv)
+check('③c 单行方法体也能识别并带类名前缀', /Box\.ping\(\)/.test(outAdv), outAdv)
+
+const cLines = filler(30, 'c')
+cLines.push('if (ready) {', '  go();', '}', 'int main(int argc, char** argv) {')
+cLines.push(...filler(5, 'cmid'))
+cLines.push('while (x) {', '}')
+const rC = foldOne({ action: 'read', args: { path: 'src/a.c' }, text: cLines.join('\n') })
+const outC = outlineOf(rC)
+check('③c C 函数保留返回类型与参数', /int main\(int argc, char\*\* argv\)/.test(outC), outC)
+check('③c C 控制语句不进大纲', !/if \(ready\)/.test(outC) && !/while \(x\)/.test(outC), outC)
+
+const mdLines = filler(30, 'md')
+mdLines.push('# Title', '## Section', '#### TooDeep')
+const rMd = foldOne({ action: 'read', args: { path: 'docs/a.md' }, text: mdLines.join('\n') })
+const outMd = outlineOf(rMd)
+check('③c Markdown 只收 1–3 级标题', /# Title/.test(outMd) && /## Section/.test(outMd) && !/TooDeep/.test(outMd), outMd)
+
+const budgetLines = filler(30, 'budget')
+for (let i = 0; i < 30; i++) budgetLines.push(`export function veryLongFunctionName${i}(argumentOne, argumentTwo, argumentThree) {`)
+const rBudget = foldOne({ action: 'read', args: { path: 'src/budget.mjs' }, text: budgetLines.join('\n') })
+const outBudget = outlineOf(rBudget)
+check('③c 大纲有界：≤320 字且不截断半个条目',
+  outBudget.length <= 320 && !outBudget.endsWith(',') && !outBudget.endsWith(' '), 'len=' + outBudget.length + ' ' + outBudget.slice(-40))
 
 /* ── ④ grep/glob：模式保留 + 命中计数 + 截断标记 ─────────────────────── */
 const hits = Array.from({ length: 25 }, (_, i) => `src/f${i}.py:10:  PORT=87${i % 10}`).join('\n')
@@ -112,9 +216,17 @@ check('⑤ 问题文本也被引号包裹保留', r9.t.includes('端口用哪个
 /* ── ⑥ 纯状态类工具：不塞无意义字段，但仍归属正确档位 ───────────────── */
 const r10 = foldOne({ action: 'todo_write', args: { todos: [] }, text: 'updated' })
 check('⑥ 状态类 grade=P0 且 status=OK', fields(r10.t)[4] === 'P0' && fields(r10.t)[3] === 'OK', r10.t)
-check('⑥ 未知工具回退：不抛、有 status、无正文回流',
-  (() => { const r = foldOne({ action: 'brand_new_tool', args: { x: 1 }, text: 'raw body should not leak' });
-           return fields(r.t)[3] === 'OK' && !r.t.includes('raw body should not leak') })())
+check('⑥ 未知工具回退：保留有界预览与总字节数，不回流全文',
+  (() => { const body = 'raw-body-'.repeat(120)
+           const r = foldOne({ action: 'brand_new_tool', args: { x: 1 }, text: body });
+           return fields(r.t)[3] === 'OK' && /out_n=1080/.test(r.t) && /head=/.test(r.t) && /trunc=mid/.test(r.t) && !r.t.includes(body) })())
+const rWeb = foldOne({ action: 'web_fetch', args: { url: 'https://example.com' }, text: 'line\n'.repeat(200), tool: 'web' })
+check('⑥ web_fetch fallback：目标 URL + 有界预览', fields(rWeb.t)[2] === 'https://example.com' && /out_n=1000/.test(rWeb.t) && /head=/.test(rWeb.t) && /tail=/.test(rWeb.t), rWeb.t.slice(0, 120))
+const rWd = foldOne({ action: 'working_directory', args: { cd: '玩' }, text: 'C:\\Users\\Administrator\\Desktop\\PLUGINTESTplace\\玩', tool: 'working_directory' })
+const fWd = parseRow(rWd.t)
+check('⑥ working_directory 记录 cd 与 cwd', !!fWd && fWd.target === '玩' && fWd.fields?.cd === '玩' && /玩/.test(fWd.fields?.cwd || ''), rWd.t)
+const rWd2 = foldOne({ action: 'working_directory', args: {}, text: 'C:\\Users\\Administrator\\Desktop\\PLUGINTESTplace', tool: 'working_directory' })
+check('⑥ 无参 working_directory 仍记录 cwd', parseRow(rWd2.t)?.fields?.cwd === 'C:\\Users\\Administrator\\Desktop\\PLUGINTESTplace', rWd2.t)
 
 /* ── ⑦ 与下游解析器互通：parseRow 两种形态都能读 ─────────────────────── */
 const p1 = parseRow(r1.t.replace(/^\[T\] /, '')) || parseRow(r1.t)
@@ -122,6 +234,8 @@ check('⑦ parseRow 认结构化行（≥5 字段）', p1 && (p1.status === 'OK'
 const legacy = parseRow('[T] read | src/a.py | OK')
 check('⑦ parseRow 也认注入器的三字段稀疏行（旧实现恒 null 的病灶）',
   !!legacy && (legacy.status === 'OK' || legacy.op === 'read' || JSON.stringify(legacy).includes('OK')), JSON.stringify(legacy).slice(0, 80))
+const plainRaw = parseRow('[T] read | src/a.py | OK | raw=42')
+check('⑦ parseRow 容忍 plain raw 指针', !!plainRaw && plainRaw.fields?.raw === '42', JSON.stringify(plainRaw).slice(0, 80))
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

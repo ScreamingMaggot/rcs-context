@@ -2,16 +2,16 @@
     "package": "rcs",
     "name": "RCS",
     "expansion": "Reasoning · Co-work · State  (R=reasoning, S=state, C=co-work)",
-    "version": "0.1.27",
-    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility + drift #11 fix (0.1.7 tool-result shape) + coverage guard + toolfold single-line contract + **package layout (installable as a dsh plugin bundle via dsh.bundle)**",
+    "version": "0.1.34",
+    "branchOf": "StateCompiler 2.2 + EXTREASON v0.3 + DSH session-format v4 compatibility + drift #11 fix (0.1.7 tool-result shape) + coverage guard + toolfold single-line contract + **package layout (installable as a dsh plugin bundle via dsh.bundle)** + **fold visibility (host compaction checkpoint protocol) + snapshot-row cleanup + transcript_expand inject fix** + **read 折叠正文预览（head/tail/代码大纲）+ edit/write del/ins** + **代码大纲词法抽取（多行签名/箭头函数/类前缀/分语言规则）** + **fold trigger subtraction (agent/turn-stopping removed; pre-step join-only; turn/end folds the just-ended round; protectLatestRound dead trigger removed)** + **checkpoint de-dup (one compactionId per session) + foldMinShadowBytes (default 2048) + ratio-only summary** + **plugin-owned status UI (host compaction rows hidden; ratio chip + fold/memory/native pulses)** + **memory compile model override (memoryLlmProvider/Model exposed in WebUI)**",
     "pluginVersions": {
-        "contextinjector": "v1.10.31",
+        "contextinjector": "v1.10.39",
         "extreason": "v0.3 M2",
         "logcompiler": "v3"
     },
     "dshBaseline": "0.1.5-rc.2 (dual-form compatible; verified on both lines)",
-    "dshVerified": "0.1.7-rc.2 + 0.2.0-rc.2",
-    "dshTarget": "0.2.0-rc.2",
+    "dshVerified": "0.1.7-rc.2 + 0.2.0-rc.2 + 0.2.1-rc.2",
+    "dshTarget": "0.2.1-rc.2",
     "license": "MIT",
     "contents": [
         "RCS-0.1.27-改进与保留项.txt",
@@ -42,10 +42,16 @@
         "regression": "node tests/drift11-toolcall-event-index.test.mjs -> 18/18 PASS",
         "realDataReplay": "archived 220 messages of session 5fe3512e -> [T] rows 0 (before) -> 114 (after), 0 degraded",
         "syntax": "node --check on contextinjector/logcompiler in all three copies",
-        "toolfold": "node tests/toolfold-single-line.test.mjs -> ALL PASS (counter-proof: pre-fix escVal emits raw CR)"
+        "toolfold": "node tests/toolfold-single-line.test.mjs -> ALL PASS (counter-proof: pre-fix escVal emits raw CR)",
+        "foldVisibility": "node tests/fold-checkpoint-visible.test.mjs -> 21/21 PASS",
+        "readPreview": "real file 尸检.py 8365B -> folded 1141B with head/tail/outline (def load/sentences/ngrams/main)",
+        "outline": "real data 10 files / 388 declarations: 74 emitted items, precision 100%, first-8 coverage 72/74 (2 misses are 9th+ declarations); 2.5-10ms per 25-187KB file; full suite 19/19, 580/580",
+        "triggerTiming": "node tests/fold-trigger-timing.test.mjs -> 26/26 PASS (pre-step join-only; turn/end folds just-ended round; 200ms join cap; default 2048B threshold; one compactionId across folds; ratio summary); full suite 19/19, 580/580",
+        "statusUI": "src edits only in this copy; live read-only DOM verification recorded in FINDINGS §30; full suite 19/19, 580/580",
+        "memoryLlmRoute": "node tests/memory-route-config.test.mjs -> 9/9 PASS (route + identifier gate); live API write/read ollama-local/qwen3:4b; qwen compile prompt with 2048 token budget -> strict JSON 10-15s, but model-id typo caught by new gate; full suite 20/20, 589/589"
     },
-    "builtAt": "2026-09-30T16:00:24+08:00",
-    "dshCompatNote": "0.2.0-rc.2：14 个关键宿主包中 10 个逐字节相同（含 dsh-session-format / dsh-session-projection / dsh-tool-subagent*），16 条插件侧接缝 0 消失 0 改名；dsh_session_log 配置 schema 收紧（enabled 改 Volatile、maxBytes 必填带默认）不影响本包，drift #10 的 inventory 扩展 schema 未变。装载与真实会话使用已验；npm/git 规格安装尚不可用（仓库根无 package.json），安装路径为 install.ps1。",
+    "builtAt": "2026-10-22T17:40:00+08:00",
+    "dshCompatNote": "0.2.0-rc.2：14 个关键宿主包中 10 个逐字节相同（含 dsh-session-format / dsh-session-projection / dsh-tool-subagent*），16 条插件侧接缝 0 消失 0 改名；dsh_session_log 配置 schema 收紧（enabled 改 Volatile、maxBytes 必填带默认）不影响本包，drift #10 的 inventory 扩展 schema 未变。装载与真实会话使用已验；npm/git 规格安装尚不可用（仓库根无 package.json），安装路径为 install.ps1。0.2.1-rc.2：事件/工具/槽位/WebServer/会话枚举接缝实测不变，目录注入、memory_* 调用、轻 LLM 编译、真实折叠与 LOGcompiler 转录全通过；唯一适配为 llm 服务延迟挂载导致启动诊断误报 ABSENT（已改 1s 复查，运行时折叠仍惰性解析）。",
     "layout": {
         "package": "web/ (contextinjector, logcompiler, extreason) + condense/ + toolfold/ + contextinjector-webui/",
         "bundleLayer": "cordis.patch.yml (root)",
