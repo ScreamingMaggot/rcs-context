@@ -49,10 +49,10 @@ const WRITEISH = ['write', 'edit', 'str_replace', 'multiedit', 'notebook_edit', 
   'todo_write', 'task_create', 'task_update', 'subagent', 'report', 'create_goal', 'update_goal',
   'delete_file', 'apply_patch', 'web_upload', 'browser_click', 'browser_type']
 check('① 白名单逐项固定（改动须显式写理由）',
-  A.READONLY.join(',') === 'read,glob,grep,web_search,memory_catalog,memory_search,memory_get,transcript_expand',
+  A.READONLY.join(',') === 'read,glob,grep,web_search,memory_catalog,memory_search,memory_get,memory_ls,transcript_expand',
   A.READONLY.join(','))
 check('① 取证面含记忆检索与转录展开（只读）',
-  ['memory_catalog', 'memory_search', 'memory_get', 'transcript_expand'].every((n) => A.READONLY.includes(n)),
+  ['memory_catalog', 'memory_search', 'memory_get', 'memory_ls', 'transcript_expand'].every((n) => A.READONLY.includes(n)),
   A.READONLY.join(','))
 check('① 白名单与"写/执行类工具"零交集',
   A.READONLY.filter((n) => WRITEISH.includes(n)).length === 0,

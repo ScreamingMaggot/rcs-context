@@ -152,10 +152,10 @@ check('② rowid 读取也受 sid 约束', store.get({ sid: 'other', rowid: stor
 {
   const tools = makeMemoryTools(store)
   const byName = Object.fromEntries(tools.map((t) => [t.name, t]))
-  const readOnly = ['memory_catalog', 'memory_search', 'memory_get']
+  const readOnly = ['memory_catalog', 'memory_search', 'memory_get', 'memory_ls']
   const writeTools = ['memory_remember', 'memory_forget', 'memory_correct']
-  check('④ 三个只读 + 三个受控写入工具',
-    tools.length === 6 && tools.every((t) => typeof t.output?.render === 'function')
+  check('④ 四个只读 + 三个受控写入工具',
+    tools.length === 7 && tools.every((t) => typeof t.output?.render === 'function')
     && tools.filter((t) => readOnly.includes(t.name)).every((t) => t.isConcurrencySafe() === true)
     && tools.filter((t) => writeTools.includes(t.name)).every((t) => t.isConcurrencySafe() === false))
   const exec = { agent: { session: { id: 'session-s1' } } }

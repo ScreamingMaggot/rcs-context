@@ -79,15 +79,55 @@ llm-pi-ai:
 
 **启用**：`control.json` 写 `"memoryEnabled": true`，重启。
 
-**工具**（前三个只读，后三个受控写入）：
+**工具**（前四个只读，后三个受控写入）：
 - `memory_catalog` — 查看记录种类/键
-- `memory_search` — 按文本/键/种类检索；中文双索引：≥3 字先走 trigram 精确子串，自然问句与两字词走 2-gram + bm25（摘要/标题列权重 30×，正文 1×，完整 value 去重后只进正文列）；多词先 AND，唯一命中直接返回，多条命中用 bigram 分数重排；功能 bigram（能用/用来/什么/怎么等）不计入证据，最强候选只命中 1 个词元时不硬凑，查询点名了索引里不存在的 ASCII 标识符（代号/版本/函数名）时返回空；候选在可见性/状态过滤后再截断，结果按“已编译 insight 优先、再相关度、再时间”排序；`scope=session` 查空时按 `project` 重查一次并返回 `widenedScope:true`
-- `memory_get` — 取单条记录（`includeRaw=true` 回解原文）
+- `memory_search` — 按文本/键/种类检索；可传 `uri` 把检索限定在一个 `rcs://` 目录（rootdir/kinddir/record），kind 目录为空时默认扩大到同一 root 一次并回传 `widenedFrom/scopeFallback/attempts`，`fallback=false` 则严格留在目录内；中文双索引：≥3 字先走 trigram 精确子串，自然问句与两字词走 2-gram + bm25（摘要/标题列权重 30×，正文 1×，完整 value 去重后只进正文列）；多词先 AND，唯一命中直接返回，多条命中用 bigram 分数重排；功能 bigram（能用/用来/什么/怎么等）不计入证据，最强候选只命中 1 个词元时不硬凑，查询点名了索引里不存在的 ASCII 标识符（代号/版本/函数名）时返回空；候选在可见性/状态过滤后再截断，结果按“已编译 insight 优先、再相关度、再时间”排序；insight 结果带 L0 `abstract` 与 `layers:{l0,l1,l2}` 元数据，内部 overview/layer_of/layer_ver 不外泄；`scope=session` 查空时按 `project` 重查一次并返回 `widenedScope:true`
+- `memory_get` — 取单条记录：`kind+key`、`rowid` 或 `uri`；`layer=auto|l0|l1|l2` 分层读取（l0/l1 只回 `view` + 定位元数据，不带 `value`；`includeRaw=true` 自动升级到 l2 并回解原文）
+- `memory_ls` — 以 `rcs://` URI 浏览记忆：默认直达当前工作区，支持 kind 目录分页、tree、字节预算与信任标记；叶子与目录条目带 L0 摘要和 `layers` 元数据，见下节
 - `memory_remember` — 仅在用户最后一条原话明确要求“记住/写入记忆”时可用；文本须逐字出自原话（4–500 字），注入型内容拒收、凭据脱敏
 - `memory_forget` — 仅在用户明确要求忘记时可用；逻辑弃用（`resolved`），不物理删除
 - `memory_correct` — 仅在用户明确更正时可用；新条目带 `supersedes`，旧条目标 `superseded`
 
 每次写入追加 `audit` 记录；没有明确指令一律拒绝，并返回原因。
+
+**URI 寻址（Phase 0）**：每条记录都有确定性的 `rcs://` 地址，把 `(scope, kind, key)` 直接映射为虚拟文件系统路径，模型可以先“看目录”再取正文：
+
+```
+rcs://                                   根（ws / sess 两棵树）
+rcs://ws/                                可见工作区
+rcs://ws/<wsid>/                         记录种类（带 active/total 计数）
+rcs://ws/<wsid>/<kind>/                  记录键（目录视图只给一行摘要）
+rcs://ws/<wsid>/<kind>/<key>             单条记录
+rcs://sess/<sid>/...                     会话私有记录，结构相同
+```
+
+`wsid` 是 `<目录名>-<规范化路径 sha1 前 8 位>`（如 `rcs-windows-3f2a1b4c`），由库内 `uri_roots` 表反查（ingest 时维护，旧库首次打开回填），跨库备份后可复现；key 里的 `/` 与 `:` 保持字面量（`file:c:/proj/src/a.mjs` 仍可读），尾斜杠编码为 `%2F` 以保证地址闭合，`?`/`#` 显式转义。路径形态的 ws 根（如 `rcs://ws/d:/p/`）返回 `bad-root`，不会静默漂移成 kind/key。
+
+**默认与导航**：`memory_ls` 默认直达当前工作区根（kind 目录与 active/total 计数），无 cwd 时退到当前会话根，显式 `uri:"rcs://"` 才看两棵树；根/错误回执带 `hint.workspace/session/default`。目录默认只列 `active`，`status=all/resolved` 可看历史。
+
+**分页与预算**：kind 目录返回 `nextCursor/hasMore`（live `command` 239 条分页无重叠）；`limit` 默认 50（上限 200），`maxBytes` 默认 24KB；`tree` 默认 28 个节点，先删叶子摘要再删叶子，目录骨架（全部 kind）永不被预算裁掉，live 为 6.8KB/8 种。
+
+**成本与可见性**：根反查走 `uri_roots` 主键，不再每次扫全库；100k 合成库上 `getByUri` 277ms→0.05ms、`tree` 2.39s→4.7ms，事件循环停摆消失。URI 读取沿用现有可见性（当前工作区 + 当前会话），越界 `not-visible`，不存在 `not-found`。
+
+**浏览元数据与信任边界**：条目带 `rowid/scope/source/confidence/usage/bytes`；叶子与 `memory_get` 一样计 usage、对 `file_state` 做 freshness。所有浏览内容标 `contentTrust:"untrusted"`；预览经 `redactSecrets` 与 quarantine 判据，命中注入时替换为 `[quarantined]`，原值仍可按 URI 显式读取（审计用）。`memory_catalog`/`memory_search`/`memory_get` 的结果与 `catalog.recent` 都回传 `uri`（resolved 记录附 `readableByDefault:false`）。
+
+**分层加载（Phase 1）**：每条 insight 同时保存三层只读投影——`L0 ≤50 字`（发现/目录）、`L1 ≤240 字`（概览）、`L2`（完整 `value` 与证据）。L0/L1 都是从 `summary` 派生的连续子串，按整子句取窗口，绝不切开路径、标识符、≥3 位数字或端口；放不下的长路径宁可不出现，也不输出半截。自动注入（索引头、目录、同会话增量、交接卡）默认只用 L0，700 字预算可容纳约 8 条事实；召回注入在“单条命中 + 预算 ≥306（建议 360）+ 用户问细节或 L0 未覆盖查询”时升到 L1，多条命中一律 L0；L2 只在显式 `memory_get(layer:"l2")` 或 `includeRaw=true` 时读取。`memory_get(layer:"l0"|"l1")` 返回 `view {text,chars,source,fallback,empty}` 与精简 `record`（无 `value`），`memory_ls` 叶子与目录条目带 `layers` 元数据。
+
+存储上 `records` 新增 `abstract/overview/layer_src/layer_of/layer_ver` 五列；旧库打开时自动 `ALTER` 并按 `layer_of=sha1(summary)` 一次性回填，meta `layerBackfill=v1` 保证幂等（第二次 0 更新；改一条 summary 只刷一条）。回填不改 `value`/`source`/FTS，因此回滚只需回代码。人工/模型提供的层（`layer_src=llm`）在 summary 未变时保留，summary 变化后自动覆盖为规则派生。
+
+**目录感知检索（Phase 2）**：`memory_search({uri})` 接受工作区/会话根、kind 目录或 record URI。`rcs://` 与 `rcs://ws/` 只能用于导航，检索会返回 `not-a-search-uri`，调用方先 `memory_ls` 拿到根地址。作用域谓词在 `LIMIT` 之前下推到 FTS/bigram/LIKE，因此目录内不会“先取全局前 N 条再过滤”；跨工作区/跨会话仍是 `not-visible`，不会退化成 0 条。
+
+`kinddir` 为空时默认只扩大到同一 root 的 `rootdir` 一次，回执带 `widenedFrom / scopeFallback / attempts / fallbackUsed / exhausted`；`fallback=false` 时只尝试一次。`rootdir + kind` 等价于虚拟 kinddir，空结果按 `scopeFallback:"kind-filter"` 丢掉 kind、仍留在同一 root。`record` URI 与 `memory_get` 同值，缺失返回 `missing:true` 且不扩大；`kind`/`key` 与 URI 冲突分别返回 `kind-mismatch` / `key-with-uri`。每次 URI 检索带 `trace`（`visited`、`fallback`、`candidates[].mode`，不含正文），供后续检索轨迹使用。注意：工作区 rootdir 只覆盖 `ws:` 事实，对话轮次属于 `sess:`；问“我刚才说”请用会话 URI 或不传 `uri`。`DSH_MEMORY_DIR_SEARCH=0` 可整体关闭。
+
+URI 路径的 LIKE 候选按“事实种类优先、再时间”取窗口（全局路径保持原行为），修复了 10k 同 kind 下旧 insight 被挤出窗口的问题；目录计数（`GROUP BY scope/kind`）走进程内缓存（2s TTL + `PRAGMA data_version` 500ms 检查 + 写代际），写后立即失效。
+
+Phase 0 完成寻址与目录浏览；Phase 2 完成目录内检索。Phase 3–5 的向量基底、检索轨迹与存储优化见下两节。
+
+**语义检索基底（Phase 3，默认关）**：`records` 的派生向量存在普通表 `record_vectors(record_id, model, dim, src_hash, vec BLOB)`，检索用 60 行 JS 余弦，不引入 sqlite-vec/扩展。默认 `off`：没有 embedder 时不发起任何网络请求。启用方式：`DSH_MEMORY_VEC=on|auto` + `DSH_MEMORY_EMBED_MODEL=bge-m3`（或 `meta.vec:model`）；embedding 端点默认 `http://127.0.0.1:11434`，只允许回环地址（远程需显式 `DSH_MEMORY_EMBED_ALLOW_REMOTE=1`），单次预算 300ms。查询向量可用 `store.searchAsync()` 自动计算；`store.search({embedding})` 供外部编排与测试。融合用加权 RRF（k=60、`wLex=1.0`、`wVec=0.8`、insight 先验 1.15），词法 `mode` 不变；`key` 精确查询、唯一 FTS 命中、代号硬拦（`missing-identifier`）、超短查询直接跳过语义臂。语义候选必须 `cos ≥ 0.35`，两臂都无候选时返回空并标 `vec.reason="no-answer"`。任何扩展/模型/维度/超时/坏 BLOB 失败都退回纯词法（`vec.state=off|degraded`），`record_vectors` 缺表或旧库无向量不影响检索。`DSH_MEMORY_VEC=off` 一键回滚；写入队列 `vec_queue` 只在启用时入队，重复 ingest 不重复排队，文本 hash 未变不重嵌。
+
+**检索轨迹（Phase 4，默认开）**：`retrieval_traces` 单表记录每次检索决策（`tool/ls/recall/inject/handover`），包含作用域、阶段耗时/候选数、候选 Top≤40、选中≤20、放宽原因与错误；**不存记忆正文、摘要、prompt 或向量**。查询文本落库前统一脱敏（Bearer/sk-/password/token、URL userinfo、Windows/POSIX 路径、邮箱、长 blob → `[REDACTED]` 或 `<path:#hash8>`），导出再次脱敏并把 sid/workspace/URI key 哈希化。单行硬上限 16KB（候选 40/8KB、选中 20/4KB、步骤 16/4KB），超限置 `truncated` 位并在详情里保留计数。写入走独立连接 + 进程内队列（250ms/32 条 flush，`DSH_MEMORY_TRACE_SYNC=1` 可同步），失败重试 3 次后丢弃，**绝不阻塞工具或注入**；轨迹是直接 SQL，不产生 `events/records/FTS`。默认保留 5000 条 / 30 天（`DSH_MEMORY_TRACE_ROWS/DAYS` 可调）。API：`GET /api/memory/traces?sessionId=…`（游标分页、trigger/since/until 过滤）、`GET /api/memory/traces/:id`、`GET /api/memory/traces/export?format=jsonl|json`、`POST /api/memory/traces/clear`；全部要求本机来源（非本机 403）。关闭：`DSH_MEMORY_TRACE=0` 或 `control.json {"memoryTrace": false}`。
+
+**存储同步优化（Phase 5.0）**：每个连接显式 `synchronous=NORMAL`、`cache_size=-65536`、`busy_timeout=5000`（`SCHEMA` 里的 PRAGMA 只在建库那次生效，重开必须重设）。`ingest` 在没有外层事务时自己包一层（一次事件 = 一次提交，重复事件不写；中途失败整条回滚）。补课 `ingestSession` 每 50 条一个事务，插件钩子用 `ingestSessionAsync` 每 25 条 `setImmediate` 让出事件循环，补课期间到达的事件先缓冲、完成后按序处理。状态轮询把 5 条 `COUNT(*)` 合成一次 `GROUP BY kind,status`，并新增 `records(status,updated_ts)` 与 `(kind,status,updated_ts)` 覆盖索引（`meta.schemaIndexV=1` 幂等建一次）。本地演练：单条 ingest p50 9.3→5.4ms、p95 6.8ms；10k 状态聚合 28.4→1.4ms；200 事件补课 95.6→31.3ms，异步分片最大 tick 间隔 9.1ms。仍为同步实现，不引入 worker；跨阈值方案见 `work/phase-prep-20261025/phase5-storage/PLAN.md`。
 
 **轻 LLM 编译**（可选）：`"memoryLlmEnabled": true`，每轮结束把新事件编译为 insight 记录。摘要必须自足：写清主语与被说明的属性/数量，不能只写裸值或动作；并跟随原文语言；数字/路径/标识符逐字保留。可在「记忆」面板选择编译模型（如本地 qwen3:4b），留空则跟随会话模型。
 

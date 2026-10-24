@@ -51,14 +51,19 @@ check('① 通配符/省略路径不误判', summaryPathsCurrent('见 C:\\foo\\*
 check('① 相对路径按 workspace 解析', summaryPathsCurrent('见 ./exists.md。', { workspace: root }) === true && summaryPathsCurrent('见 ./gone.md。', { workspace: root }) === false)
 
 const verified = catalogDigest(store, { sid: 's1', workspace: WS, verifyPaths: true })
-check('② 目录注入保留存在路径', verified.includes('exists.md') && verified.includes('spaced.md'), verified)
-check('② 目录注入剔除缺失路径', !verified.includes('gone.md'), verified)
+// Phase 1：自动注入只用 L0（≤50），长路径不保证出现在 L0；存在性复验仍按完整 summary 过滤。
+check('② 目录注入保留存在的事实', verified.includes('项目说明在') && verified.includes('项目说明另见'), verified)
+check('② 目录注入剔除缺失路径', !verified.includes('旧项目说明') && !verified.includes('gone.md'), verified)
 const unverified = catalogDigest(store, { sid: 's1', workspace: WS })
-check('② 默认不改变旧行为', unverified.includes('gone.md'), unverified)
+check('② 默认不改变旧行为', unverified.includes('旧项目说明'), unverified)
+const recGood = store.get({ sid: 's1', scope: 'ws:' + WS, workspace: WS, kind: 'insight', key: 'good-path' })
+const goodL1 = mem.resolveLayer(recGood, 'l1')
+check('② 长路径在 L1 完整可读', goodL1.text.includes('exists.md') && goodL1.chars <= 240, goodL1.text)
+check('② L0 不输出半截路径', !verified.includes('exists.md') && !verified.includes('rcs-inject-db-'), verified)
 
 const hint = buildRecallHint(store, { sid: 's1', workspace: WS, userText: '项目说明', verifyPaths: true })
-check('③ 召回注入保留存在路径', !!hint && hint.text.includes('exists.md') && hint.text.includes('spaced.md'), hint && hint.text)
-check('③ 召回注入剔除缺失路径', !!hint && !hint.text.includes('gone.md'), hint && hint.text)
+check('③ 召回注入保留存在的事实', !!hint && hint.text.includes('项目说明在') && hint.text.includes('项目说明另见'), hint && hint.text)
+check('③ 召回注入剔除缺失路径', !!hint && !hint.text.includes('旧项目说明') && !hint.text.includes('gone.md'), hint && hint.text)
 
 const delta = buildInsightDelta(store, { sid: 's1', workspace: WS, since: 0, verifyPaths: true })
 check('④ 同会话增量保留存在路径', delta.includes('项目说明另见') && delta.includes('项目说明在'), delta)

@@ -66,7 +66,7 @@ const CHILD_EFFORT = CHILD_EFFORT_FOLLOW
 // memory_* 由 MEMORY 插件注册，transcript_expand 由 CONTEXTinjector 注册；预检会取可见工具的交集。
 const READONLY = [
   'read', 'glob', 'grep', 'web_search',
-  'memory_catalog', 'memory_search', 'memory_get', 'transcript_expand',
+  'memory_catalog', 'memory_search', 'memory_get', 'memory_ls', 'transcript_expand',
 ]
 
 // Host migration: 0.1.6+ used startContinuable; 0.2.1 subagent seam exposes

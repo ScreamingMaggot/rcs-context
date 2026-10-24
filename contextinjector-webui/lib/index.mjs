@@ -12,8 +12,7 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync, existsSy
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-// v1.8 可移植：不硬编码本机路径。DSH_HOME 由启动器注入；缺省回落 ~/.dsh（与插件侧同规则，
-// 二者必须一致，否则面板读不到 control.json）。显式 env 仍最高优先。
+import { listTraces, getTrace, exportTraces, clearTraces, TRACE_TRIGGERS } from './trace-read.mjs'
 const DSH_HOME = process.env.DSH_HOME || join(homedir(), '.dsh')
 const STATE_DIR = process.env.DSH_CONTEXTINJECTOR_STATE_DIR || join(DSH_HOME, 'state-compiler')
 const SESSIONS_DIR = join(STATE_DIR, '..', 'sessions')
@@ -23,6 +22,7 @@ const LG_CONTROL_FILE = join(STATE_DIR, 'logcompiler.control.json')
 const LG_RUNTIME_FILE = join(STATE_DIR, 'logcompiler.runtime.json')
 // MEMORY 面板数据源（与 web/memory.mjs 同规则：env 优先，否则 state-compiler/memory）
 const MEM_DB = process.env.DSH_MEMORY_DB || join(STATE_DIR, 'memory', 'memory.sqlite')
+const TRACE_DB = process.env.DSH_MEMORY_TRACE_DB || MEM_DB
 
 mkdirSync(STATE_DIR, { recursive: true })
 
@@ -132,7 +132,7 @@ async function memorySnapshot(sessionId = null, opts = {}) {
   if (!sq) { out.error = 'sqlite-unavailable'; return out }
   let db = null
   try {
-    db = new sq.DatabaseSync(MEM_DB, { readOnly: true })
+    db = tuneReadOnly(new sq.DatabaseSync(MEM_DB, { readOnly: true }))
     out.sqlite = true
     const one = (sql, ...args) => { try { return db.prepare(sql).get(...args) } catch { return null } }
     const all = (sql, ...args) => { try { return db.prepare(sql).all(...args) } catch { return [] } }
@@ -181,15 +181,33 @@ async function memorySnapshot(sessionId = null, opts = {}) {
     out.armed = out.flags.enabled === true
       && armedAtMs > 0 && (Date.now() - armedAtMs) < 150000
       && (armedPid === process.pid || armedPid === 0)
-    const active = Number(one("SELECT COUNT(*) n FROM records WHERE status='active'")?.n ?? 0)
-    const resolved = Number(one("SELECT COUNT(*) n FROM records WHERE status='resolved'")?.n ?? 0)
+    // Phase 5.0：一次 GROUP BY 取代 5 条全表 COUNT（100k 轮询的主要成本是重复扫整行）。
+    const byKindStatus = all("SELECT kind, status, COUNT(*) n FROM records GROUP BY kind, status")
+    const kindCounts = new Map()
+    let active = 0
+    let resolved = 0
+    let activeInsights = 0
+    let activeErrors = 0
+    for (const r of byKindStatus) {
+      const n = Number(r.n) || 0
+      const kind = String(r.kind)
+      if (String(r.status) === 'active') {
+        active += n
+        kindCounts.set(kind, (kindCounts.get(kind) || 0) + n)
+        if (kind === 'insight') activeInsights += n
+        if (kind === 'error') activeErrors += n
+      } else if (String(r.status) === 'resolved') {
+        resolved += n
+      }
+    }
     out.totals.active = active
     out.totals.resolved = resolved
-    out.totals.insights = Number(one("SELECT COUNT(*) n FROM records WHERE kind='insight' AND status='active'")?.n ?? 0)
-    out.totals.errors = Number(one("SELECT COUNT(*) n FROM records WHERE kind='error' AND status='active'")?.n ?? 0)
+    out.totals.insights = activeInsights
+    out.totals.errors = activeErrors
     out.totals.workspaces = Number(one("SELECT COUNT(DISTINCT scope) n FROM records WHERE scope LIKE 'ws:%'")?.n ?? 0)
-    out.kinds = all("SELECT kind, COUNT(*) n FROM records WHERE status='active' GROUP BY kind ORDER BY n DESC")
-      .map((r) => ({ kind: String(r.kind), n: Number(r.n) }))
+    out.kinds = [...kindCounts.entries()]
+      .map(([kind, n]) => ({ kind, n }))
+      .sort((a, b) => b.n - a.n)
     const byCurrent = (a, b) => (Number(b.current) - Number(a.current)) || (b.last - a.last)
     out.workspaces = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records WHERE scope LIKE 'ws:%' GROUP BY scope ORDER BY last DESC LIMIT 12")
       .map((r) => {
@@ -314,7 +332,7 @@ async function memoryGraph(sessionId = null, opts = {}) {
   if (!sq) { out.error = 'sqlite-unavailable'; return out }
   let db = null
   try {
-    db = new sq.DatabaseSync(MEM_DB, { readOnly: true })
+    db = tuneReadOnly(new sq.DatabaseSync(MEM_DB, { readOnly: true }))
     const one = (sql, ...a) => { try { return db.prepare(sql).get(...a) ?? null } catch { return null } }
     const all = (sql, ...a) => { try { return db.prepare(sql).all(...a) ?? [] } catch { return [] } }
     const range = String(opts.range ?? 'current')
@@ -534,7 +552,7 @@ async function memoryEvidence(scope, key) {
   if (!sq) { out.error = 'sqlite-unavailable'; return out }
   let db = null
   try {
-    db = new sq.DatabaseSync(MEM_DB, { readOnly: true })
+    db = tuneReadOnly(new sq.DatabaseSync(MEM_DB, { readOnly: true }))
     const rec = db.prepare("SELECT value, status, updated_ts FROM records WHERE scope=? AND kind='insight' AND key=?").get(sc, out.key)
     if (!rec) { out.error = 'not-found'; return out }
     let v = {}
@@ -841,6 +859,12 @@ function isLocalOrigin(req) {
   const host = req.headers['host'] || ''
   return /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host.replace(/^\[.*?\]/, '')) || host === 'localhost'
 }
+function tuneReadOnly(db) {
+  for (const p of ['busy_timeout=5000', 'cache_size=-65536', 'synchronous=NORMAL']) {
+    try { db.exec('PRAGMA ' + p) } catch { /* read-only connections may reject some pragmas */ }
+  }
+  return db
+}
 function sendJson(res, code, body) {
   const buf = Buffer.from(JSON.stringify(body))
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': buf.length })
@@ -855,6 +879,18 @@ function readBody(req) {
     })
     req.on('error', () => resolve(null))
   })
+}
+function traceTime(raw) {
+  const s = String(raw ?? '').trim()
+  if (!s) return 0
+  const rel = /^(\d+)([hd])$/i.exec(s)
+  if (rel) return Date.now() - Number(rel[1]) * (rel[2].toLowerCase() === 'h' ? 3600_000 : 86400_000)
+  const n = Number(s)
+  return Number.isFinite(n) && n >= 0 ? Math.min(Date.now(), n) : NaN
+}
+function traceCursor(raw) {
+  const m = /^(\d{1,16}):(\d{1,16})$/.exec(String(raw ?? ''))
+  return m ? { ts: Number(m[1]), id: Number(m[2]) } : null
 }
 
 export default {
@@ -1273,6 +1309,84 @@ export default {
         }
       },
     }))
+    // Phase 4：检索轨迹。列表/详情/导出/清除都要求本机来源（轨迹含 query 文本）。
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/api/memory/traces',
+      handler(req, res) {
+        if (!isLocalOrigin(req)) { sendJson(res, 403, { ok: false, error: 'forbidden' }); return }
+        if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        let u = null
+        try { u = new URL(String(req.url || ''), 'http://localhost') } catch { sendJson(res, 400, { ok: false, error: 'bad-request' }); return }
+        const sid = normSid(u.searchParams.get('sessionId') || '').slice(0, 120)
+        if (!sid) { sendJson(res, 400, { ok: false, error: 'missing-sessionId' }); return }
+        const since = traceTime(u.searchParams.get('since'))
+        const until = traceTime(u.searchParams.get('until'))
+        if (Number.isNaN(since) || Number.isNaN(until) || (since && until && since > until)) {
+          sendJson(res, 400, { ok: false, error: 'bad-range' }); return
+        }
+        const trigger = String(u.searchParams.get('trigger') || '')
+        if (trigger && !TRACE_TRIGGERS.has(trigger)) { sendJson(res, 400, { ok: false, error: 'bad-trigger' }); return }
+        const cursorRaw = u.searchParams.get('cursor')
+        const cursor = traceCursor(cursorRaw)
+        if (cursorRaw && !cursor) { sendJson(res, 400, { ok: false, error: 'bad-cursor' }); return }
+        const limit = Math.max(1, Math.min(200, Number(u.searchParams.get('limit')) || 50))
+        const out = listTraces(TRACE_DB, { sid, since, until, limit, cursor, trigger })
+        sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', sessionId: sid, ...out })
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'prefix',
+      path: '/api/memory/traces/',
+      handler(req, res) {
+        if (!isLocalOrigin(req)) { sendJson(res, 403, { ok: false, error: 'forbidden' }); return }
+        let u = null
+        try { u = new URL(String(req.url || ''), 'http://localhost') } catch { sendJson(res, 400, { ok: false, error: 'bad-request' }); return }
+        const suffix = decodeURIComponent(u.pathname.slice('/api/memory/traces/'.length).replace(/\/+$/, ''))
+        if (suffix === 'clear') {
+          if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+          readBody(req).then((args) => {
+            const sid = normSid(args?.sessionId).slice(0, 120)
+            if (!sid) { sendJson(res, 400, { ok: false, error: 'missing-sessionId' }); return }
+            const r = clearTraces(TRACE_DB, sid)
+            sendJson(res, r.ok ? 200 : 500, { ok: r.ok, plugin: 'MEMORY-webui', deleted: r.deleted })
+          })
+          return
+        }
+        if (suffix === 'export') {
+          if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+          const sid = normSid(u.searchParams.get('sessionId') || '').slice(0, 120)
+          if (!sid) { sendJson(res, 400, { ok: false, error: 'missing-sessionId' }); return }
+          const since = traceTime(u.searchParams.get('since'))
+          const until = traceTime(u.searchParams.get('until'))
+          if (Number.isNaN(since) || Number.isNaN(until) || (since && until && since > until)) {
+            sendJson(res, 400, { ok: false, error: 'bad-range' }); return
+          }
+          const format = String(u.searchParams.get('format') || 'jsonl').toLowerCase()
+          const out = exportTraces(TRACE_DB, { sid, since, until, limit: 5000 })
+          const body = format === 'json'
+            ? JSON.stringify({ ok: true, plugin: 'MEMORY-webui', available: out.available, traces: out.rows }, null, 2)
+            : out.rows.map((r) => JSON.stringify(r)).join('\n')
+          const buf = Buffer.from(body + (body ? '\n' : ''))
+          const safe = sid.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 64)
+          res.writeHead(200, {
+            'content-type': format === 'json' ? 'application/json; charset=utf-8' : 'application/x-ndjson; charset=utf-8',
+            'content-length': buf.length,
+            'content-disposition': `attachment; filename="rcs-traces-${safe}.${format === 'json' ? 'json' : 'jsonl'}"`,
+            'cache-control': 'no-store',
+          })
+          res.end(buf)
+          return
+        }
+        if (!/^\d+$/.test(suffix)) { sendJson(res, 404, { ok: false, error: 'not-found' }); return }
+        if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        const id = Number(suffix)
+        const out = getTrace(TRACE_DB, id)
+        if (!out.available) { sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', available: false, trace: null }); return }
+        if (!out.trace) { sendJson(res, 404, { ok: false, error: 'not-found' }); return }
+        sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', ...out })
+      },
+    }))
     disposers.push(webServer.register({
       kind: 'exact',
       path: '/api/memory/consolidate',
@@ -1298,7 +1412,7 @@ export default {
         readBody(req).then((args) => {
           const cur = readControl()
           const next = { ...cur }
-          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog', 'memoryHandoff', 'memoryConsolidateAuto']) {
+          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog', 'memoryHandoff', 'memoryConsolidateAuto', 'memoryTrace']) {
             if (typeof args?.[k] === 'boolean') next[k] = args[k]
           }
           if ('memoryConsolidateIdleMs' in (args ?? {})) {
