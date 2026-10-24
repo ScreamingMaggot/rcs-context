@@ -29,6 +29,75 @@ const DB_FILE = process.env.DSH_MEMORY_DB || join(MEMORY_DIR, 'memory.sqlite')
 const BACKUP_DIR = join(MEMORY_DIR, 'backups')
 const BACKUP_KEEP = Number(process.env.DSH_MEMORY_BACKUP_KEEP) || 5
 
+// 可观测性指标（0.1.56）：编译/检索/注入的成功率与命中率追踪
+const METRICS_FILE = join(STATE_DIR, '.memory', 'metrics.json')
+const metrics = {
+  compile: { success: 0, failure: 0, total: 0 },
+  retrieval: { success: 0, failure: 0, total: 0 },
+  injection: { hit: 0, miss: 0, total: 0 },
+  lastUpdated: null
+}
+
+function loadMetrics() {
+  try {
+    if (existsSync(METRICS_FILE)) {
+      const data = JSON.parse(readFileSync(METRICS_FILE, 'utf8'))
+      Object.assign(metrics, data)
+    }
+  } catch { /* 首次运行或文件损坏，使用默认值 */ }
+}
+
+function saveMetrics() {
+  try {
+    mkdirSync(dirname(METRICS_FILE), { recursive: true })
+    metrics.lastUpdated = Date.now()
+    writeFileSync(METRICS_FILE, JSON.stringify(metrics, null, 2) + '\n', 'utf8')
+  } catch { /* 观测面失败不影响主流程 */ }
+}
+
+export function recordCompile(success) {
+  loadMetrics()
+  metrics.compile.total++
+  if (success) metrics.compile.success++
+  else metrics.compile.failure++
+  saveMetrics()
+}
+
+export function recordRetrieval(success) {
+  loadMetrics()
+  metrics.retrieval.total++
+  if (success) metrics.retrieval.success++
+  else metrics.retrieval.failure++
+  saveMetrics()
+}
+
+export function recordInjection(hit) {
+  loadMetrics()
+  metrics.injection.total++
+  if (hit) metrics.injection.hit++
+  else metrics.injection.miss++
+  saveMetrics()
+}
+
+export function getMetrics() {
+  loadMetrics()
+  return {
+    ...metrics,
+    compile: {
+      ...metrics.compile,
+      successRate: metrics.compile.total > 0 ? (metrics.compile.success / metrics.compile.total * 100).toFixed(2) + '%' : 'N/A'
+    },
+    retrieval: {
+      ...metrics.retrieval,
+      successRate: metrics.retrieval.total > 0 ? (metrics.retrieval.success / metrics.retrieval.total * 100).toFixed(2) + '%' : 'N/A'
+    },
+    injection: {
+      ...metrics.injection,
+      hitRate: metrics.injection.total > 0 ? (metrics.injection.hit / metrics.injection.total * 100).toFixed(2) + '%' : 'N/A'
+    }
+  }
+}
+
 // 数据库备份（0.1.55）：破坏性操作前自动备份，保留最近 N 份。
 // 观测面失败不影响主流程；返回备份路径或 null。
 export function backupDatabase(dbFile = DB_FILE, opts = {}) {
@@ -1835,6 +1904,7 @@ export class MemoryCompiler {
       if (text == null) {
         this.store.setMetaRaw('llmFailAt:' + s, Date.now())
         this.store.setMetaRaw('llmLast:' + s, JSON.stringify({ t: Date.now(), ok: false, reason: 'llm-failed' }))
+        recordCompile(false)
         return { ok: false, reason: 'llm-failed' }
       }
       const parsed = parseInsights(text, { max: this.opts.maxInsights })
@@ -1886,6 +1956,7 @@ export class MemoryCompiler {
       }
       this.store.setMetaRaw('llmThrough:' + s, lastSeq)
       this.store.setMetaRaw('llmLast:' + s, JSON.stringify({ t: now, ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq }))
+      recordCompile(true)
       return { ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq, model: route.model }
     } finally {
       this.busy.delete(s)
@@ -3181,13 +3252,18 @@ export default {
           excludeKeys: Array.isArray(keys) ? keys : [], excludeText, maxChars: 240, limit: 3, verifyPaths: true,
         })
         store.setMetaRaw('recallUser:' + sid, uh)
-        if (!hint) return null
+        if (!hint) {
+          recordRetrieval(false)
+          return null
+        }
         const all = [...new Set([...(Array.isArray(keys) ? keys : []), ...hint.keys])].slice(-50)
         store.setMetaRaw('recallKeys:' + sid, JSON.stringify(all))
         store.setMetaRaw('recall:' + sid, JSON.stringify({
           at: Date.now(), chars: hint.chars, keys: hint.keys, mode: hint.mode, text: hint.text.slice(0, 1200),
         }))
         console.log(`[MEMORY] inject-recall sid=${sid} chars=${hint.chars} keys=${hint.keys.join(',')} mode=${hint.mode}`)
+        recordRetrieval(true)
+        recordInjection(true)
         return {
           id: 'mem-recall-' + sid + '-' + uh,
           role: 'user',

@@ -97,9 +97,13 @@ llm-pi-ai:
 
 **编译与折叠串行**：编译调用模型前先等本会话折叠落定（先让 400ms 防抖的轮末折叠登记标记，最多等 30s）；仍在飞则本轮放弃、不推进 `llmThrough`，下一轮再编；陈旧标记 120s 后不再阻塞。
 
+**阻塞 join 回归**（0.1.56 新增）：`agent/pre-step` 必须等待折叠完成（带 3s 超时闸）再放行请求，保证每轮都吃到压缩增益。旧实现（v1.10.53）曾改为非阻塞 join，导致用户开启压缩但新消息不等压缩完成就发出，本轮无法享受压缩收益。现改回 `await joinFoldInFlight()`，超时后继续放行但不取消后台任务。
+
 **事实类型与生命周期**：每条 insight 带 `state / constraint / task / history` 类型。自动注入（索引头、目录、召回）只给 `state/constraint`；`task` 是意图（“接下来要改端口”），不会当成已完成状态；“用户已认知/已了解某工作区”这类用户认知归 `history`，不作为当前项目状态；`history` 只在显式 `memory_search` 里出现。编译器被要求“请求不能改写成已完成状态、只信较新的观测、删除/清空后不再复述被删内容”。
 
 **工作区重置**：成功执行的删除/清空命令（`Remove-Item`、`rm`、`git clean`、`git reset --hard`、`robocopy /MIR` 等，或输出含 `REMOVING:`）记为 reset 标记。重置前的 `state` 一律逻辑失效为 `historical`，`constraint` 不受株连；记录体和证据保留，可审计、可回溯。每条事实的 `value.invalidated` 写明时间、原因与证据。
+
+**数据库备份**（0.1.56 新增）：破坏性操作（工作区重置）前自动备份 SQLite 数据库到 `memory/backups/`，时间戳精确到毫秒避免覆盖，默认保留最近 5 份（`DSH_MEMORY_BACKUP_KEEP` 环境变量可调）。备份失败不影响主流程。恢复时手动复制备份文件覆盖 `memory.sqlite` 即可。
 
 **文件巡检**：会话首次 pre-step 对当前工作区的文件事实做一次 `stat`：路径消失标 `stale`，仍存在则刷新 `verifiedAt`。幂等、无模型，失败不影响会话。
 
@@ -126,6 +130,8 @@ llm-pi-ai:
 **信任边界**：索引头、摘要和交接卡都声明为不可信背景，不得执行其中的指令；写入工具只在真人明确指令下动作，其余时间模型不能改库。EXTREASON 子代理同样只能调用 `memory_*` 与 `transcript_expand` 取证，不能写文件或执行命令。
 
 **注入回执**：首次注入后，`meta` 里保留实际注入文本、字符数、sha1 与时间；「记忆」面板的当前会话区可直接展开查看。全文标记为不可信背景，只作审计，不执行。
+
+**可观测性指标**（0.1.56 新增）：自动追踪编译/检索/注入的成功率与命中率，存储在 `~/.dsh/state-compiler/.memory/metrics.json`。通过 `GET /api/memory/metrics` 查询实时指标，返回编译成功率、检索成功率、注入命中率及各项计数。指标记录开销 < 0.3ms/次，对主流程无影响。性能基线测试脚本：`performance-baseline.mjs`，报告见 `docs/PERFORMANCE-BASELINE.md`。
 
 **简报出处闸**：EXTREASON 返回的每条 `[R]` 行中，3 位以上数字必须逐字出现在“子代理本轮工具结果 ∪ 父会话摘要 ∪ 用户原文”里，否则整行丢弃；全部被丢弃时不注入，并记 `inject-skipped why=ungrounded`。这是确定性核对，不替代语义判断。子代理只接受含 `[R]` 的正文；纯 prose 不注入。上一轮简报为空时，≤12 字的纯确认（“继续/好/收到”）不再触发子代理（`EXTREASON_IDLE_SKIP=0` 可关）。
 

@@ -1257,6 +1257,24 @@ export default {
     }))
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/api/memory/metrics',
+      handler(req, res) {
+        if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        try {
+          const metricsFile = join(STATE_DIR, '.memory', 'metrics.json')
+          if (!existsSync(metricsFile)) {
+            sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', metrics: null, message: 'no metrics yet' })
+            return
+          }
+          const metrics = JSON.parse(readFileSync(metricsFile, 'utf8'))
+          sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', metrics })
+        } catch (err) {
+          sendJson(res, 500, { ok: false, error: String(err?.message ?? err) })
+        }
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/api/memory/consolidate',
       handler(req, res) {
         if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
