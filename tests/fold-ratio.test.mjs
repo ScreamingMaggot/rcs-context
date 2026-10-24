@@ -43,6 +43,14 @@ check('ffab17e9：旧 3824 倍 → 0.9', Math.abs(ff - 0.9) < 1e-9, 'shrink=' + 
 const de = foldShrinkOf({ appendedBytes: 1165, incrementalRawBytes: 1870, transcriptBytes: 2323, shadowedBytes: 2323 })
 check('de4959d2：旧 6.5863(659%) → 0.623', Math.abs(de - 0.623) < 1e-9, 'shrink=' + de)
 
+// —— 首折的 head 段：原样保留、折叠前后都在场（字节中性），不能只算进分子 ——
+// 真机 session-2082c756（2026-10-23 23:50）：transcript 2150B = head 1756B + 新段 393B，
+// 新原料 2132B。旧口径 2150/2132=1.0084 ⇒ 面板显示 101%，但新段实际只占 18.5%。
+const headMixed = foldShrinkOf({ appendedBytes: 2150, incrementalRawBytes: 2132, headBytes: 1756, transcriptBytes: 2150, shadowedBytes: 4675 })
+check('首折 head 保留段不计入本折占比（101% → 18.5%）', Math.abs(headMixed - 0.1848) < 1e-4, 'ratio=' + headMixed)
+check('不传 headBytes 时保持旧读数（防误用默认值掩盖）',
+  Math.abs(foldShrinkOf({ appendedBytes: 2150, incrementalRawBytes: 2132 }) - 1.0084) < 1e-4)
+
 // —— 分母为 0 或缺失 ⇒ 回退旧算式（老记录兼容），两者都没有 ⇒ null ——
 check('缺增量原料 ⇒ 回退 transcript/shadowed',
   foldShrinkOf({ appendedBytes: 100, incrementalRawBytes: 0, transcriptBytes: 725, shadowedBytes: 8951 }) === Number((725 / 8951).toFixed(4)))

@@ -1,6 +1,6 @@
 // 经济性算术回归测试（回本闸 + 准入闸）——钉住"折叠是否值得做"这条判据。
 //   背景（v1.10.23 引入）：折一条 [A] 要花**一次付费调用**，省下的却在后续回合按**缓存读价**计——
-//   今天按 1.0 全额付、换明天每回合 0.25 的折扣，于是必须算回本回合数 m*(S)，否则"折叠"可能是亏的。
+//   今天按 1.0 全额付、换明天每回合 1/30 的折扣，于是必须算回本回合数 m*(S)，否则"折叠"可能是亏的。
 //   被守的主张：
 //     · 回本回合数 = 一次性成本 ÷ 每回合收益，且随正文变大而**下降**（大块更划算）
 //     · 收益为 0（正文不比输出长）⇒ turns = Infinity，调用方据此不折（不是 NaN）
@@ -34,8 +34,8 @@ check('① 逐项自洽：cost / benefitPerTurn == turns',
   near(p1k.cost / p1k.benefitPerTurn, p1k.turns), JSON.stringify(p1k))
 check('① 输出 token 按正文的固定比例估（<正文，才可能有收益）',
   p1k.outTok < p1k.bodyTok && near(p1k.outTok / p1k.bodyTok, 0.6, 0.01), p1k.outTok + '/' + p1k.bodyTok)
-check('① 折扣可反推且为 0.25 量级（缓存读价）',
-  near(p1k.benefitPerTurn / (p1k.bodyTok - p1k.outTok), 0.25, 0.02),
+check('① 折扣可反推且为 1/30（当前价目表的缓存读价）',
+  near(p1k.benefitPerTurn / (p1k.bodyTok - p1k.outTok), 1 / 30, 1e-6),
   String(p1k.benefitPerTurn / (p1k.bodyTok - p1k.outTok)))
 const sizes = [200, 500, 1000, 2000, 5000, 20000, 100000]
 const turns = sizes.map((n) => paybackOf(n).turns)
@@ -56,9 +56,9 @@ check('② 无 aux ⇒ null', paybackMeasured(null, 4000, 1000) === null)
 check('② aux.calls=0 ⇒ null', paybackMeasured({ calls: 0 }, 4000, 1000) === null)
 const aux = { calls: 1, in: 100, cacheRead: 200, out: 50 }
 const m1 = paybackMeasured(aux, 4000, 1000)
-check('② 成本按账单口径：in + cacheRead×0.25 + out',
-  m1 && near(m1.cost, 100 + 200 * 0.25 + 50), m1 && String(m1.cost))
-check('② 收益 = 省下 token × 0.25 折扣，且自洽',
+check('② 成本按账单口径：in + cacheRead×(1/30) + out',
+  m1 && near(m1.cost, 100 + 200 / 30 + 50), m1 && String(m1.cost))
+check('② 收益 = 省下 token × (1/30) 折扣，且自洽',
   m1 && near(m1.cost / m1.benefitPerTurn, m1.turns), m1 && JSON.stringify(m1))
 const m2 = paybackMeasured(aux, 1000, 4000)
 check('② 正文比输出还短 ⇒ 收益为 0 ⇒ turns = Infinity（调用方据此拒折）',

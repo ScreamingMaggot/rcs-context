@@ -19,9 +19,9 @@ mkdirSync(join(root, 'state-b'), { recursive: true })
 mkdirSync(join(root, 'state-c'), { recursive: true })
 
 // 内部常量/函数未导出 ⇒ 复制一份并在末尾追加导出（不改动仓库源文件）
-const EXPORTS = '\nexport const __t = { READONLY, TURN_TIMEOUT_MS, TOOL_TIMEOUT_MS, STEER_AT,'
+const EXPORTS = '\nexport const __t = { READONLY, subagentStartKind, PERSONA, groundBriefRows, TURN_TIMEOUT_MS, TOOL_TIMEOUT_MS, STEER_AT,'
   + ' MAX_BRIEF_CHARS, MAX_BRIEF_ROWS, MAX_BRIEF_ROW, CHILD_LABEL, DIGEST_ON, DIGEST_CLAMP,'
-  + ' parseBriefRows, extractTargets, buildDigest, maxSeqOf }\n'
+  + ' parseBriefRows, extractTargets, buildDigest, maxSeqOf, toolResultInfo, pickChildBrief, trivialContinuation, IDLE_SKIP }\n'
 const src = readFileSync(join(SRC, 'web', 'extreason.mjs'), 'utf8')
 writeFileSync(join(root, 'ext-a.mjs'), src + EXPORTS, 'utf8')
 writeFileSync(join(root, 'ext-b.mjs'), src + EXPORTS, 'utf8')
@@ -48,13 +48,23 @@ const check = (name, cond, detail) => {
 const WRITEISH = ['write', 'edit', 'str_replace', 'multiedit', 'notebook_edit', 'pwsh', 'bash', 'shell',
   'todo_write', 'task_create', 'task_update', 'subagent', 'report', 'create_goal', 'update_goal',
   'delete_file', 'apply_patch', 'web_upload', 'browser_click', 'browser_type']
-check('① 白名单逐项固定（改动须显式写理由）', A.READONLY.join(',') === 'read,glob,grep,web_search',
+check('① 白名单逐项固定（改动须显式写理由）',
+  A.READONLY.join(',') === 'read,glob,grep,web_search,memory_catalog,memory_search,memory_get,transcript_expand',
+  A.READONLY.join(','))
+check('① 取证面含记忆检索与转录展开（只读）',
+  ['memory_catalog', 'memory_search', 'memory_get', 'transcript_expand'].every((n) => A.READONLY.includes(n)),
   A.READONLY.join(','))
 check('① 白名单与"写/执行类工具"零交集',
   A.READONLY.filter((n) => WRITEISH.includes(n)).length === 0,
   A.READONLY.filter((n) => WRITEISH.includes(n)).join(','))
 check('① 简报交付不走工具（report 被禁 ⇒ 只读边界不因交付而破口）',
   WRITEISH.includes('report') && !A.READONLY.includes('report'))
+check('① 新宿主 startActivation 被识别', A.subagentStartKind({ startActivation() {} }) === 'activation')
+check('① 旧宿主 startContinuable 仍优先', A.subagentStartKind({ startContinuable() {}, startActivation() {} }) === 'continuable')
+check('① 无子代理 API ⇒ none（干净跳过）', A.subagentStartKind({}) === 'none')
+check('① 记忆取证提示：默认 project scope、不误限 kind、空结果不许猜',
+  /default project scope/.test(A.PERSONA) && /omit kind/.test(A.PERSONA)
+  && /count 0/.test(A.PERSONA) && /Never guess/.test(A.PERSONA))
 
 /* ── ② 预算常量（deck 第 5 页写死的三个数） ────────────────────────────── */
 check('② 整轮硬掐断 45s', A.TURN_TIMEOUT_MS === 45000, A.TURN_TIMEOUT_MS)
@@ -72,8 +82,19 @@ check('③ 无空格写法被规范化（否则进得了请求、进不了转录
   A.parseBriefRows('[R]紧凑') === '[R] 紧凑', A.parseBriefRows('[R]紧凑'))
 check('③ 规范化结果与转录器口径 /^\\[R\\] / 完全一致',
   A.parseBriefRows('[R]x').split('\n').every((l) => /^\[R\] /.test(l)))
-check('③ 一条 [R] 都没有 ⇒ 空串（调用方据此 fail-open，不阻塞本轮）',
-  A.parseBriefRows('只有普通文本\n第二行') === '')
+check('③ 简报数字有出处 ⇒ 保留', (() => {
+  const g = A.groundBriefRows('[R] 接口端口是8848。', '接口端口固定为8848')
+  return g.dropped === 0 && g.text === '[R] 接口端口是8848。'
+})())
+check('③ 简报数字无出处 ⇒ 整行丢弃', (() => {
+  const g = A.groundBriefRows('[R] 接口端口是3306。', '接口端口固定为8848')
+  return g.dropped === 1 && g.text === ''
+})())
+check('③ 无数字结论不受影响', (() => {
+  const g = A.groundBriefRows('[R] 未找到相关记忆。', '')
+  return g.dropped === 0 && g.text === '[R] 未找到相关记忆。'
+})())
+check('③ 一条 [R] 都没有 ⇒ 空串（调用方据此 fail-open，不阻塞本轮）',  A.parseBriefRows('只有普通文本\n第二行') === '')
 check('③ null / undefined 安全', A.parseBriefRows(null) === '' && A.parseBriefRows(undefined) === '')
 const many = Array.from({ length: 55 }, (_, i) => `[R] 第 ${i} 条`).join('\n')
 const clipped = A.parseBriefRows(many)
@@ -84,6 +105,19 @@ check('③ 保留的是前 40 条（顺序不重排）',
 const longRow = '[R] ' + 'x'.repeat(3000)
 check('③ 单行超 1200 ⇒ 行内截断并留可见标记',
   A.parseBriefRows(longRow).includes('…(truncated)') && A.parseBriefRows(longRow).length < 1300)
+
+/* ── ③b 子代理多步正文：后一句 prose 不得覆盖先前的 [R] 简报 ───────────── */
+check('③b 后续 prose 不覆盖已有 [R]', A.pickChildBrief('[R] 端口 8848', 'I will check that now.') === '[R] 端口 8848')
+check('③b 后续 [R] 覆盖先前 [R]', A.pickChildBrief('[R] 旧', '[R] 新') === '[R] 新')
+check('③b 全程 prose 仍保留（由上层判 no-brief，不注入）', A.pickChildBrief('', 'prose only') === 'prose only')
+
+/* ── ③c 空简报后的极窄跳过：只跳纯确认，不跳问句/报错/路径 ─────────────── */
+check('③c 空简报后“继续”可跳过', A.IDLE_SKIP === true && A.trivialContinuation('继续') && A.trivialContinuation('继续搞吧'))
+check('③c 带问号/报错/路径/长文本一律不跳',
+  !A.trivialContinuation('继续，顺便看下端口？')
+  && !A.trivialContinuation('报错了')
+  && !A.trivialContinuation('看下 src/web/memory.mjs')
+  && !A.trivialContinuation('继续把语义压缩和值保真两条线都跑一遍'))
 
 /* ── ④ extractTargets：度量用，别把目录/标识符当文件 ───────────────────── */
 check('④ Windows 盘符完整保留（旧实现从 DSH\\ 起匹配，丢盘符）',
@@ -119,6 +153,23 @@ check('⑤ 默认开摘要、总量上限 24000（【修 8】恢复：不裁会�
   A.DIGEST_ON === true && A.DIGEST_CLAMP === true)
 check('⑤ 逐行不截半（行内 slice 是修 5 的病灶：子会话会误判"回复被截断"）',
   dig.split('\n').every((l) => !l.startsWith('[A] ') || l === '[A] 我先看文件'))
+
+/* ── ⑤b DSH 0.1.7 工具结果形态：{role:'tool', toolCallId, content:[text]}，无 tool-result 块 ── */
+// 旧实现只认块级 tool-result ⇒ [T] 行整类消失、haystack 恒空 ⇒ 数字出处闸会把**正确**简报误删。
+const newShape = [
+  ev(1, 'tool/call', { callId: 'c3', name: 'memory_search', arguments: JSON.stringify({ query: '接口端口' }) }),
+  ev(2, 'tool/result', { message: { role: 'tool', toolCallId: 'c3', isError: false, content: [{ type: 'text', text: '{"count":1,"results":[{"value":"接口端口是 8848"}]}' }] } }),
+]
+const dig2 = A.buildDigest(newShape, 0)
+check('⑤b 0.1.7 形态仍产 [T] 行', /\[T\] memory_search \| - \| OK/.test(dig2), dig2)
+const infoOk = A.toolResultInfo(newShape[1])
+check('⑤b 正文进 haystack（数字出处闸能查到）',
+  infoOk.text.includes('8848') && infoOk.callId === 'c3' && infoOk.isError === false, JSON.stringify(infoOk))
+check('⑤b 消息层 isError=true ⇒ ERR（块级缺失时不能一律当成功）',
+  /\[T\] memory_search \| - \| ERR/.test(A.buildDigest([
+    ev(1, 'tool/call', { callId: 'c4', name: 'memory_search', arguments: '{}' }),
+    ev(2, 'tool/result', { message: { role: 'tool', toolCallId: 'c4', isError: true, content: [{ type: 'text', text: 'boom' }] } }),
+  ], 0)))
 
 /* ── ⑥ env 覆盖与"0 必须真关"（修 2 的病灶回归） ───────────────────────── */
 const B = await load('ext-b.mjs', {

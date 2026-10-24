@@ -66,7 +66,7 @@ const rowsOf = (line) => ['[ROUND] 1', '[U] 用户指令', line, '[T] read | src
   check('② 统计：a=1 / folded=1 / fallback=0 / calls=1',
     out.stat.a === 1 && out.stat.folded === 1 && out.stat.fallback === 0 && out.stat.calls === 1, JSON.stringify(out.stat))
   check('② 真实用量记账（auxCalls + 账单口径）',
-    out.stat.auxCalls === 1 && out.stat.auxBilled === Math.round(120 + 800 * 0.25 + 40), String(out.stat.auxBilled))
+    out.stat.auxCalls === 1 && out.stat.auxBilled === Math.round(120 + 800 / 30 + 40), String(out.stat.auxBilled))
   check('② 实测回本回合落盘（预估 vs 实付并列）',
     Number.isFinite(out.stat.paybackEst) && out.stat.paybackEst > 1, 'est=' + out.stat.paybackEst)
 }

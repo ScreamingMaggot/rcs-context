@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.39 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留)'
+const PLUGIN_VERSION = 'v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -484,11 +484,18 @@ function pathOf(argsJson) {
 // 【0.1.27 · 压缩比口径】本折压缩后占比 = 本次新增转录 ÷ 本次被转写的新原料。
 //   为什么必须"本折 ÷ 本折"：旧写法是 transcriptBytes(累计转录) / shadowedBytes(本折遮蔽)，
 //   首次折叠时二者同源才显得正常，增量折叠上结构性 >1（真机 5914%、917%、3824 倍）。
+// 【0.1.38 · head 段同口径】首折转录里有一段原样保留的 head（首次折叠前的首轮消息）：
+//   它折叠前后都是同一批字节（raw 1756B → transcript 1756B），字节中性，既不该进分子也不该进分母。
+//   旧实现分子含 head、分母只算新原料 ⇒ 真机 2150/2132=101%（新段实际 393B=18.5%）。
 //   缺增量数据的旧记录（v1.10.25 之前）回退旧算式，保证字段恒为数值。纯函数，可单测。
-export function foldShrinkOf({ appendedBytes, incrementalRawBytes, transcriptBytes, shadowedBytes }) {
+export function foldShrinkOf({ appendedBytes, incrementalRawBytes, headBytes = 0, transcriptBytes, shadowedBytes }) {
   const ap = Number(appendedBytes)
   const raw = Number(incrementalRawBytes)
-  if (Number.isFinite(ap) && Number.isFinite(raw) && raw > 0) return Number((ap / raw).toFixed(4))
+  if (Number.isFinite(ap) && Number.isFinite(raw) && raw > 0) {
+    const head = Number(headBytes)
+    const retained = Number.isFinite(head) && head > 0 ? head : 0
+    return Number((Math.max(0, ap - retained) / raw).toFixed(4))
+  }
   const tr = Number(transcriptBytes), sh = Number(shadowedBytes)
   if (Number.isFinite(tr) && Number.isFinite(sh)) return Number((tr / Math.max(1, sh)).toFixed(4))
   return null
@@ -1258,7 +1265,7 @@ export function effectiveMaxTokens(bodyChars, ceiling) {
 // =====================================================================================
 // 为什么必须加这道闸（实测标定见 tools/agg-cost.mjs，n=56 条带真实 usage 的探针记录）：
 //   折一条 [A] 要花**一次付费调用**，而它省下的 token 在后续回合里是**缓存读**——只值 D 倍。
-//   于是产生一个致命不对称：**今天按 1.0 全额付费，换取明天每回合 0.25 的折扣**。
+//   于是产生一个致命不对称：**今天按 1.0 全额付费，换取明天每回合 1/30 的折扣**。
 //
 //   计费等价（billed-equivalent token）：
 //     成本（一次性）  = 正文 token            [未缓存，1.0]
@@ -1274,7 +1281,7 @@ export function effectiveMaxTokens(bodyChars, ceiling) {
 //
 //   旋钮：
 //     DSH_CONTEXTINJECTOR_LOSSY_PAYBACK=<n>   允许的回本视界（回合）；**缺省 0 = 关闭该闸**（行为不变）
-//     DSH_CONTEXTINJECTOR_CACHE_DISCOUNT=<f>  缓存读折扣 D（默认 0.25，与 bench 的 BENCH_D 同量级）
+//     DSH_CONTEXTINJECTOR_CACHE_DISCOUNT=<f>  缓存读折扣 D（默认 1/30，按当前价目表；旧 0.25 为经验值）
 //     DSH_CONTEXTINJECTOR_CACHED_PREFIX_TOKENS=<n> 辅助调用被缓存的提示词前缀（默认 640，实测中位）
 //
 //   ★为什么缺省**关**：下面那组"字符→token / 输出比"常数是从探针语料反推的，而该语料在 token 拆分上
@@ -1291,7 +1298,9 @@ const PB_HORIZON = (() => {
 })()
 const PB_CACHE_DISCOUNT = (() => {
   const n = Number(process.env.DSH_CONTEXTINJECTOR_CACHE_DISCOUNT)
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.25
+  // 缓存读价按**当前价目表**取 1/30（未命中输入价的 0.0333…）；旧值 0.25 只是 bench 的
+  // BENCH_D 经验值，从未按价目表独立取数，会把回本回合数低估约 7.5 倍。换 provider 时用 env 覆盖。
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 1 / 30
 })()
 const PB_CACHED_PREFIX_TOKENS = (() => {
   const n = Number(process.env.DSH_CONTEXTINJECTOR_CACHED_PREFIX_TOKENS)
@@ -2192,7 +2201,11 @@ export default {
       const prevTranscriptBytes = (foldText === '' || standaloneSeg) ? 0 : foldText.length
       const incrementalRawBytes = rawNewBytes // 与微折门槛同源，避免两处口径漂移
       const appendedBytes = Math.max(0, transcriptBytes - prevTranscriptBytes)
-      const foldRatio = incrementalRawBytes > 0 ? Number((appendedBytes / incrementalRawBytes).toFixed(4)) : null
+      // 首折的 head 段原样保留（raw → transcript 同字节），字节中性：从分子剔除，分母本就不含它。
+      const headRetainedBytes = foldText === '' ? headBytes : 0
+      const foldRatio = incrementalRawBytes > 0
+        ? Number((Math.max(0, appendedBytes - headRetainedBytes) / incrementalRawBytes).toFixed(4))
+        : null
       // 【v1.10.38】同一个会话复用同一个 compactionId：宿主聊天区按 id 建标记节点，
       //   复用 ⇒ 只有一行「上下文已压缩」在原地更新，而不是每折一次追加一行。
       //   摘要只放两个比值（<1 表示这次/累计真的省了），不再写“规则折叠 N 条…”的长句。
@@ -2204,11 +2217,11 @@ export default {
       //   旧值 transcriptBytes/shadowedBytes 是"累计转录 ÷ 本折遮蔽"，首次折叠时二者同源才显得正常，
       //   增量折叠上结构性 >1（真机 5914%）——那是混合口径，不是压缩比。
       //   累计量仍以 transcriptBytes 原样保留；缺增量数据（老记录）时回退旧算式，保证字段恒为数值。
-      const foldShrink = foldShrinkOf({ appendedBytes, incrementalRawBytes, transcriptBytes, shadowedBytes })
+      const foldShrink = foldShrinkOf({ appendedBytes, incrementalRawBytes, headBytes: headRetainedBytes, transcriptBytes, shadowedBytes })
       log('fold-attempt', {
         trigger, step: stepNo, turn, claimed, end, keepInject: ki ? 1 : 0,
         shadowedCount: shadowedSeqs.length, shadowedSeqs,
-        headCount: headSeqs.length, headSeqs, headBytes,
+        headCount: headSeqs.length, headSeqs, headBytes, headRetainedBytes,
         incrementalCount: incremental.length, shadowedBytes,
         transcriptBytes, shrink: foldShrink, foldShrinkScope: 'this-fold(appended/incrementalRaw)',
         // v1.10.25 经济性口径（见上方注释）：真实请求体量 / 本次新原料 / 本次新增转录 / 本折压缩比
@@ -2280,7 +2293,7 @@ export default {
         //   本字段与 tools/measure-prompt-surface.mjs 的不变量判据互为交叉校验。
         const liveBytes = Array.isArray(after) ? after.reduce((a, e) => a + (Number(e.bytes) || 0), 0) : null
         rawAppend(sid, incremental) // raw 权威存证：每次成功折叠把被遮蔽增量原文全量落盘（无论是否 lossy）
-        log('fold-committed', { trigger, step: stepNo, after, liveBytes, incrementalRawBytes, appendedBytes, foldRatio, cumRatio })
+        log('fold-committed', { trigger, step: stepNo, after, liveBytes, incrementalRawBytes, appendedBytes, headRetainedBytes, foldRatio, cumRatio })
         console.log(`[contextinjector] fold trigger=${trigger} @step${stepNo}: ${incrementalRawBytes}->${appendedBytes} B (${(1 / Math.max(1e-9, foldShrink)).toFixed(2)}x), round=${foldRound}${mode !== 'off' ? ` condense[${mode}]:[A]${stat?.folded ?? 0}/${stat?.a ?? 0}` : ''}`)
         // 【v1.10.5 ★必须-1】折叠索引（只追加，供 LogCompiler K 做 seq ↔ 转录累计行号双向溯源）
         
@@ -2295,10 +2308,10 @@ try {
           condenseRoute, // v1.8：实际浓缩模型（provider/model/来源），便于核验"用了谁的模型"
           condenseErr, // v1.9：本次折叠浓缩模型调用失败原因（无则 undefined，JSON 省略）
           condenseErrKind, // #9：condenseErr 的分型 enum（供 WebUI 如实展示错误类别）
-          shadowedBytes, transcriptBytes, shrink: foldShrink, foldShrinkScope: 'this-fold(appended/incrementalRaw)',
+          shadowedBytes, transcriptBytes, shrink: foldShrink, foldShrinkScope: 'this-fold((appended-headRetained)/incrementalRaw)',
           // 【v1.10.25】`shrink` 保留（面板/历史消费方零改动），但它**不是收益指标**：单段模式下
           //   被替换集含上一版转录节点本身 ⇒ 结构上恒 ≈1（实测 0.998）。真正的收益看下面四个量：
-          liveBytes, incrementalRawBytes, appendedBytes, foldRatio, cumRatio,
+          liveBytes, incrementalRawBytes, appendedBytes, headRetainedBytes, foldRatio, cumRatio,
           headSeqs, headBytes, // v1.10.1：本次折叠补录的头部节点；v1.10.13 起多段转录下该段**同时被遮蔽**（不再重复）
           transcriptHash: hash256(transcript).slice(0, 16),
           // v1.10.13 多段转录：新增 `segments`/`segCount`（`full` 仍 = 全部段按序拼接 ⇒ 面板与协作方零改动）
@@ -2434,9 +2447,13 @@ try {
             if (TRACE) {
               try { log('trace', { step: stepNo, turn, claimed, transcript: transcriptNodesOf(session.deriveMessages()) }) } catch { /* best-effort */ }
             }
-            // 放在 next() 之前：next() 就拿当前 surface 组装请求，join 得越早越好。
-            // 超时上限由 foldJoinTimeoutMs 钉死（缺省 3s）——后台折叠再慢也拖不住本轮。
-            await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
+            // 【v1.10.53 · 非阻塞 join】不再 await 折叠完成——后台折叠再慢也不拖住本轮请求。
+            // 折叠结果稍后落地，下一轮 pre-step 自然看到折叠后的 surface。
+            // 旧实现：await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
+            //        导致用户看到"压缩中"最多 3s，主对话被阻滞。
+            joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo).catch((err) => {
+              log('join-fold-error', { error: String(err?.message ?? err) })
+            })
             // 回归通道（缺省关）：headless 单轮没有 turn/end 事件，仍允许在 pre-step 同步折一次。
             // 必须在 next() **之后**折（那时本轮 [A] 才在 surface 上）；生产路径不会走到这里。
             if (TEST_ROUND) testFold = { session, surface, sid, ctrl, gate, stepNo, turn, claimed }

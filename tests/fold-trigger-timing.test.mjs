@@ -223,10 +223,12 @@ const A = (n) => '第一轮的回答内容较长'.repeat(n)
   const t0 = Date.now()
   const pre = await host.preStep()
   const elapsed = Date.now() - t0
-  check('④ pre-step 最多等 foldJoinTimeoutMs（不被 1.2s 浓缩拖住）',
-    pre.nextCalls === 1 && elapsed >= 150 && elapsed < 1000, `elapsed=${elapsed}ms`)
-  check('④ join 超时后请求照常放行（决策已返回）', pre.decision === 'decision')
-  check('④ 超时当时折叠仍在飞（检查点尚未提交）', checkpoints(host).length === 0,
+  // 【v1.10.53 · 非阻塞 join】pre-step 不再等待折叠完成，直接放行请求。
+  // 旧行为：elapsed >= 150（等 foldJoinTimeoutMs）；新行为：elapsed < 50（几乎不等待）。
+  check('④ pre-step 非阻塞 join（不被慢折叠拖住）',
+    pre.nextCalls === 1 && elapsed < 50, `elapsed=${elapsed}ms`)
+  check(' join 后请求照常放行（决策已返回）', pre.decision === 'decision')
+  check('④ join 时折叠仍在飞（检查点尚未提交）', checkpoints(host).length === 0,
     `checkpoints=${checkpoints(host).length}`)
 
   const cp = await waitFor(() => checkpoints(host)[0], 5000)

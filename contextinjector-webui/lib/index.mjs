@@ -34,10 +34,15 @@ function sqliteModule() {
 }
 const truthy = (v) => v === true || v === '1'
 function memoryFlags(control, env = process.env) {
+  const idleRaw = Number(env.DSH_MEMORY_CONSOLIDATE_IDLE_MS) || Number(control.memoryConsolidateIdleMs) || 15 * 60 * 1000
   return {
     enabled: env.DSH_MEMORY === '0' ? false : (truthy(env.DSH_MEMORY) || control.memoryEnabled === true),
     llmEnabled: env.DSH_MEMORY_LLM === '0' ? false : (truthy(env.DSH_MEMORY_LLM) || control.memoryLlmEnabled === true),
     injectCatalog: env.DSH_MEMORY_INJECT === '0' ? false : control.memoryInjectCatalog !== false,
+    handoff: env.DSH_MEMORY_HANDOFF === '0' ? false : control.memoryHandoff !== false,
+    consolidateAuto: env.DSH_MEMORY_CONSOLIDATE === '0' ? false
+      : (env.DSH_MEMORY_CONSOLIDATE === '1' || control.memoryConsolidateAuto !== false),
+    consolidateIdleMs: Math.max(60_000, Math.min(24 * 3600_000, idleRaw)),
   }
 }
 // 环境变量是否真的把某一项钉死（与 web/memory.mjs 的解析同口径）：
@@ -48,16 +53,47 @@ function envLockOf(env = process.env) {
     enabled: env.DSH_MEMORY === '0' || env.DSH_MEMORY === '1',
     llmEnabled: env.DSH_MEMORY_LLM === '0' || env.DSH_MEMORY_LLM === '1',
     injectCatalog: env.DSH_MEMORY_INJECT === '0',
+    handoff: env.DSH_MEMORY_HANDOFF === '0',
+    consolidateAuto: env.DSH_MEMORY_CONSOLIDATE === '0' || env.DSH_MEMORY_CONSOLIDATE === '1',
   }
 }
 // 只读快照：任何一步失败都返回已有结构 + error，面板不空白。
-async function memorySnapshot(sessionId = null) {
+// range：all | workspace | session | current（当前工作区 + 本会话私有）；缺省有会话时 current，否则 all。
+async function memorySnapshot(sessionId = null, opts = {}) {
   const control = readControl()
+  const wsReg = workspaceRegistry()
+  const titles = loadSessionTitles()
+  const titleCache = new Map()
+  const bare = sessionId ? bareSid(sessionId) : null
+  const cwd = bare ? sessionCwdOf(bare) : ''
+  const curWs = bare ? (wsReg.bySid.get(bare) || (cwd ? workspaceInfo(cwd, wsReg) : null)) : null
+  const curWsScope = curWs?.path ? 'ws:' + normWsKey(curWs.path) : null
+  const curSessScope = bare ? 'sess:' + bare : null
+  const curTitle = bare ? sessionTitleOf(bare, titles, titleCache) : ''
+  const reqRange = ['all', 'workspace', 'session', 'current'].includes(String(opts.range ?? ''))
+    ? String(opts.range) : (sessionId ? 'current' : 'all')
+  let range = reqRange
+  if (range === 'workspace' && !curWsScope) range = 'all'
+  else if (range === 'session' && !curSessScope) range = 'all'
+  else if (range === 'current' && !curWsScope && !curSessScope) range = 'all'
+  // 事实钻取/分页：默认仍为 200 条，老调用方不传参数时行为不变。
+  const factLimit = Math.max(1, Math.min(1000, Number(opts.factLimit) || 200))
+  const focusRaw = String(opts.focusScope ?? '')
+  const focusScope = /^(ws|sess):[^|]{1,400}$/.test(focusRaw) ? focusRaw : null
+  const sinceRaw = Number(opts.sinceTs)
+  const sinceTs = Number.isFinite(sinceRaw) && sinceRaw > 0 ? Math.min(Date.now(), sinceRaw) : 0
+  // 游标分页：updated_ts 相同的记录用 rowid 破平，避免翻页时重复/漏条。
+  const cursorRaw = String(opts.cursor ?? '')
+  const cursorMatch = /^(\d{1,16}):(\d{1,16})$/.exec(cursorRaw)
+  const cursor = cursorMatch ? { ts: Number(cursorMatch[1]), rowid: Number(cursorMatch[2]) } : null
   const out = {
     flags: memoryFlags(control),
     db: { path: MEM_DB, exists: existsSync(MEM_DB), bytes: 0 },
     totals: { active: 0, resolved: 0, insights: 0, errors: 0, workspaces: 0 },
-    kinds: [], workspaces: [], insights: [], recent: [],
+    range: reqRange,
+    rangeEffective: range,
+    current: null,
+    kinds: [], workspaces: [], sessions: [], insights: [], recent: [],
     compile: { cursors: 0, last: null },
     // 轻 LLM 编译的显式路由覆盖（control.memoryLlmProvider/Model）；两者都空 = 跟随会话模型。
     llmRoute: {
@@ -65,6 +101,23 @@ async function memorySnapshot(sessionId = null) {
       model: typeof control?.memoryLlmModel === 'string' && control.memoryLlmModel ? control.memoryLlmModel : null,
     },
     inflight: sessionId ? readMemoryInflight(sessionId) : null,
+    // 记忆整理：下次自动时间、进行中阶段、上次结果（均按会话存档；无会话时只有开关与间隔）。
+    consolidate: (() => {
+      const flags = memoryFlags(control)
+      const manualRoute = {
+        provider: typeof control?.memoryConsolidateManualProvider === 'string' && control.memoryConsolidateManualProvider ? control.memoryConsolidateManualProvider : null,
+        model: typeof control?.memoryConsolidateManualModel === 'string' && control.memoryConsolidateManualModel ? control.memoryConsolidateManualModel : null,
+      }
+      const base = { auto: flags.consolidateAuto, idleMs: flags.consolidateIdleMs, manualRoute, next: null, inflight: null, last: null }
+      if (!sessionId) return base
+      const id = normSid(sessionId)
+      return {
+        ...base,
+        next: readJson(memSessionFile('consolidate-next', id)),
+        inflight: readConsolidateInflight(id),
+        last: readJson(memSessionFile('consolidate-last', id)),
+      }
+    })(),
     session: null,
     // armed=记忆插件在本进程里真正 apply 过（meta.armedPid 与当前 pid 同号）；仅控制层启用还不够。
     armed: false,
@@ -83,12 +136,51 @@ async function memorySnapshot(sessionId = null) {
     out.sqlite = true
     const one = (sql, ...args) => { try { return db.prepare(sql).get(...args) } catch { return null } }
     const all = (sql, ...args) => { try { return db.prepare(sql).all(...args) } catch { return [] } }
+    // 作用域是否真实存在：未知会话不能因为构造出 sess:<sid> 就声称"当前上下文"。
+    const scopeHas = (scope) => !!scope && !!one('SELECT 1 x FROM records WHERE scope=? LIMIT 1', scope)
+    const knownSession = !!curWs || scopeHas(curSessScope)
+    if (range === 'workspace' && !curWs) range = 'all'
+    else if (range === 'session' && !curWs && !scopeHas(curSessScope)) range = 'all'
+    else if (range === 'current' && !curWs && !scopeHas(curSessScope)) range = 'all'
+    out.rangeEffective = range
+    const scopes = [curWsScope, curSessScope].filter(Boolean)
+    const rangeSql = range === 'all' ? '' : (range === 'current'
+      ? ` AND scope IN (${scopes.map(() => '?').join(',')})`
+      : ' AND scope=?')
+    const rangeArgs = range === 'all' ? [] : (range === 'current' ? scopes : [range === 'workspace' ? curWsScope : curSessScope])
+    // 作用域钻取：与客户端 visibleMemoryGraph 的 focus 语义一致。
+    //   sess:S → 本会话私有事实 + 由 S 产生的工作区共享事实；
+    //   ws:X   → X 的共享事实 + 属于 X 的会话私有事实。
+    let focusSql = ''
+    let focusArgs = []
+    if (focusScope && focusScope.startsWith('sess:')) {
+      focusSql = " AND (scope=? OR (scope LIKE 'ws:%' AND sid=?))"
+      focusArgs = [focusScope, focusScope.slice(5)]
+    } else if (focusScope && focusScope.startsWith('ws:')) {
+      const sids = []
+      for (const [sid, info] of wsReg.bySid) {
+        if (info?.path && ('ws:' + normWsKey(info.path)) === focusScope) sids.push('sess:' + bareSid(sid))
+      }
+      focusSql = sids.length
+        ? ` AND (scope=? OR scope IN (${sids.map(() => '?').join(',')}))`
+        : ' AND scope=?'
+      focusArgs = [focusScope, ...sids]
+    }
+    // 时间窗：只过滤事实/最近记录，不改全库 totals 与范围节点本身。
+    const sinceSql = sinceTs ? ' AND updated_ts>=?' : ''
+    const sinceArgs = sinceTs ? [sinceTs] : []
+    // 游标只约束事实页；insights/recent/总数仍按原范围口径。
+    const cursorSql = cursor ? ' AND (updated_ts<? OR (updated_ts=? AND rowid<?))' : ''
+    const cursorArgs = cursor ? [cursor.ts, cursor.ts, cursor.rowid] : []
     const armed = one("SELECT value FROM meta WHERE key='armedPid'")
     const armedAt = one("SELECT value FROM meta WHERE key='armedAt'")
-    // pid 可能被重启后的进程复用：再要求 armedAt 不早于本进程启动（留 5s 装载余量）。
-    const procStart = Date.now() - process.uptime() * 1000
-    out.armed = armed != null && Number(armed.value) === process.pid
-      && armedAt != null && Number(armedAt.value) >= procStart - 5000
+    // 心跳口径：armedAt 由记忆层每 60s 续期，2.5 分钟内算活着；armedPid 被子实例清 0 不再误报。
+    // 若 pid 属于另一个仍在运行的进程，则不把共享库里的新鲜心跳算到本进程头上。
+    const armedPid = Number(armed?.value ?? NaN)
+    const armedAtMs = Number(armedAt?.value ?? 0)
+    out.armed = out.flags.enabled === true
+      && armedAtMs > 0 && (Date.now() - armedAtMs) < 150000
+      && (armedPid === process.pid || armedPid === 0)
     const active = Number(one("SELECT COUNT(*) n FROM records WHERE status='active'")?.n ?? 0)
     const resolved = Number(one("SELECT COUNT(*) n FROM records WHERE status='resolved'")?.n ?? 0)
     out.totals.active = active
@@ -98,31 +190,109 @@ async function memorySnapshot(sessionId = null) {
     out.totals.workspaces = Number(one("SELECT COUNT(DISTINCT scope) n FROM records WHERE scope LIKE 'ws:%'")?.n ?? 0)
     out.kinds = all("SELECT kind, COUNT(*) n FROM records WHERE status='active' GROUP BY kind ORDER BY n DESC")
       .map((r) => ({ kind: String(r.kind), n: Number(r.n) }))
-    out.workspaces = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records GROUP BY scope ORDER BY last DESC LIMIT 8")
-      .map((r) => ({ scope: String(r.scope), n: Number(r.n), last: Number(r.last) }))
-    out.insights = all("SELECT key, value, scope, updated_ts FROM records WHERE kind='insight' AND status='active' ORDER BY updated_ts DESC LIMIT 20")
+    const byCurrent = (a, b) => (Number(b.current) - Number(a.current)) || (b.last - a.last)
+    out.workspaces = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records WHERE scope LIKE 'ws:%' GROUP BY scope ORDER BY last DESC LIMIT 12")
+      .map((r) => {
+        const scope = String(r.scope)
+        const info = workspaceInfo(scope, wsReg)
+        return { scope, kind: 'workspace', label: info.title, path: info.path, n: Number(r.n), last: Number(r.last), current: scope === curWsScope }
+      }).sort(byCurrent)
+    out.sessions = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records WHERE scope LIKE 'sess:%' GROUP BY scope ORDER BY last DESC LIMIT 12")
+      .map((r) => {
+        const scope = String(r.scope)
+        const sid = scope.slice(5)
+        const title = sessionTitleOf(sid, titles, titleCache)
+        const ws = wsReg.bySid.get(bareSid(sid)) || null
+        return {
+          scope, kind: 'session', sid, label: sessionLabelOf(sid, title), title,
+          workspace: ws?.title || '', path: ws?.path || '',
+          n: Number(r.n), last: Number(r.last), current: scope === curSessScope,
+        }
+      }).sort(byCurrent)
+    const scopeMeta = (scope, sid) => {
+      const s = String(scope || '')
+      if (s.startsWith('ws:')) {
+        const info = workspaceInfo(s, wsReg)
+        return { scopeLabel: '工作区 ' + (info.title || info.path), originTitle: sid ? sessionTitleOf(sid, titles, titleCache) : '' }
+      }
+      const x = s.startsWith('sess:') ? s.slice(5) : s
+      return { scopeLabel: sessionLabelOf(x, sessionTitleOf(x, titles, titleCache)), originTitle: '' }
+    }
+    out.insights = all(`SELECT key, value, scope, sid, updated_ts FROM records WHERE kind='insight' AND status='active'${rangeSql}${focusSql}${sinceSql} ORDER BY updated_ts DESC LIMIT 20`, ...rangeArgs, ...focusArgs, ...sinceArgs)
       .map((r) => {
         let v = {}
         try { v = JSON.parse(r.value) } catch { /* keep empty */ }
+        const m = scopeMeta(r.scope, r.sid)
         return {
           key: String(r.key), summary: String(v.summary ?? ''), confidence: Number(v.confidence ?? 0),
-          model: v.model ?? null, scope: String(r.scope), updated_ts: Number(r.updated_ts),
+          model: v.model ?? null, scope: String(r.scope), scopeLabel: m.scopeLabel,
+          originSid: r.sid ? bareSid(r.sid) : null, originTitle: m.originTitle,
+          updated_ts: Number(r.updated_ts),
           evidence: Array.isArray(v.evidence) ? v.evidence.length : 0,
           evidenceIds: Array.isArray(v.evidence) ? v.evidence.slice(-8).map(Number) : [],
         }
       })
-    out.recent = all("SELECT kind, key, status, scope, updated_ts FROM records ORDER BY updated_ts DESC LIMIT 15")
-      .map((r) => ({ kind: String(r.kind), key: String(r.key), status: String(r.status), scope: String(r.scope), updated_ts: Number(r.updated_ts) }))
+    out.recent = all(`SELECT kind, key, status, scope, sid, updated_ts FROM records WHERE 1=1${rangeSql}${focusSql}${sinceSql} ORDER BY updated_ts DESC LIMIT 15`, ...rangeArgs, ...focusArgs, ...sinceArgs)
+      .map((r) => {
+        const m = scopeMeta(r.scope, r.sid)
+        return {
+          kind: String(r.kind), key: String(r.key), status: String(r.status), scope: String(r.scope),
+          scopeLabel: m.scopeLabel, originSid: r.sid ? bareSid(r.sid) : null, originTitle: m.originTitle,
+          updated_ts: Number(r.updated_ts),
+        }
+      })
+    const countScope = (scope) => {
+      if (!scope) return { records: 0, insights: 0 }
+      return {
+        records: Number(one('SELECT COUNT(*) n FROM records WHERE scope=?', scope)?.n ?? 0),
+        insights: Number(one("SELECT COUNT(*) n FROM records WHERE scope=? AND kind='insight' AND status='active'", scope)?.n ?? 0),
+      }
+    }
+    const wsCount = countScope(curWsScope)
+    const sessCount = countScope(curSessScope)
+    if (sessionId && knownSession) {
+      out.current = {
+        sid: bare,
+        title: curTitle,
+        workspace: curWs ? {
+          scope: curWsScope, title: curWs.title, path: curWs.path,
+          records: wsCount.records, insights: wsCount.insights,
+        } : null,
+        session: { scope: curSessScope, title: curTitle, records: sessCount.records, insights: sessCount.insights },
+        records: wsCount.records + sessCount.records,
+        insights: wsCount.insights + sessCount.insights,
+      }
+    }
+    out.graph = null
     out.compile.cursors = Number(one("SELECT COUNT(*) n FROM meta WHERE key LIKE 'compiledThrough:%'")?.n ?? 0)
     const last = one("SELECT key, value FROM meta WHERE key LIKE 'llmThrough:%' ORDER BY CAST(value AS INTEGER) DESC LIMIT 1")
     out.compile.last = last ? { sid: String(last.key).replace(/^llmThrough:/, ''), through: Number(last.value) } : null
-    if (sessionId) {
+    if (sessionId && knownSession) {
       const sid = normSid(sessionId)
+      const injRaw = one("SELECT value FROM meta WHERE key=?", 'injected:' + sid)?.value
+      let injection = null
+      if (injRaw) {
+        try {
+          const j = JSON.parse(injRaw)
+          injection = {
+            chars: Number(j.chars ?? 0), handover: !!j.handover, sha1: j.sha1 ?? null,
+            at: Number(j.at ?? 0) || null, untrusted: true,
+            text: String(j.text ?? '').slice(0, 1600),
+          }
+        } catch { injection = { legacy: true, untrusted: true } }
+      }
       out.session = {
         sid,
+        title: curTitle,
         records: Number(one('SELECT COUNT(*) n FROM records WHERE sid=?', sid)?.n ?? 0),
+        privateRecords: sessCount.records,
+        privateInsights: sessCount.insights,
+        workspaceRecords: wsCount.records,
+        workspaceInsights: wsCount.insights,
+        workspace: curWs ? { title: curWs.title, path: curWs.path, scope: curWsScope } : null,
         turns: Number(one("SELECT COUNT(*) n FROM records WHERE sid=? AND kind='user_turn'", sid)?.n ?? 0),
-        injected: Number(one("SELECT COUNT(*) n FROM meta WHERE key=?", 'injected:' + sid)?.n ?? 0) > 0,
+        injected: !!injRaw,
+        injection,
         compiledThrough: Number(one('SELECT value FROM meta WHERE key=?', 'compiledThrough:' + sid)?.value ?? -1),
         llmThrough: Number(one('SELECT value FROM meta WHERE key=?', 'llmThrough:' + sid)?.value ?? -1),
       }
@@ -135,6 +305,284 @@ async function memorySnapshot(sessionId = null) {
   return out
 }
 
+// 独立图谱端点：只返回 graph 部分（nodes/edges/stats），不含 records/insights/recent 等。
+// 用于前端图谱 tab 按需拉取，避免 5s 轮询 /api/memory/status 时携带 64.9% 的图谱负载。
+async function memoryGraph(sessionId = null, opts = {}) {
+  const out = { ok: true, graph: null, error: null }
+  if (!existsSync(MEM_DB)) { out.error = 'db-missing'; return out }
+  const sq = await sqliteModule()
+  if (!sq) { out.error = 'sqlite-unavailable'; return out }
+  let db = null
+  try {
+    db = new sq.DatabaseSync(MEM_DB, { readOnly: true })
+    const one = (sql, ...a) => { try { return db.prepare(sql).get(...a) ?? null } catch { return null } }
+    const all = (sql, ...a) => { try { return db.prepare(sql).all(...a) ?? [] } catch { return [] } }
+    const range = String(opts.range ?? 'current')
+    const bare = sessionId ? normSid(sessionId) : ''
+    const knownSession = !!(sessionId && bare)
+    const curSessScope = knownSession ? 'sess:' + bare : null
+    const wsReg = workspaceRegistry()
+    const curWsScope = knownSession ? (wsReg.bySid.get(bare) ? 'ws:' + normWsKey(wsReg.bySid.get(bare).path) : null) : null
+    const curWs = curWsScope ? workspaceInfo(curWsScope, wsReg) : null
+    const titles = loadSessionTitles()
+    const titleCache = new Map()
+    const curTitle = knownSession ? sessionTitleOf(bare, titles, titleCache) : ''
+    const focusScopeRaw = opts.focusScope ? String(opts.focusScope) : null
+    const focusScope = (focusScopeRaw && (focusScopeRaw.startsWith('ws:') || focusScopeRaw.startsWith('sess:'))) ? focusScopeRaw : null
+    const factLimit = Math.max(1, Math.min(1000, Number(opts.factLimit) || 200))
+    const sinceTsRaw = opts.sinceTs ? Number(opts.sinceTs) : 0
+    const sinceTs = Number.isFinite(sinceTsRaw) && sinceTsRaw > 0 ? sinceTsRaw : 0
+    const cursorRaw = String(opts.cursor ?? '')
+    const cursorMatch = /^(\d{1,16}):(\d{1,16})$/.exec(cursorRaw)
+    const cursor = cursorMatch ? { ts: Number(cursorMatch[1]), rowid: Number(cursorMatch[2]) } : null
+    let rangeSql = '', rangeArgs = []
+    if (range === 'workspace' && curWsScope) { rangeSql = ' AND scope=?'; rangeArgs = [curWsScope] }
+    else if (range === 'session' && curSessScope) { rangeSql = ' AND scope=?'; rangeArgs = [curSessScope] }
+    else if (range === 'current') {
+      if (curWsScope && curSessScope) { rangeSql = ' AND scope IN (?,?)'; rangeArgs = [curWsScope, curSessScope] }
+      else if (curWsScope) { rangeSql = ' AND scope=?'; rangeArgs = [curWsScope] }
+      else if (curSessScope) { rangeSql = ' AND scope=?'; rangeArgs = [curSessScope] }
+    }
+    let focusSql = '', focusArgs = []
+    if (focusScope) {
+      if (focusScope.startsWith('ws:')) { focusSql = ' AND (scope=? OR (scope LIKE \'sess:%\' AND sid IN (SELECT sid FROM records WHERE scope=?)))'; focusArgs = [focusScope, focusScope] }
+      else if (focusScope.startsWith('sess:')) { focusSql = ' AND (scope=? OR scope=?)'; focusArgs = [focusScope, focusScope] }
+    }
+    let sinceSql = '', sinceArgs = []
+    if (sinceTs && Number.isFinite(sinceTs)) { sinceSql = ' AND updated_ts>=?'; sinceArgs = [sinceTs] }
+    let cursorSql = '', cursorArgs = []
+    if (cursor) { cursorSql = ' AND (updated_ts<? OR (updated_ts=? AND rowid<?))'; cursorArgs = [cursor.ts, cursor.ts, cursor.rowid] }
+    const scopeMeta = (scope, sid) => {
+      const s = String(scope || '')
+      if (s.startsWith('ws:')) {
+        const info = workspaceInfo(s, wsReg)
+        return { scopeLabel: '工作区 ' + (info.title || info.path), originTitle: sid ? sessionTitleOf(sid, titles, titleCache) : '' }
+      }
+      const x = s.startsWith('sess:') ? s.slice(5) : s
+      return { scopeLabel: sessionLabelOf(x, sessionTitleOf(x, titles, titleCache)), originTitle: '' }
+    }
+    const wsScopeOfSid = (sid) => {
+      const w = wsReg.bySid.get(bareSid(sid))
+      return w ? 'ws:' + normWsKey(w.path) : null
+    }
+    const gWs = new Map()
+    const wsRows = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records WHERE scope LIKE 'ws:%' GROUP BY scope ORDER BY last DESC LIMIT 12")
+    for (const r of wsRows) {
+      const info = workspaceInfo(r.scope, wsReg)
+      gWs.set(r.scope, { id: r.scope, scope: r.scope, kind: 'workspace', label: info.title, path: info.path, n: Number(r.n), last: Number(r.last), current: r.scope === curWsScope, facts: 0 })
+    }
+    if (curWsScope && !gWs.has(curWsScope)) {
+      gWs.set(curWsScope, {
+        id: curWsScope, scope: curWsScope, kind: 'workspace', label: curWs?.title || workspaceInfo(curWsScope, wsReg).title,
+        path: curWs?.path || workspaceInfo(curWsScope, wsReg).path, n: 0, last: Date.now(), current: true, facts: 0,
+      })
+    }
+    const gSess = new Map()
+    const sessRows = all("SELECT scope, COUNT(*) n, MAX(updated_ts) last FROM records WHERE scope LIKE 'sess:%' GROUP BY scope ORDER BY last DESC LIMIT 12")
+    for (const r of sessRows) {
+      const scope = String(r.scope)
+      const sid = scope.slice(5)
+      const title = sessionTitleOf(sid, titles, titleCache)
+      const ws = wsReg.bySid.get(bareSid(sid)) || null
+      gSess.set(scope, {
+        id: scope, scope, kind: 'session', sid, label: sessionLabelOf(sid, title), title,
+        workspace: ws?.title || '', path: ws?.path || '',
+        workspaceScope: ws ? 'ws:' + normWsKey(ws.path) : null,
+        n: Number(r.n), last: Number(r.last), current: scope === curSessScope, facts: 0, originFacts: 0,
+      })
+    }
+    if (curSessScope && !gSess.has(curSessScope)) {
+      gSess.set(curSessScope, {
+        id: curSessScope, scope: curSessScope, kind: 'session', sid: bare, label: sessionLabelOf(bare, curTitle), title: curTitle,
+        workspace: curWs?.title || '', path: curWs?.path || '', workspaceScope: curWsScope,
+        n: 0, last: Date.now(), current: true, facts: 0, originFacts: 0,
+      })
+    }
+    const sidCounts = new Map(all("SELECT sid, COUNT(*) n, MAX(updated_ts) last FROM records WHERE sid<>'' GROUP BY sid")
+      .map((r) => [bareSid(r.sid), { n: Number(r.n), last: Number(r.last) }]))
+    const ensureSession = (sid) => {
+      const s = bareSid(sid)
+      if (!s) return null
+      const id = 'sess:' + s
+      if (!gSess.has(id)) {
+        const wsScope = wsScopeOfSid(s)
+        const wsInfo = wsScope ? workspaceInfo(wsScope, wsReg) : null
+        const c = sidCounts.get(s) || { n: 0, last: 0 }
+        gSess.set(id, {
+          id, scope: id, kind: 'session', sid: s, label: sessionLabelOf(s, sessionTitleOf(s, titles, titleCache)),
+          title: sessionTitleOf(s, titles, titleCache), workspace: wsInfo?.title || '', path: wsInfo?.path || '',
+          workspaceScope: wsScope, n: c.n, last: c.last, current: id === curSessScope, facts: 0, originFacts: 0,
+        })
+      }
+      return gSess.get(id)
+    }
+    const factRowsRaw = all(`SELECT rowid AS rid, key, value, scope, sid, status, fact_type, updated_ts FROM records
+      WHERE kind='insight' AND status IN ('active','stale','historical','superseded')${rangeSql}${focusSql}${sinceSql}${cursorSql}
+      ORDER BY updated_ts DESC, rowid DESC LIMIT ?`, ...rangeArgs, ...focusArgs, ...sinceArgs, ...cursorArgs, factLimit + 1)
+    const hasMore = factRowsRaw.length > factLimit
+    const factRows = hasMore ? factRowsRaw.slice(0, factLimit) : factRowsRaw
+    const factTail = factRows[factRows.length - 1] || null
+    const nextCursor = hasMore && factTail ? (Number(factTail.updated_ts) + ':' + Number(factTail.rid)) : null
+    const factTotal = Number(one(`SELECT COUNT(*) n FROM records
+      WHERE kind='insight' AND status IN ('active','stale','historical','superseded')${rangeSql}${focusSql}${sinceSql}`,
+      ...rangeArgs, ...focusArgs, ...sinceArgs)?.n ?? 0)
+    const scopeFactCounts = new Map(all(`SELECT scope, COUNT(*) n FROM records
+      WHERE kind='insight' AND status IN ('active','stale','historical','superseded')${rangeSql}${sinceSql}
+      GROUP BY scope`, ...rangeArgs, ...sinceArgs).map((r) => [String(r.scope), Number(r.n) || 0]))
+    const factNodes = []
+    const edges = []
+    const edgeSeen = new Set()
+    const addEdge = (source, target, kind) => {
+      if (!source || !target) return
+      const k = source + '|' + target + '|' + kind
+      if (edgeSeen.has(k)) return
+      edgeSeen.add(k)
+      edges.push({ source, target, kind })
+    }
+    for (const r of factRows) {
+      const scope = String(r.scope)
+      let v = {}
+      try { v = JSON.parse(r.value) } catch { /* keep empty */ }
+      const meta = scopeMeta(scope, r.sid)
+      const originSid = r.sid ? bareSid(r.sid) : ''
+      const node = {
+        id: 'fact:' + scope + '|' + String(r.key), kind: 'fact', key: String(r.key),
+        summary: String(v.summary ?? ''), factType: String(r.fact_type || v.type || ''),
+        status: String(r.status || ''), confidence: Number(v.confidence ?? 0),
+        scope, scopeLabel: meta.scopeLabel, originSid, originTitle: meta.originTitle,
+        updated_ts: Number(r.updated_ts), evidence: Array.isArray(v.evidence) ? v.evidence.length : 0,
+        model: v.model ?? null,
+      }
+      factNodes.push(node)
+      if (scope.startsWith('ws:')) {
+        if (!gWs.has(scope)) {
+          const info = workspaceInfo(scope, wsReg)
+          gWs.set(scope, { id: scope, scope, kind: 'workspace', label: info.title, path: info.path, n: 0, last: node.updated_ts, current: scope === curWsScope, facts: 0 })
+        }
+        const w = gWs.get(scope)
+        w.facts += 1
+        addEdge(node.id, scope, 'shared')
+        if (originSid) {
+          const s = ensureSession(originSid)
+          if (s) { s.originFacts += 1; addEdge(node.id, s.scope, 'origin') }
+        }
+      } else if (scope.startsWith('sess:')) {
+        const s = ensureSession(scope.slice(5))
+        if (s) { s.facts += 1; addEdge(node.id, s.scope, 'private') }
+      }
+    }
+    for (const s of gSess.values()) {
+      if (s.workspaceScope) {
+        if (!gWs.has(s.workspaceScope)) {
+          const info = workspaceInfo(s.workspaceScope, wsReg)
+          gWs.set(s.workspaceScope, { id: s.workspaceScope, scope: s.workspaceScope, kind: 'workspace', label: info.title, path: info.path, n: 0, last: s.last, current: s.workspaceScope === curWsScope, facts: 0 })
+        }
+        addEdge(s.scope, s.workspaceScope, 'member')
+      }
+    }
+    for (const w of gWs.values()) w.factTotal = scopeFactCounts.get(w.scope) || 0
+    for (const s of gSess.values()) s.factTotal = scopeFactCounts.get(s.scope) || 0
+    out.graph = {
+      nodes: [...gWs.values(), ...gSess.values(), ...factNodes],
+      edges,
+      stats: {
+        workspaces: gWs.size,
+        sessions: gSess.size,
+        facts: factNodes.length,
+        activeFacts: factNodes.filter((x) => x.status === 'active').length,
+        factTotal,
+        factLimit,
+        sinceTs,
+        hasMore,
+        nextCursor,
+        cursor: cursor ? cursorRaw : null,
+        truncated: factTotal > factNodes.length,
+        focusScope: focusScope || null,
+      },
+    }
+  } catch (err) {
+    out.error = String(err?.message ?? err)
+  } finally {
+    try { db?.close() } catch { /* already closed */ }
+  }
+  return out
+}
+
+// 证据摘要：事件 value 是 JSON 对象，按"人读优先"的字段顺序拼一行；没有已知字段时退回 JSON。
+// 只做展示，不参与任何判定；原文另存 raw 供展开。
+function evidencePreview(v) {
+  if (v == null) return ''
+  if (typeof v === 'string') return v
+  if (typeof v !== 'object') return String(v)
+  const order = ['summary', 'text', 'cmd', 'pattern', 'question', 'answer', 'path', 'target', 'head', 'tail', 'job_id', 'state', 'status']
+  const picks = []
+  for (const k of order) {
+    const x = v[k]
+    if (typeof x === 'string' && x.trim()) picks.push(k + ': ' + x.trim())
+  }
+  return picks.length ? picks.join(' · ') : JSON.stringify(v)
+}
+
+// 只读证据钻取：按 scope+key 取一条 insight 的 evidence ids，再回查 events。
+// 不接受任意 SQL 片段；两个参数都只用于参数化查询。
+async function memoryEvidence(scope, key) {
+  const out = { scope: String(scope ?? ''), key: String(key ?? ''), summary: '', status: '', evidence: [], error: null }
+  const sc = out.scope
+  if (!/^(ws|sess):[^|]{1,400}$/.test(sc) || !out.key || out.key.length > 300) { out.error = 'bad-request'; return out }
+  if (!existsSync(MEM_DB)) { out.error = 'db-missing'; return out }
+  const sq = await sqliteModule()
+  if (!sq) { out.error = 'sqlite-unavailable'; return out }
+  let db = null
+  try {
+    db = new sq.DatabaseSync(MEM_DB, { readOnly: true })
+    const rec = db.prepare("SELECT value, status, updated_ts FROM records WHERE scope=? AND kind='insight' AND key=?").get(sc, out.key)
+    if (!rec) { out.error = 'not-found'; return out }
+    let v = {}
+    try { v = JSON.parse(rec.value) ?? {} } catch { /* keep key only */ }
+    out.summary = String(v.summary ?? '')
+    out.status = String(rec.status ?? '')
+    const ids = Array.isArray(v.evidence) ? v.evidence.slice(-16) : []
+    const numeric = []
+    const extras = []
+    for (const id of ids) {
+      const n = Number(id)
+      if (Number.isFinite(n) && n > 0) numeric.push(n)
+      else extras.push(String(id))
+    }
+    const titles = loadSessionTitles()
+    const cache = new Map()
+    const rows = numeric.length
+      ? db.prepare(`SELECT id, ts, sid, seq, kind, key, value, scope FROM events WHERE id IN (${numeric.map(() => '?').join(',')})`).all(...numeric)
+      : []
+    const byId = new Map(rows.map((r) => [Number(r.id), r]))
+    for (const id of numeric) {
+      const r = byId.get(id)
+      if (!r) { out.evidence.push({ id: 'e:' + id, kind: 'missing', content: '事件 ' + id + ' 已不存在', ts: 0 }); continue }
+      let ev = {}
+      try { ev = JSON.parse(r.value) ?? {} } catch { /* keep raw-less */ }
+      const sid = r.sid ? bareSid(r.sid) : null
+      out.evidence.push({
+        id: 'e:' + id, eventId: Number(r.id), kind: String(r.kind ?? ''), key: String(r.key ?? ''),
+        ts: Number(r.ts) || 0, seq: r.seq == null ? null : Number(r.seq),
+        sid, sessionTitle: sid ? sessionTitleOf(sid, titles, cache) : '',
+        content: evidencePreview(ev).slice(0, 600),
+        raw: JSON.stringify(ev, null, 2).slice(0, 2000),
+      })
+    }
+    for (const id of extras) {
+      const kind = id.startsWith('r:') ? 'reset' : (id.startsWith('f:') ? 'probe' : 'ref')
+      const label = kind === 'reset' ? '重置事件 ' + id.slice(2) : (kind === 'probe' ? '文件探针 ' + id.slice(2) : '引用 ' + id)
+      out.evidence.push({ id, kind, content: label, ts: 0 })
+    }
+    out.count = out.evidence.length
+    out.updated_ts = Number(rec.updated_ts) || 0
+  } catch (err) {
+    out.error = String(err?.message ?? err)
+  } finally {
+    try { db?.close() } catch { /* already closed */ }
+  }
+  return out
+}
 // 【在飞折叠】「上一轮输出压缩中…」的陈旧闸：后台折叠在飞时进程崩溃会留下孤儿标记文件。
 //   超过该时长一律按"没有在飞折叠"上报 —— 绝不让面板永久显示"压缩中"（用户看不到就会以为卡死）。
 const FOLD_INFLIGHT_TTL_MS = 10 * 60 * 1000
@@ -144,11 +592,30 @@ export function isFoldInflightStale(marker, now = Date.now(), ttlMs = FOLD_INFLI
   if (typeof t0 !== 'number' || !Number.isFinite(t0)) return true
   return now - t0 > ttlMs
 }
+// 【0.1.38 读时校正】旧 last-fold 的本折比值把首折原样保留的 head 计入分子（真机 101%）。
+//   只修"带 head 段且具备原始计数"的记录；新记录写入口径已是同一算式，重算结果不变。
+//   为什么在读取侧做：历史文件不重写（保持审计原样），但面板不能继续显示旧口径。
+export function normalizeLastFold(lf) {
+  if (!lf || typeof lf !== 'object') return lf
+  const segs = Array.isArray(lf.segments) ? lf.segments : null
+  if (!segs || !segs.some((s) => s && s.kind === 'head')) return lf
+  const raw = Number(lf.incrementalRawBytes)
+  const ap = Number(lf.appendedBytes)
+  const hb = Number(lf.headBytes)
+  if (!(raw > 0) || !Number.isFinite(ap) || !Number.isFinite(hb)) return lf
+  const fixed = Number((Math.max(0, ap - hb) / raw).toFixed(4))
+  lf.foldRatio = fixed
+  if (lf.shrink != null) lf.shrink = fixed
+  return lf
+}
 // 会话 id 归一（与 contextinjector.mjs 的 normSessionId 同规则：目录名 session-<uuid> ↔ 运行时 uuid）
 const normSid = (s) => String(s ?? '').replace(/^session-?/i, '')
 const readJson = (p) => {
   try { return JSON.parse(readFileSync(p, 'utf8')) } catch { return null }
 }
+// 记忆整理的状态文件按会话落盘（与 memory.mjs 的 normSid 规则一致）。
+const memSessionFile = (dir, sid) => join(STATE_DIR, '.memory', dir,
+  normSid(sid).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) + '.json')
 // 【无 sid 兜底】逐会话在飞标记**全量**列表（只在请求不带 ?sessionId= 时给出，见下）。
 //   为什么需要：会话页「压缩中」小标若因任何原因拿不到当前会话 id，就只能问"全机有几个会话在飞"——
 //   客户端据此在**恰好 1 个**时才敢显示（多会话在飞一律不显示，避免张冠李戴）。
@@ -184,6 +651,12 @@ function readMemoryInflight(sid) {
   if (!sid) return null
   const m = readJson(join(STATE_DIR, '.memory', 'compile-inflight', markerName(sid) + '.json'))
   return m && !isFoldInflightStale(m) ? { startedAt: m.startedAt } : null
+}
+// 整理在飞标记与折叠同款陈旧闸：整理进程崩溃留下的孤儿标记不能让面板永久显示「整理中」。
+function readConsolidateInflight(sid) {
+  if (!sid) return null
+  const m = readJson(memSessionFile('consolidate-inflight', sid))
+  return m && !isFoldInflightStale(m) ? m : null
 }
 function readMemoryLast(sid) {
   if (!sid) return null
@@ -258,6 +731,59 @@ function listSessions() {
   for (const s of out) s.title = titles.get(s.id) || ''
   out.sort((a, b) => (a.workspace + ':' + (a.title || a.id)).localeCompare(b.workspace + ':' + (b.title || b.id)))
   return out
+}
+// ---- MEMORY 作用域展示：工作区名/会话标题 ----
+// 记录里的 ws scope 是小写归一路径，视觉上需要还原成用户认识的工作区名（registry.title）。
+const bareSid = (s) => String(s ?? '').replace(/^session-?/i, '')
+const normWsKey = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+function workspaceRegistry() {
+  const byKey = new Map()
+  const bySid = new Map()
+  try {
+    const reg = readJson(WORKSPACE_FILE)
+    for (const meta of Object.values(reg?.tables?.workspaces ?? {})) {
+      const path = String(meta?.path ?? '')
+      if (!path) continue
+      const base = path.split(/[\\/]/).filter(Boolean).pop() || path
+      const info = { path, title: String(meta?.title ?? '').trim() || base }
+      byKey.set(normWsKey(path), info)
+      for (const sid of meta?.sessionIds ?? []) bySid.set(bareSid(sid), info)
+    }
+  } catch { /* best-effort */ }
+  return { byKey, bySid }
+}
+function workspaceInfo(value, reg) {
+  const raw = String(value ?? '').replace(/^ws:/, '')
+  const info = reg.byKey.get(normWsKey(raw))
+  const base = raw.split(/[\\/]/).filter(Boolean).pop() || raw
+  return { path: info?.path || raw, title: info?.title || base || '未命名工作区' }
+}
+function sessionCwdOf(sid) {
+  const s = bareSid(sid)
+  if (!s) return ''
+  try {
+    const j = readJson(join(STATE_DIR, '..', 'storages', 'session_projcache', 'sessions', 'session-' + s + '.json'))
+    return String(j?.record?.rows?.workingDirectory?.val || j?.record?.identity?.cwd || '')
+  } catch { return '' }
+}
+function sessionTitleOf(sid, titles, cache) {
+  const s = bareSid(sid)
+  if (!s) return ''
+  const fromReg = titles.get('session-' + s) || titles.get(s)
+  if (fromReg) return fromReg
+  if (cache.has(s)) return cache.get(s)
+  let title = ''
+  try {
+    const j = readJson(join(STATE_DIR, '..', 'storages', 'session_projcache', 'sessions', 'session-' + s + '.json'))
+    title = String(j?.record?.rows?.title?.val ?? '').trim()
+    if (!title) title = String(j?.record?.rows?.titleInput?.val?.first?.text ?? '').trim()
+  } catch { /* best-effort */ }
+  cache.set(s, title)
+  return title
+}
+function sessionLabelOf(sid, title) {
+  const s = bareSid(sid)
+  return title ? '会话「' + title + '」' : '会话 ' + (s ? s.slice(0, 8) : '未知')
 }
 function readControl() {
   return readJson(CONTROL_FILE) ?? { enabled: false, sessions: [], updatedAt: null }
@@ -361,6 +887,7 @@ export default {
         }
         // 面板「最近一次折叠」头部标签：trigger 本就在 last-fold.json 内（turn-end；旧记录可能是 pre-step / turn-stopping），
         //   这里显式归一出参（非字符串 → null）——用户靠它判断"本轮结束即折"到底有没有跑过。
+        lastFold = normalizeLastFold(lastFold)
         if (lastFold && typeof lastFold.trigger !== 'string') lastFold.trigger = null
         // 「上一轮输出压缩中…」在飞折叠标记（per-sid；无 ?sessionId= / 无标记 / 已陈旧 → null）。
         //   背景：turn-end 触发的是**后台**折叠，浓缩模型要跑几秒~十几秒；这段时间 lastFold
@@ -387,6 +914,23 @@ export default {
         const memoryInflight = sid ? readMemoryInflight(sid) : null
         const memoryLast = sid ? readMemoryLast(sid) : null
         const nativeCompaction = sid ? readNativeCompaction(sid) : null
+        // 状态条 chip 与记忆面板共用同一份整理标记；chip 读的是本接口（不是 /api/memory/status），
+        // 这里必须一并返回，否则「记忆整理中/已整理」永远不会出现。
+        const consolidate = sid ? (() => {
+          const fl = memoryFlags(control)
+          const id = normSid(sid)
+          return {
+            auto: fl.consolidateAuto,
+            idleMs: fl.consolidateIdleMs,
+            manualRoute: {
+              provider: typeof control?.memoryConsolidateManualProvider === 'string' && control.memoryConsolidateManualProvider ? control.memoryConsolidateManualProvider : null,
+              model: typeof control?.memoryConsolidateManualModel === 'string' && control.memoryConsolidateManualModel ? control.memoryConsolidateManualModel : null,
+            },
+            next: readJson(memSessionFile('consolidate-next', id)),
+            inflight: readConsolidateInflight(id),
+            last: readJson(memSessionFile('consolidate-last', id)),
+          }
+        })() : null
         // #5 IVR：该会话（bare sid）的注入经济计量序列（ivr/<sid>.json）；无则 null
         let ivr = null
         if (sid) {
@@ -404,6 +948,7 @@ export default {
           foldInflightAll, // 【无 sid 兜底】不带 ?sessionId= 时 = 全机在飞标记数组（[]/1 项/多项）；带 sid 时 = null
           memoryInflight, // 「记忆编译中」：{ startedAt } | null
           memoryLast, // 最近一次记忆编译：{ t, ok, insights, through, model, reason } | null
+          consolidate, // 记忆整理：{ auto, idleMs, next, inflight, last } | null（状态条 chip 数据源）
           nativeCompaction, // DSH 原生 compaction 在飞：{ startedAt } | null
           ivr,
           sessions: listSessions(),
@@ -647,8 +1192,83 @@ export default {
         if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
         const m = /[?&]sessionId=([^&]+)/.exec(String(req.url || ''))
         const sid = m ? decodeURIComponent(m[1]) : null
-        memorySnapshot(sid).then((snap) => sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', ...snap }))
+        const rm = /[?&]range=([^&]+)/.exec(String(req.url || ''))
+        let range = null
+        try { range = rm ? decodeURIComponent(rm[1]) : null } catch { range = null }
+        const lm = /[?&]factLimit=([^&]+)/.exec(String(req.url || ''))
+        const fm = /[?&]focusScope=([^&]+)/.exec(String(req.url || ''))
+        const sm = /[?&]sinceTs=([^&]+)/.exec(String(req.url || ''))
+        const cm = /[?&]cursor=([^&]+)/.exec(String(req.url || ''))
+        let factLimit = null
+        let focusScope = null
+        let sinceTs = null
+        let cursor = null
+        try { factLimit = lm ? Number(decodeURIComponent(lm[1])) : null } catch { factLimit = null }
+        try { focusScope = fm ? decodeURIComponent(fm[1]) : null } catch { focusScope = null }
+        try { sinceTs = sm ? Number(decodeURIComponent(sm[1])) : null } catch { sinceTs = null }
+        try { cursor = cm ? decodeURIComponent(cm[1]) : null } catch { cursor = null }
+        memorySnapshot(sid, { range, factLimit, focusScope, sinceTs, cursor }).then((snap) => sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', ...snap }))
           .catch((err) => sendJson(res, 500, { ok: false, error: String(err?.message ?? err) }))
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/api/memory/graph',
+      handler(req, res) {
+        if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        const m = /[?&]sessionId=([^&]+)/.exec(String(req.url || ''))
+        const sid = m ? decodeURIComponent(m[1]) : null
+        const rm = /[?&]range=([^&]+)/.exec(String(req.url || ''))
+        let range = null
+        try { range = rm ? decodeURIComponent(rm[1]) : null } catch { range = null }
+        const lm = /[?&]factLimit=([^&]+)/.exec(String(req.url || ''))
+        const fm = /[?&]focusScope=([^&]+)/.exec(String(req.url || ''))
+        const sm = /[?&]sinceTs=([^&]+)/.exec(String(req.url || ''))
+        const cm = /[?&]cursor=([^&]+)/.exec(String(req.url || ''))
+        let factLimit = null
+        let focusScope = null
+        let sinceTs = null
+        let cursor = null
+        try { factLimit = lm ? Number(decodeURIComponent(lm[1])) : null } catch { factLimit = null }
+        try { focusScope = fm ? decodeURIComponent(fm[1]) : null } catch { focusScope = null }
+        try { sinceTs = sm ? Number(decodeURIComponent(sm[1])) : null } catch { sinceTs = null }
+        try { cursor = cm ? decodeURIComponent(cm[1]) : null } catch { cursor = null }
+        memoryGraph(sid, { range, factLimit, focusScope, sinceTs, cursor }).then((g) => sendJson(res, 200, { ok: true, plugin: 'MEMORY-webui', ...g }))
+          .catch((err) => sendJson(res, 500, { ok: false, error: String(err?.message ?? err) }))
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/api/memory/evidence',
+      handler(req, res) {
+        if (req.method !== 'GET') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        let scope = ''
+        let key = ''
+        try {
+          const sm = /[?&]scope=([^&]+)/.exec(String(req.url || ''))
+          const km = /[?&]key=([^&]+)/.exec(String(req.url || ''))
+          scope = sm ? decodeURIComponent(sm[1]) : ''
+          key = km ? decodeURIComponent(km[1]) : ''
+        } catch { sendJson(res, 400, { ok: false, error: 'bad-encoding' }); return }
+        memoryEvidence(scope, key)
+          .then((ev) => sendJson(res, ev.error === 'bad-request' ? 400 : 200, { ok: !ev.error, plugin: 'MEMORY-webui', ...ev }))
+          .catch((err) => sendJson(res, 500, { ok: false, error: String(err?.message ?? err) }))
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/api/memory/consolidate',
+      handler(req, res) {
+        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        if (!isLocalOrigin(req)) { sendJson(res, 403, { ok: false, error: 'forbidden' }); return }
+        readBody(req).then((args) => {
+          const sid = normSid(args?.sessionId)
+          if (!sid) { sendJson(res, 400, { ok: false, error: 'missing-sessionId' }); return }
+          const dir = join(STATE_DIR, '.memory', 'consolidate-request')
+          try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+          const ok = writeJson(join(dir, sid.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) + '.json'), { sessionId: sid, at: Date.now() })
+          sendJson(res, ok ? 202 : 500, { ok, queued: ok })
+        })
       },
     }))
     disposers.push(webServer.register({
@@ -660,8 +1280,13 @@ export default {
         readBody(req).then((args) => {
           const cur = readControl()
           const next = { ...cur }
-          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog']) {
+          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog', 'memoryHandoff', 'memoryConsolidateAuto']) {
             if (typeof args?.[k] === 'boolean') next[k] = args[k]
+          }
+          if ('memoryConsolidateIdleMs' in (args ?? {})) {
+            const n = Number(args.memoryConsolidateIdleMs)
+            if (Number.isFinite(n) && n > 0) next.memoryConsolidateIdleMs = Math.max(60_000, Math.min(24 * 3600_000, n))
+            else delete next.memoryConsolidateIdleMs
           }
           // 编译模型覆盖：两者必须成对；null/空串 = 清除覆盖（回退到会话当前模型）。
           const touchedRoute = args != null && ('memoryLlmProvider' in args || 'memoryLlmModel' in args)
@@ -670,6 +1295,14 @@ export default {
             const m = typeof args?.memoryLlmModel === 'string' ? args.memoryLlmModel.trim() : ''
             if (p && m) { next.memoryLlmProvider = p; next.memoryLlmModel = m }
             else { delete next.memoryLlmProvider; delete next.memoryLlmModel }
+          }
+          // 手动整理独立路由：两者必须成对；空 = 回退到会话/编译模型。自动整理永远不用它。
+          const touchedManualRoute = args != null && ('memoryConsolidateManualProvider' in args || 'memoryConsolidateManualModel' in args)
+          if (touchedManualRoute) {
+            const p = typeof args?.memoryConsolidateManualProvider === 'string' ? args.memoryConsolidateManualProvider.trim() : ''
+            const m = typeof args?.memoryConsolidateManualModel === 'string' ? args.memoryConsolidateManualModel.trim() : ''
+            if (p && m) { next.memoryConsolidateManualProvider = p; next.memoryConsolidateManualModel = m }
+            else { delete next.memoryConsolidateManualProvider; delete next.memoryConsolidateManualModel }
           }
           next.updatedAt = Date.now()
           const ok = writeJson(CONTROL_FILE, next)
@@ -681,12 +1314,16 @@ export default {
               provider: typeof ctrlNow?.memoryLlmProvider === 'string' && ctrlNow.memoryLlmProvider ? ctrlNow.memoryLlmProvider : null,
               model: typeof ctrlNow?.memoryLlmModel === 'string' && ctrlNow.memoryLlmModel ? ctrlNow.memoryLlmModel : null,
             },
+            consolidateManualRoute: {
+              provider: typeof ctrlNow?.memoryConsolidateManualProvider === 'string' && ctrlNow.memoryConsolidateManualProvider ? ctrlNow.memoryConsolidateManualProvider : null,
+              model: typeof ctrlNow?.memoryConsolidateManualModel === 'string' && ctrlNow.memoryConsolidateManualModel ? ctrlNow.memoryConsolidateManualModel : null,
+            },
             envLocked: envLockOf(),
           })
         })
       },
     }))
     ctx.effect(() => () => { for (const d of disposers) d() })
-    console.log(`[contextinjector-webui] /api/context-inject/{status,config,session} + /api/logcompiler/{config,export} + /api/memory/{status,config} ready (stateDir=${STATE_DIR})`)
+    console.log(`[contextinjector-webui] /api/context-inject/{status,config,session} + /api/logcompiler/{config,export} + /api/memory/{status,config,consolidate} ready (stateDir=${STATE_DIR})`)
   },
 }

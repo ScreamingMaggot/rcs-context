@@ -152,7 +152,12 @@ check('② rowid 读取也受 sid 约束', store.get({ sid: 'other', rowid: stor
 {
   const tools = makeMemoryTools(store)
   const byName = Object.fromEntries(tools.map((t) => [t.name, t]))
-  check('④ 三个工具都注册为只读定义', tools.length === 3 && tools.every((t) => typeof t.output?.render === 'function' && t.isConcurrencySafe() === true))
+  const readOnly = ['memory_catalog', 'memory_search', 'memory_get']
+  const writeTools = ['memory_remember', 'memory_forget', 'memory_correct']
+  check('④ 三个只读 + 三个受控写入工具',
+    tools.length === 6 && tools.every((t) => typeof t.output?.render === 'function')
+    && tools.filter((t) => readOnly.includes(t.name)).every((t) => t.isConcurrencySafe() === true)
+    && tools.filter((t) => writeTools.includes(t.name)).every((t) => t.isConcurrencySafe() === false))
   const exec = { agent: { session: { id: 'session-s1' } } }
   const c = await byName.memory_catalog.execute({}, exec)
   check('④ catalog 默认当前会话', c.ok === true && c.sid === 's1' && c.total >= 3, JSON.stringify(c).slice(0, 160))
@@ -367,14 +372,16 @@ check('② rowid 读取也受 sid 约束', store.get({ sid: 'other', rowid: stor
   }
 
   const dg2 = catalogDigest(s, { sid: 'c1', workspace: ws })
-  check('⑧ 目录只含语义摘要（无 kind/计数/key）', dg2.startsWith('Known project memory') && dg2.includes('npm test')
-    && !/records/.test(dg2) && !dg2.includes('test-command') && !dg2.includes('user_turn') && !dg2.includes('cmd:'), dg2)
+  check('⑧ 目录含索引头与语义摘要（无内部 key/kind）', dg2.startsWith('Known project memory') && dg2.includes('npm test')
+    && /Index: \d+ facts?/.test(dg2) && !/records/.test(dg2) && !dg2.includes('test-command')
+    && !dg2.includes('user_turn') && !dg2.includes('cmd:'), dg2)
   check('⑧ 目录摘要不超过 700 字符', dg2.length <= 700, String(dg2.length))
   check('⑧ 空库不产目录', catalogDigest(s, { sid: 'nobody', workspace: 'c:/nope' }) === '')
   {
     const bare = new MemoryStore(new DatabaseSync(join(root, 'bare.sqlite')), { stateDir: root, rawDir })
     bare.ingest({ sid: 'b1', seq: 1, kind: 'file_state', key: 'file:/b', scope: 'ws:c:/proj/bare', value: { size: 1 }, source: { sid: 'b1', seq: 1 } })
-    check('⑧ 只有原始记录、没有 insight ⇒ 不注入', catalogDigest(bare, { sid: 'b1', workspace: 'c:/proj/bare' }) === '')
+    const bareDg = catalogDigest(bare, { sid: 'b1', workspace: 'c:/proj/bare' })
+    check('⑧ 只有原始记录、没有 insight ⇒ 仍给索引头且标记 unknown', /insights: unknown/.test(bareDg) && !bareDg.includes('Known facts:'), bareDg)
     bare.close()
   }
   s.close()

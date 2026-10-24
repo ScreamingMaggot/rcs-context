@@ -17,8 +17,8 @@ window.__ModuleLoader__.load({
 			".ci-root{font-size:13px;line-height:1.55;max-width:1240px;padding:14px 16px;color:var(--dsw-alias-label-primary,#e7e7ee)}",
 			// 双栏（v1.10）：右栏承载管理（当前会话/白名单/日志编译），宽屏并排、窄屏 flex 自动回退单列
 			".ci-cols{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}",
-			".ci-main{flex:1 1 540px;min-width:0;max-height:72vh;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}",
-			".ci-rail{flex:1 1 260px;min-width:230px;max-width:360px;display:flex;flex-direction:column;gap:10px;max-height:72vh;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}",
+			".ci-main{flex:1 1 540px;min-width:0;max-height:72vh;overflow-y:auto;overscroll-behavior:contain;padding-right:2px;padding-bottom:16px}",
+			".ci-rail{flex:1 1 260px;min-width:230px;max-width:360px;display:flex;flex-direction:column;gap:10px;max-height:72vh;overflow-y:auto;overscroll-behavior:contain;padding-right:2px;padding-bottom:16px}",
 			".ci-main::-webkit-scrollbar,.ci-rail::-webkit-scrollbar{width:8px}",
 			".ci-main::-webkit-scrollbar-thumb,.ci-rail::-webkit-scrollbar-thumb{background:rgba(127,127,150,.35);border-radius:4px}",
 			".ci-hd{display:flex;align-items:center;gap:10px;margin-bottom:4px}",
@@ -139,6 +139,8 @@ window.__ModuleLoader__.load({
 			".mem-conf.low{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.12);color:inherit}",
 			".mem-summary{margin-top:4px;font-size:12px;line-height:1.5;word-break:break-word}",
 			".mem-meta{margin-top:4px;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-prov{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid rgba(127,127,150,.3);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85));white-space:nowrap}",
+			".mem-prov.private{border-color:rgba(25,145,70,.45);background:rgba(25,145,70,.1)}",
 			".mem-recent{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;overscroll-behavior:contain}",
 			".mem-row{display:grid;grid-template-columns:92px minmax(80px,1fr) 70px 74px;gap:8px;align-items:center;font-size:11px;padding:3px 2px;border-bottom:1px solid rgba(127,127,150,.08)}",
 			".mem-row .k{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
@@ -166,14 +168,111 @@ window.__ModuleLoader__.load({
 			".mem-evidence{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid rgba(100,140,255,.35);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
 			".mem-ws{display:flex;flex-direction:column;gap:4px}",
 			".mem-ws-row{display:grid;grid-template-columns:minmax(0,1fr) 44px 76px;gap:8px;align-items:center;font-size:11px;padding:2px 0}",
+			".mem-ws-row.current{background:rgba(100,140,255,.07);border-radius:6px}",
 			".mem-ws-row .k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
 			".mem-ws-row .n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace)}",
 			".mem-ws-row .t{text-align:right;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7))}",
+			".mem-group-t{margin-top:9px;font-size:11px;font-weight:600;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
+			".mem-cur{font-size:9px;line-height:15px;padding:0 5px;border-radius:999px;border:1px solid rgba(52,199,89,.5);background:rgba(52,199,89,.12);color:#58c46b;margin-left:6px;white-space:nowrap}",
+			".mem-origin{font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.68));margin-left:5px;white-space:nowrap}",
+			".mem-range{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}",
+			".mem-range-btn{font-size:11px;padding:3px 9px}",
+			".mem-range-btn.on{border-color:rgba(100,140,255,.65);background:rgba(100,140,255,.16)}",
 			".mem-row{grid-template-columns:86px minmax(80px,1fr) 112px 62px 76px}",
 			".mem-row .mem-scope{font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
 			".mem-row .mem-time{text-align:right;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7))}",
 			".mem-row.mem-head{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.65));border-bottom:1px solid rgba(127,127,150,.18);padding-bottom:4px;margin-bottom:2px}",
 			"@media (max-width:720px){.mem-row{grid-template-columns:80px minmax(70px,1fr) 60px 70px}.mem-row .mem-scope,.mem-row.mem-head .mem-scope{display:none}}",
+			// 图谱 / 列表 / 设置 三页签
+			".mem-tabs{display:flex;align-items:center;gap:4px;margin:10px 0 0;border-bottom:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.18))}",
+			".mem-tab{font-family:inherit;font-size:12px;line-height:24px;padding:1px 11px 3px;border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;background:transparent;color:inherit;cursor:pointer;opacity:.72}",
+			".mem-tab:hover{background:rgba(127,127,150,.1);opacity:1}",
+			".mem-tab.on{opacity:1;border-color:var(--dsw-alias-border-l2,rgba(127,127,150,.22));background:rgba(127,127,150,.09);box-shadow:inset 0 -2px 0 rgba(100,140,255,.75)}",
+			".mem-tabs-note{margin-left:auto;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));padding-bottom:4px;white-space:nowrap}",
+			".mem-strip{display:flex;flex-wrap:wrap;gap:4px 18px;padding:8px 11px;margin:10px 0 8px;border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.2));border-radius:10px;background:rgba(127,127,150,.035);font-size:11px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
+			".mem-strip b{color:var(--dsw-alias-label-primary,inherit);font-variant-numeric:tabular-nums;margin-left:3px}",
+			".mem-limit{margin:2px 0 8px;padding:4px 9px;border:1px dashed rgba(127,127,150,.35);border-radius:7px;font-size:10px;line-height:1.5;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.82));display:flex;gap:8px;align-items:center;flex-wrap:wrap}",
+			".mem-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}",
+			".mem-toolbar .ci-sel{min-width:88px;max-width:150px;width:auto;font-size:11px;padding:2px 4px}",
+			".mem-toolbar-label{font-size:10px;letter-spacing:.08em;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7))}",
+			".mem-search{min-width:130px;flex:1 1 130px;max-width:240px}",
+			".mem-focus{display:inline-flex;align-items:center;gap:3px;font-size:10px;line-height:18px;padding:0 3px 0 8px;border-radius:999px;border:1px solid rgba(100,140,255,.45);background:rgba(100,140,255,.12);max-width:220px}",
+			".mem-focus>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-focus-x{border:none;background:transparent;color:inherit;cursor:pointer;font-family:inherit;font-size:13px;line-height:1;padding:0 3px}",
+			".mem-settings{max-width:900px;margin:10px auto 0}",
+			// 图谱
+			".mem-graph-wrap{position:relative;border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.2));border-radius:12px;background:radial-gradient(circle at 50% 45%,rgba(100,140,255,.07),transparent 64%),rgba(127,127,150,.025);overflow:hidden}",
+			".mem-graph{display:block;width:100%;height:clamp(220px,32vh,430px);touch-action:none;cursor:grab}",
+			".mem-graph:active{cursor:grabbing}",
+			".mem-graph-tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px}",
+			".mem-graph-tools .ci-btn{padding:1px 7px;min-width:26px;line-height:17px}",
+			".mem-graph-wrap .mem-legend{border-top:1px solid rgba(127,127,150,.12);background:rgba(127,127,150,.03)}",
+			".mem-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:5px 9px;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8))}",
+			".mem-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;background:rgba(127,127,150,.7)}",
+			".mem-dot.ws{border-radius:2px;background:rgba(100,140,255,.9)}",
+			".mem-dot.sess{background:rgba(88,196,107,.85)}",
+			".mem-dot.fact.constraint{background:#e2a33b}",
+			".mem-dot.fact.state{background:#5b9dff}",
+			".mem-dot.fact.task{background:#a78bfa}",
+			".mem-dot.fact.history{background:#8b95a5}",
+			".mem-line{display:inline-block;width:16px;height:0;border-top:2px solid rgba(127,127,150,.4);margin-right:4px;vertical-align:middle}",
+			".mem-line.shared{border-top-color:rgba(100,140,255,.7)}",
+			".mem-line.origin{border-top-style:dashed;border-top-color:rgba(167,139,250,.75)}",
+			".mem-line.private{border-top-color:rgba(88,196,107,.75)}",
+			".mem-line.member{border-top-style:dashed;border-top-color:rgba(127,127,150,.5)}",
+			".mem-edge{stroke:rgba(127,127,150,.3);stroke-width:1;fill:none;transition:stroke .12s ease,stroke-width .12s ease}",
+			".mem-edge.shared{stroke:rgba(100,140,255,.55);stroke-width:1.4}",
+			".mem-edge.origin{stroke:rgba(167,139,250,.55);stroke-dasharray:4 3}",
+			".mem-edge.private{stroke:rgba(88,196,107,.55)}",
+			".mem-edge.member{stroke:rgba(127,127,150,.26);stroke-dasharray:2 3}",
+			".mem-edge.on{stroke:rgba(100,140,255,.95);stroke-width:2;stroke-dasharray:none}",
+			".mem-node circle,.mem-node rect{stroke:rgba(127,127,150,.5);stroke-width:1;fill:rgba(127,127,150,.18);transition:opacity .12s ease}",
+			".mem-node.workspace rect{fill:rgba(100,140,255,.2);stroke:rgba(100,140,255,.8)}",
+			".mem-node.session circle{fill:rgba(88,196,107,.18);stroke:rgba(88,196,107,.75)}",
+			".mem-node.fact circle{fill:rgba(127,127,150,.28);stroke:rgba(127,127,150,.6)}",
+			".mem-node.fact.constraint circle{fill:rgba(226,163,59,.3);stroke:#e2a33b}",
+			".mem-node.fact.state circle{fill:rgba(91,157,255,.28);stroke:#5b9dff}",
+			".mem-node.fact.task circle{fill:rgba(167,139,250,.28);stroke:#a78bfa}",
+			".mem-node.fact.history circle{fill:rgba(139,149,165,.26);stroke:#8b95a5}",
+			".mem-node.current circle:not(.mem-ring),.mem-node.current rect{stroke-width:2.2}",
+			".mem-node .mem-ring{fill:none;stroke:rgba(100,140,255,.6);stroke-width:1.1;stroke-dasharray:3 3}",
+			".mem-node.sel circle,.mem-node.sel rect{stroke-width:2.6}",
+			".mem-node.dim{opacity:.22}",
+			".mem-node.muted{opacity:.48}",
+			".mem-node:focus{outline:none}",
+			".mem-focus-ring{fill:none;stroke:#7cc4ff;stroke-width:2;stroke-dasharray:3 3;pointer-events:none}",
+			".mem-graph-tools .ci-btn.on{border-color:rgba(100,140,255,.65);background:rgba(100,140,255,.16)}",
+			".mem-zen .mem-strip,.mem-zen .mem-graph-wrap .mem-legend{display:none}",
+			".mem-zen .mem-graph{height:clamp(300px,50vh,640px)}",
+			".mem-node-label{font-size:14px;fill:currentColor;pointer-events:none;user-select:none}",
+			// 详情栏与列表卡片
+			".mem-detail-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:11px;padding:4px 0;border-bottom:1px solid rgba(127,127,150,.08)}",
+			".mem-detail-row:last-of-type{border-bottom:none}",
+			".mem-detail-row span{color:var(--dsw-alias-label-secondary,rgba(180,180,195,.75));flex:none}",
+			".mem-detail-row b{font-weight:500;text-align:right;word-break:break-all;min-width:0}",
+			".mem-detail-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}",
+			".mem-detail-sub{margin-top:10px;font-size:10px;letter-spacing:.05em;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.62));text-transform:uppercase}",
+			".mem-evs{display:flex;flex-direction:column;gap:2px;margin-top:4px}",
+			".mem-ev{border-bottom:1px solid rgba(127,127,150,.08);padding:3px 0}",
+			".mem-ev summary{display:flex;align-items:baseline;gap:6px;cursor:pointer;list-style:none;font-size:11px}",
+			".mem-ev summary::-webkit-details-marker{display:none}",
+			".mem-ev-k{flex:none;font-size:9px;padding:0 5px;border-radius:999px;border:1px solid rgba(127,127,150,.3);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.8))}",
+			".mem-ev-c{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary,rgba(205,205,220,.9))}",
+			".mem-ev-t{flex:none;font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.6))}",
+			".mem-ev-meta{font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));padding:3px 0 0 2px}",
+			".mem-ev-raw{white-space:pre-wrap;word-break:break-all;font-size:10px;max-height:160px;overflow:auto;background:rgba(127,127,150,.08);padding:6px;border-radius:5px;margin:5px 0 0;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace)}",
+			".mem-fact-label{font-size:14px;fill:var(--dsw-alias-label-secondary,rgba(214,218,228,.92));pointer-events:none}",
+			".mem-fact{cursor:pointer}",
+			".mem-fact:hover{border-color:rgba(100,140,255,.4);background:rgba(100,140,255,.055)}",
+			".mem-fact.sel{border-color:rgba(100,140,255,.6);background:rgba(100,140,255,.09)}",
+			".mem-fact.muted{opacity:.58}",
+			".mem-type{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid rgba(127,127,150,.32);color:var(--dsw-alias-label-secondary,rgba(180,180,195,.85))}",
+			".mem-type.constraint{border-color:rgba(226,163,59,.5);background:rgba(226,163,59,.1)}",
+			".mem-type.state{border-color:rgba(91,157,255,.45)}",
+			".mem-type.task{border-color:rgba(167,139,250,.45)}",
+			"@media (max-width:720px){.mem-tabs-note{display:none}.mem-graph{height:30vh}.mem-toolbar .ci-sel{flex:1 1 96px;max-width:none}.mem-search{flex:1 1 100%;max-width:none}}",
+			"@media (max-width:900px){.mem-node-label{font-size:17px}.mem-fact-label{font-size:15px}.mem-toolbar-label{display:none}}",
+			"@media (prefers-color-scheme:light){.mem-edge{stroke:rgba(60,75,110,.5)}.mem-edge.shared{stroke:rgba(40,90,215,.8);stroke-width:1.6}.mem-edge.origin{stroke:rgba(110,70,205,.8)}.mem-edge.private{stroke:rgba(25,145,70,.85)}.mem-edge.member{stroke:rgba(90,100,120,.45)}.mem-node circle,.mem-node rect{fill:rgba(90,105,130,.16);stroke:rgba(60,75,105,.75)}.mem-node.workspace rect{fill:rgba(50,95,215,.14);stroke:rgba(40,90,215,.95)}.mem-node.session circle{fill:rgba(25,145,70,.12);stroke:rgba(25,145,70,.9)}.mem-node.fact.constraint circle{fill:rgba(200,140,30,.25);stroke:#b7791f}.mem-node.fact.state circle{fill:rgba(40,110,220,.2);stroke:#2b6cd4}.mem-node.fact.task circle{fill:rgba(120,85,200,.22);stroke:#6d4bc0}.mem-node.fact.history circle{fill:rgba(100,110,125,.18);stroke:#5d6674}.mem-node .mem-ring{stroke:rgba(40,90,215,.7)}.mem-node-label{fill:#1b1f27}.mem-fact-label{fill:#3a4150}.mem-focus-ring{stroke:#1b64c8}}",
 			"@media (prefers-reduced-motion:reduce){.ci-switch,.ci-caret,.cim-chip{transition:none}.ci-pulse{animation:none;opacity:.9}}"
 		].join("");
 		var CSS_TAG = "contextinjector-webui/client.css";
@@ -477,7 +576,7 @@ window.__ModuleLoader__.load({
 				var label = ttl || shortId(s.id);
 				// 右键出菜单（导出 LOG / 复制会话 ID）；stopPropagation 防止顺带触发 chip 的勾选
 				// 【取自 RCS-0.1.0 返回包】
-				return e("span", { key: s.id, className: "ci-chip" + (sel[s.id] ? " ci-chipon" : ""), onClick: function () { toggleSession(s.id); }, title: s.id + (s.workspace ? " @ " + s.workspace : "") + "（右键可导出 LOG）",
+				return e("span", { key: s.id, className: "ci-chip" + (sel[s.id] ? " ci-chipon" : ""), role: "checkbox", "aria-checked": !!sel[s.id], tabIndex: 0, onClick: function () { toggleSession(s.id); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleSession(s.id); } }, title: s.id + (s.workspace ? " @ " + s.workspace : "") + "（右键可导出 LOG）",
 					onContextMenu: function (ev) {
 						ev.preventDefault(); ev.stopPropagation();
 						setCtxMenu({ x: ev.clientX, y: ev.clientY, sid: s.id, title: ttl || shortId(s.id), hasLog: lgHasLog(s.id) });
@@ -496,7 +595,7 @@ window.__ModuleLoader__.load({
 					var ok = st === "OK";
 					// 超长 [T] 行同样走点击折叠（与消息块同规则），避免长工具结果把面板撑爆。
 					return e("div", { key: id, className: "ci-t" + (ok ? " ci-t-ok" : " ci-t-err") },
-						e("div", { className: "ci-text" + (open ? "" : " ci-clamp"), onClick: function () { toggleExpand(id); }, title: open ? "收起" : "展开" },
+						e("div", { className: "ci-text" + (open ? "" : " ci-clamp"), role: "button", tabIndex: 0, "aria-expanded": !!open, onClick: function () { toggleExpand(id); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleExpand(id); } }, title: open ? "收起" : "展开" },
 							"▸ " + b.t));
 				}
 				// 角色标记（等宽、同尺寸，时间线不因新增「推理」行而重排）：
@@ -505,7 +604,7 @@ window.__ModuleLoader__.load({
 				var ico = isR ? "\u25C8 " : "";
 				var role = isU ? "你" : (isR ? "推理" : "AI");
 				return e("div", { key: id, className: "ci-msg " + (isU ? "ci-u" : isR ? "ci-r" : "ci-a") },
-					e("div", { className: "ci-text" + (open ? "" : " ci-clamp"), onClick: function () { toggleExpand(id); }, title: open ? "收起" : "展开" },
+					e("div", { className: "ci-text" + (open ? "" : " ci-clamp"), role: "button", tabIndex: 0, "aria-expanded": !!open, onClick: function () { toggleExpand(id); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleExpand(id); } }, title: open ? "收起" : "展开" },
 						e("span", { className: "ci-role" }, ico + role), b.t));
 			}
 			function timeline(rounds2) {
@@ -617,13 +716,13 @@ window.__ModuleLoader__.load({
 							var open = !!lgOpenWs[w] || (wsNames.length === 1); // 单工作区默认展开
 							var recN = 0; list.forEach(function (s) { if (lgRec(s.id)) recN++; });
 							return e("div", { key: w, className: "ci-grp" + (open ? " ci-open" : "") },
-								e("div", { className: "ci-grphd", onClick: function () { toggleLgGroup(w); } },
+								e("div", { className: "ci-grphd", role: "button", tabIndex: 0, "aria-expanded": !!open, onClick: function () { toggleLgGroup(w); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleLgGroup(w); } } },
 									e("span", { className: "ci-caret" }, "▶"),
 									e("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, w || "(未分组)"),
 									e("span", { className: "ci-sub" }, recN + "/" + list.length)),
 								(open ? e("div", { className: "ci-chips" }, list.map(function (s) {
 									var rec = lgRec(s.id);
-									return e("span", { key: s.id, className: "ci-chip" + (rec ? " ci-chipon" : ""), title: s.id + (s.workspace ? " @ " + s.workspace : "") + (rec ? " · 记录中" : " · 已关") + "（右键可导出 LOG）", onClick: function () { lgPost({ sessionId: s.id, on: !rec }); },
+									return e("span", { key: s.id, className: "ci-chip" + (rec ? " ci-chipon" : ""), role: "checkbox", "aria-checked": !!rec, tabIndex: 0, title: s.id + (s.workspace ? " @ " + s.workspace : "") + (rec ? " · 记录中" : " · 已关") + "（右键可导出 LOG）", onClick: function () { lgPost({ sessionId: s.id, on: !rec }); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); lgPost({ sessionId: s.id, on: !rec }); } },
 										onContextMenu: function (ev) {
 											ev.preventDefault(); ev.stopPropagation();
 											setCtxMenu({ x: ev.clientX, y: ev.clientY, sid: s.id, title: s.title || shortId(s.id), hasLog: lgHasLog(s.id) });
@@ -670,7 +769,7 @@ window.__ModuleLoader__.load({
 							e("div", { className: "ci-sub" }, lfOn ? "注入中 · 白名单会话在跨轮后折叠为转录" : "默认关闭 · 勾选会话后才生效")),
 						e("div", { className: "ci-toggle", onClick: function () { save({ enabled: !on, sessions: Object.keys(sel).filter(function (k) { return sel[k]; }) }); } },
 							e("span", { className: "ci-switch" }), e("span", { style: { fontSize: 12 } }, on ? "开" : "关"))),
-					(err ? e("div", { className: "ci-err" }, "⚠ " + err) : null),
+					(err ? e("div", { className: "ci-err", role: "alert", "aria-live": "assertive" }, "⚠ " + err) : null),
 					e("div", { className: "ci-cols" },
 						e("div", { className: "ci-main" },
 							e("div", { className: "ci-sec" },
@@ -786,7 +885,7 @@ window.__ModuleLoader__.load({
 									var open = !!openWs[w];
 									var picked = list.filter(function (s) { return sel[s.id]; }).length;
 									return e("div", { key: w, className: "ci-grp" + (open ? " ci-open" : "") },
-										e("div", { className: "ci-grphd", onClick: function () { toggleGroup(w); } },
+										e("div", { className: "ci-grphd", role: "button", tabIndex: 0, "aria-expanded": !!open, onClick: function () { toggleGroup(w); }, onKeyDown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleGroup(w); } } },
 											e("span", { className: "ci-caret" }, "▶"),
 											e("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, w || "(未分组)"),
 											e("span", { className: "ci-sub" }, picked + "/" + list.length)),
@@ -1014,6 +1113,9 @@ window.__ModuleLoader__.load({
 			var mi = (st && st.memoryInflight) || null;
 			var ml = (st && st.memoryLast) || null;
 			var ni = (st && st.nativeCompaction) || null;
+			var co = (st && st.consolidate) || null;
+			var coi = (co && co.inflight) || null;
+			var col = (co && co.last) || null;
 			var pctOf = function (v) {
 				var n = Number(v);
 				return Number.isFinite(n) ? Math.round(n * 100) : null;
@@ -1023,7 +1125,8 @@ window.__ModuleLoader__.load({
 			// 只在拿到本会话自己的折叠结果时显示（status 无 per-sid 文件时会回退全局 last-fold ⇒ 别拿别人会话的比值冒充）
 			var hasFoldDone = foldPct != null && cumPct != null && (!sid || (st && st.lastFoldPerSession === true));
 			var memRecent = !!(ml && ml.ok === true && Number.isFinite(Number(ml.t)) && (Date.now() - Number(ml.t)) < 30000);
-			if (!forced && !f && !infer && !ni && !mi && !hasFoldDone && !memRecent) return null; // 常态：一个节点都不渲染
+			var coRecent = !!(col && col.ok === true && Number.isFinite(Number(col.t)) && (Date.now() - Number(col.t)) < 30000);
+			if (!forced && !f && !infer && !ni && !mi && !hasFoldDone && !memRecent && !coi && !coRecent) return null; // 常态：一个节点都不渲染
 			var secOf = function (x) {
 				var t0 = Number(x && x.startedAt);
 				return Number.isFinite(t0) ? Math.max(0, Math.round((Date.now() - t0) / 1000)) : null;
@@ -1048,8 +1151,22 @@ window.__ModuleLoader__.load({
 				chips.push(e("span", { key: "f", className: "ci-foldchip ci-foldchip-done", "data-ci-foldchip": "done",
 					title: "本折 " + (lf.foldRatio != null ? Number(lf.foldRatio).toFixed(2) : "—")
 						+ " · 累计 " + (lf.cumRatio != null ? Number(lf.cumRatio).toFixed(2) : "—")
-						+ "（<1 表示省）；本折 = 本次新增转录 ÷ 本次新原料，累计 = 当前转录 ÷ 累计折叠原料" },
+						+ "（<1 表示省）；本折 = (本次新增转录 − 首折原样保留的 head) ÷ 本次新原料，累计 = 当前转录 ÷ 累计折叠原料" },
 					"本折 " + foldPct + "% · 累计 " + cumPct + "%"));
+			}
+			if (coi) {
+				var cosec = secOf(coi);
+				var stageText = ({ sweep: "核对文件", gather: "收集事件", llm: "模型考证", repair: "修复输出", apply: "写入结果" }[coi.stage] || "整理中");
+				chips.push(e("span", { key: "c", className: "ci-foldchip", "data-ci-foldchip": "consolidate",
+					title: "记忆整理（" + (coi.trigger === "manual" ? "手动" : "空闲自动") + "）：" + stageText + (cosec != null ? " · 已 " + cosec + "s" : "") },
+					e("span", { className: "ci-pulse" }), "记忆整理中" + (cosec != null ? " " + cosec + "s" : "")));
+			} else if (coRecent) {
+				var coN = (Number(col.invalidated) || 0) + (Number(col.superseded) || 0) + (Number(col.merged) || 0) + (Number(col.added) || 0);
+				chips.push(e("span", { key: "c", className: "ci-foldchip ci-foldchip-done", "data-ci-foldchip": "consolidate-done",
+					title: "上次整理：" + (col.invalidated || 0) + " 条失效 · " + (col.superseded || 0) + " 条取代 · "
+						+ (col.merged || 0) + " 条合并 · " + (col.added || 0) + " 条新增"
+						+ (col.ms != null ? " · " + (col.ms / 1000).toFixed(1) + "s" : "") },
+					"记忆已整理" + (coN ? " · " + coN : "")));
 			}
 			if (ni) {
 				var nsec = secOf(ni);
@@ -1148,7 +1265,7 @@ window.__ModuleLoader__.load({
 			var t = String(s || "");
 			if (t.indexOf("ws:") === 0) {
 				var p = t.slice(3).split("/").filter(Boolean);
-				return "工作区 " + (p.length ? p.slice(-2).join("/") : t.slice(3));
+				return "工作区 " + (p.length ? p[p.length - 1] : t.slice(3));
 			}
 			if (t.indexOf("sess:") === 0) return "会话 " + t.slice(5, 13);
 			return t || "—";
@@ -1163,20 +1280,277 @@ window.__ModuleLoader__.load({
 			var v = Number(n);
 			return Number.isFinite(v) && v >= 0 ? String(v) : "—";
 		}
-		var MEM_ENV = { memoryEnabled: "DSH_MEMORY", memoryLlmEnabled: "DSH_MEMORY_LLM", memoryInjectCatalog: "DSH_MEMORY_INJECT" };
-		var MEM_LOCK = { memoryEnabled: "enabled", memoryLlmEnabled: "llmEnabled", memoryInjectCatalog: "injectCatalog" };
+		// ---- 记忆图谱：来源结构（工作区 → 会话 → 洞察） ----
+		// 纯函数、确定性布局；命令/文件不画点，只作为节点计数。便于单测与重绘。
+		function memHash(s) {
+			var h = 2166136261;
+			var t = String(s || "");
+			for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); }
+			return h >>> 0;
+		}
+		function memClip(s, n) {
+			var t = String(s || "");
+			return t.length > n ? (t.slice(0, n) + "…") : t;
+		}
+		function memNodeLabel(n) {
+			if (!n) return "";
+			if (n.kind === "workspace") return memClip(n.label || "工作区", 16);
+			if (n.kind === "session") return n.title ? ("「" + memClip(n.title, 13) + "」") : ("会话 " + String(n.sid || "").slice(0, 8));
+			return n.key || "洞察";
+		}
+		function memNodeRadius(n) {
+			if (n.kind === "workspace") return 17 + Math.min(10, Math.log((Number(n.n) || 1) + 1) * 2);
+			if (n.kind === "session") return 9 + Math.min(8, Math.log((Number(n.n) || 1) + 1) * 1.6);
+			return 4 + Math.min(4, (Number(n.confidence) || 0.5) * 4);
+		}
+		// 布局签名的单条缓存：hover/平移/缩放都可能触发重绘，节点集合没变时不应重跑 24 轮 O(n²) 斥力。
+		var memLayoutCache = { sig: "", at: null };
+		function memoryGraphLayout(nodes, edges, W, H) {
+			W = Number(W) || 900; H = Number(H) || 560;
+			nodes = (nodes || []).map(function (n) { return n.id ? n : Object.assign({}, n, { id: n.scope }); });
+			var sig = W + "x" + H + "|" + nodes.map(function (n) {
+				return n.id + ":" + n.kind + ":" + (Number(n.n) || 0) + ":" + (Number(n.confidence) || 0) + ":" + (n.originSid || "") + ":" + (n.workspaceScope || "");
+			}).join("|");
+			if (memLayoutCache.sig === sig && memLayoutCache.at) {
+				var atCached = memLayoutCache.at;
+				return {
+					nodes: nodes.map(function (n) { var p = atCached.get(n.id); return Object.assign({}, n, { x: p.x, y: p.y }); }),
+					edges: edges || [],
+				};
+			}
+			var ws = nodes.filter(function (n) { return n.kind === "workspace"; });
+			var sess = nodes.filter(function (n) { return n.kind === "session"; });
+			var facts = nodes.filter(function (n) { return n.kind === "fact"; });
+			var cx = W / 2, cy = H / 2;
+			var pos = new Map();
+			var wr = ws.length > 1 ? Math.min(W, H) * 0.30 : 0;
+			ws.forEach(function (n, i) {
+				var a = ws.length > 1 ? (Math.PI * 2 * i / ws.length) - Math.PI : 0;
+				pos.set(n.id, { x: cx + Math.cos(a) * wr, y: cy + Math.sin(a) * wr });
+			});
+			var sessByWs = new Map();
+			sess.forEach(function (n) {
+				var k = n.workspaceScope || "";
+				if (!sessByWs.has(k)) sessByWs.set(k, []);
+				sessByWs.get(k).push(n);
+			});
+			sessByWs.forEach(function (list, k) {
+				var base = pos.get(k) || { x: cx, y: cy };
+				var rr = list.length > 1 ? Math.min(210, 86 + list.length * 26) : 128;
+				list.forEach(function (n, i) {
+					var a = (Math.PI * 2 * i / Math.max(1, list.length)) + (memHash(n.id) % 100) / 500;
+					pos.set(n.id, { x: base.x + Math.cos(a) * rr, y: base.y + Math.sin(a) * rr });
+				});
+			});
+			var factsByScope = new Map();
+			facts.forEach(function (n) {
+				var k = n.scope || "";
+				if (!factsByScope.has(k)) factsByScope.set(k, []);
+				factsByScope.get(k).push(n);
+			});
+			factsByScope.forEach(function (list, scope) {
+				var base = pos.get(scope) || { x: cx, y: cy };
+				var rr = list.length > 1 ? Math.min(210, 72 + list.length * 15) : 74;
+				list.forEach(function (n, i) {
+					var a = (Math.PI * 2 * i / Math.max(1, list.length)) + (memHash(n.id) % 100) / 700;
+					var p = { x: base.x + Math.cos(a) * rr, y: base.y + Math.sin(a) * rr };
+					if (String(scope).indexOf("ws:") === 0 && n.originSid) {
+						var op = pos.get("sess:" + n.originSid);
+						if (op) p = { x: (p.x * 2 + op.x) / 3, y: (p.y * 2 + op.y) / 3 };
+					}
+					pos.set(n.id, p);
+				});
+			});
+			nodes.forEach(function (n) {
+				if (pos.has(n.id)) return;
+				var a = (memHash(n.id) % 360) * Math.PI / 180;
+				pos.set(n.id, { x: cx + Math.cos(a) * 80, y: cy + Math.sin(a) * 80 });
+			});
+			var arr = nodes.map(function (n) { var p = pos.get(n.id); return { id: n.id, kind: n.kind, x: p.x, y: p.y }; });
+			var minOf = function (a, b) {
+				if (a.kind === "workspace" || b.kind === "workspace") return 70;
+				if (a.kind === "session" || b.kind === "session") return 34;
+				return 14;
+			};
+			for (var it = 0; it < 24; it++) {
+				for (var i = 0; i < arr.length; i++) {
+					for (var j = i + 1; j < arr.length; j++) {
+						var a = arr[i], b = arr[j];
+						var dx = b.x - a.x, dy = b.y - a.y;
+						var d = Math.sqrt(dx * dx + dy * dy);
+						if (d < 0.5) {
+							// 完全重合时方向未定义；用 id 哈希给一个确定性分离方向（纯随机会让每次重绘跳动）。
+							var ang = (memHash(a.id + '|' + b.id) % 360) * Math.PI / 180;
+							dx = Math.cos(ang) * 0.5; dy = Math.sin(ang) * 0.5; d = 0.5;
+						}
+						var min = minOf(a, b);
+						if (d < min) {
+							var push = (min - d) / d * 0.5;
+							a.x -= dx * push; a.y -= dy * push;
+							b.x += dx * push; b.y += dy * push;
+						}
+					}
+				}
+				for (i = 0; i < arr.length; i++) {
+					arr[i].x = Math.max(24, Math.min(W - 24, arr[i].x));
+					arr[i].y = Math.max(24, Math.min(H - 24, arr[i].y));
+				}
+			}
+			// 初始环半径只保证结构可读；再按包围盒整体缩放，让稀疏图也能撑满画布（留出标签余量）。
+			var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+			arr.forEach(function (p) {
+				if (p.x < minX) minX = p.x;
+				if (p.y < minY) minY = p.y;
+				if (p.x > maxX) maxX = p.x;
+				if (p.y > maxY) maxY = p.y;
+			});
+			var bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+			// 画布是横向的：x/y 分别缩放，稀疏图也能用满宽度；节点半径与字号不变。
+			var sx = Math.min(1.9, (W - 200) / bw);
+			var sy = Math.min(1.6, (H - 160) / bh);
+			if (Number.isFinite(sx) && Number.isFinite(sy) && (sx > 1 || sy > 1)) {
+				sx = Math.max(1, sx); sy = Math.max(1, sy);
+				arr.forEach(function (p) { p.x = cx + (p.x - cx) * sx; p.y = cy + (p.y - cy) * sy; });
+			}
+			var at = new Map(arr.map(function (n) { return [n.id, n]; }));
+			memLayoutCache = { sig: sig, at: at };
+			return {
+				nodes: nodes.map(function (n) { var p = at.get(n.id); return Object.assign({}, n, { x: p.x, y: p.y }); }),
+				edges: edges || [],
+			};
+		}
+		// 范围/类型/状态/搜索/聚焦过滤；返回可绘制的子图。
+		function visibleMemoryGraph(graph, opts) {
+			graph = graph || { nodes: [], edges: [] };
+			opts = opts || {};
+			var range = opts.range || "all";
+			var type = opts.type || "all";
+			var status = opts.status || "active";
+			var q = String(opts.query || "").trim().toLowerCase();
+			var focus = opts.focus || null;
+			var curWsScope = opts.curWsScope || null;
+			var curSessScope = opts.curSessScope || null;
+			var allNodes = (graph.nodes || []).map(function (n) { return n.id ? n : Object.assign({}, n, { id: n.scope }); });
+			// 列表分页：更早的事实只进列表，不把图谱撑到上千节点。
+			var extraFacts = Array.isArray(opts.extraFacts) ? opts.extraFacts : [];
+			var sessMap = new Map();
+			allNodes.forEach(function (n) { if (n.kind === "session") sessMap.set(n.scope, n); });
+			function inRange(scope) {
+				if (range === "all") return true;
+				if (range === "workspace") return scope === curWsScope;
+				if (range === "session") return scope === curSessScope;
+				return scope === curWsScope || scope === curSessScope;
+			}
+			function factOk(n) {
+				if (!n || n.kind !== "fact") return false;
+				if (status !== "all" && n.status !== status) return false;
+				if (type !== "all" && n.factType !== type) return false;
+				if (q && (String(n.summary) + " " + String(n.key)).toLowerCase().indexOf(q) < 0) return false;
+				if (!inRange(n.scope)) return false;
+				if (focus) {
+					if (focus.indexOf("ws:") === 0) {
+						if (n.scope === focus) return true;
+						if (String(n.scope).indexOf("sess:") === 0) {
+							var s = sessMap.get(n.scope);
+							return !!(s && s.workspaceScope === focus);
+						}
+						return false;
+					}
+					if (focus.indexOf("sess:") === 0) {
+						if (n.scope === focus) return true;
+						if (String(n.scope).indexOf("ws:") === 0 && ("sess:" + n.originSid) === focus) return true;
+						return false;
+					}
+				}
+				return true;
+			}
+			var graphFacts = allNodes.filter(factOk);
+			var facts = graphFacts.slice();
+			var factIds = new Set(facts.map(function (f) { return f.id; }));
+			extraFacts.forEach(function (f) {
+				if (!factOk(f) || factIds.has(f.id)) return;
+				factIds.add(f.id);
+				facts.push(f);
+			});
+			var keep = new Set();
+			graphFacts.forEach(function (n) {
+				keep.add(n.id); keep.add(n.scope);
+				if (n.originSid) keep.add("sess:" + n.originSid);
+			});
+			if (range !== "all") {
+				if (curWsScope) keep.add(curWsScope);
+				if (curSessScope) keep.add(curSessScope);
+			}
+			Array.from(keep).forEach(function (id) {
+				var s = sessMap.get(id);
+				if (s && s.workspaceScope) keep.add(s.workspaceScope);
+			});
+			var nodes = allNodes.filter(function (n) {
+				if (n.kind === "fact") return keep.has(n.id);
+				if (range === "all" && !focus) return true;
+				return keep.has(n.scope);
+			});
+			var ids = new Set(nodes.map(function (n) { return n.id; }));
+			var edges = (graph.edges || []).filter(function (x) { return ids.has(x.source) && ids.has(x.target); });
+			return { nodes: nodes, edges: edges, facts: facts, graphFacts: graphFacts };
+		}
+		var MEM_ENV = { memoryEnabled: "DSH_MEMORY", memoryLlmEnabled: "DSH_MEMORY_LLM", memoryInjectCatalog: "DSH_MEMORY_INJECT", memoryHandoff: "DSH_MEMORY_HANDOFF", memoryConsolidateAuto: "DSH_MEMORY_CONSOLIDATE" };
+		var MEM_LOCK = { memoryEnabled: "enabled", memoryLlmEnabled: "llmEnabled", memoryInjectCatalog: "injectCatalog", memoryHandoff: "handoff", memoryConsolidateAuto: "consolidateAuto" };
+		// 注入回执：把“模型这轮到底看到了什么”从 console 搬到面板。全文是不可信数据，不执行。
+		function InjectionReceipt(inj) {
+			if (!inj) return null;
+			if (inj.legacy) return e("div", { className: "ci-sub", style: { marginTop: 6 } }, "注入回执：旧版只记录了“已注入”，无原文");
+			return e("div", { className: "ci-sub", style: { marginTop: 6 } },
+				"注入回执 " + inj.chars + " 字 · sha " + (inj.sha1 || "-") + (inj.handover ? " · 含交接卡" : ""),
+				inj.text ? e("details", null,
+					e("summary", { style: { cursor: "pointer" } }, "查看注入原文（不可信背景）"),
+					e("pre", { style: { whiteSpace: "pre-wrap", maxHeight: 180, overflow: "auto", fontSize: 11, margin: "4px 0 0" } }, inj.text)) : null);
+		}
 		function MemoryView(props) {
 			var _d = useState(null), data = _d[0], setData = _d[1];
 			var _e = useState(null), err = _e[0], setErr = _e[1];
 			var _b = useState(false), busy = _b[0], setBusy = _b[1];
 			var sid = (props && props.sessionId) || "";
+			// 记忆范围：current = 当前工作区共享 + 本会话私有；缺省打开具体会话时看当前上下文。
+			var _rg = useState(sid ? "current" : "all"), range = _rg[0], setRange = _rg[1];
+			var _tab = useState("graph"), tab = _tab[0], setTab = _tab[1];
+			var _ty = useState("all"), type = _ty[0], setType = _ty[1];
+			var _stt = useState("active"), status = _stt[0], setStatus = _stt[1];
+			var _q = useState(""), query = _q[0], setQuery = _q[1];
+			var _sel = useState([]), selected = _sel[0], setSelected = _sel[1];
+			var _fo = useState(null), focus = _fo[0], setFocus = _fo[1];
+			var _vp = useState({ x: 0, y: 0, k: 1 }), viewport = _vp[0], setViewport = _vp[1];
+			var _hv = useState(null), hover = _hv[0], setHover = _hv[1];
 			// 编译模型覆盖（control.memoryLlmProvider/Model）：空 = 跟随会话当前模型。
 			var _mp = useState(""), memP = _mp[0], setMemP = _mp[1];
 			var _mm = useState(""), memM = _mm[0], setMemM = _mm[1];
 			var _mps = useState([]), memProviders = _mps[0], setMemProviders = _mps[1];
 			var _mms = useState([]), memModels = _mms[0], setMemModels = _mms[1];
 			var _mde = useState(null), memMdlErr = _mde[0], setMemMdlErr = _mde[1];
+			// 证据钻取：选中事实后懒加载证据链；切换选择时清空，避免旧证据短暂挂在新事实上。
+			var _evd = useState(null), evData = _evd[0], setEvData = _evd[1];
+			var _evx = useState(null), evErr = _evx[0], setEvErr = _evx[1];
+			// 画布比例跟随容器：固定 900x560 在 600x220 的槽里会按高度缩到 0.39，标签实际只有 5–6px。
+			var _gb = useState({ w: 900, h: 560 }), graphBox = _gb[0], setGraphBox = _gb[1];
+			// roving tabindex：整个图谱只占一个 Tab 位，方向键在节点间移动。
+			var _kb = useState(null), kbId = _kb[0], setKbId = _kb[1];
+			var _zn = useState(false), zen = _zn[0], setZen = _zn[1];
+			// 时间窗（天）：0=全部；只影响事实/最近记录，不改全库计数。
+			var _sd = useState(0), sinceDays = _sd[0], setSinceDays = _sd[1];
+			// 列表分页：更早的事实只在列表追加；查询签名变化时清空，避免跨范围串页。
+			var _old = useState({ sig: "", facts: [], cursor: null, hasMore: false, pages: 0, loading: false, err: null }), older = _old[0], setOlder = _old[1];
+			// 图谱独立端点：graph tab 激活时按需拉取，避免 5s 轮询 /api/memory/status 携带 64.9% 的图谱负载。
+			var _gd = useState(null), graphData = _gd[0], setGraphData = _gd[1];
+			// 框选：在图谱空白处拖拽画矩形，松开时选中矩形内所有节点。
+			var _bs = useState(null), boxSelect = _bs[0], setBoxSelect = _bs[1];
+			var boxRef = useRef(null);
+			var listSig = [sid, range, focus || "", sinceDays].join("|");
+			var wrapRef = useRef(null);
 			var memPicked = useRef(false); // 用户手动改过后，轮询不再覆盖选择
+			var dragRef = useRef(null);
+			var svgRef = useRef(null);
+			var viewRef = useRef(viewport);
+			viewRef.current = viewport;
 			function loadMemModels(p) {
 				if (!p) { setMemModels([]); return Promise.resolve(); }
 				return fetch("/api/context-inject/models", {
@@ -1219,13 +1593,82 @@ window.__ModuleLoader__.load({
 				setMemM(m);
 				if (m) saveMemRoute(memP, m);
 			}
-			function pull() {
-				var q = sid ? "?sessionId=" + encodeURIComponent(sid) : "";
-				return fetch("/api/memory/status" + q, { headers: { "Content-Type": "application/json" } })
+			function memoryQuery(useRange, opts) {
+				var o = opts || {};
+				var q = [];
+				if (sid) q.push("sessionId=" + encodeURIComponent(sid));
+				q.push("range=" + encodeURIComponent(useRange || range));
+				// 聚焦某个工作区/会话时向服务端下钻并放宽上限；未聚焦仍保持 200 条默认值。
+				var focusReq = focus && /^(ws|sess):/.test(focus) ? focus : "";
+				q.push("factLimit=" + (o.factLimit || (focusReq ? 500 : 200)));
+				if (focusReq) q.push("focusScope=" + encodeURIComponent(focusReq));
+				var days = Number(sinceDays) || 0;
+				if (days > 0) {
+					var cut = new Date();
+					cut.setHours(0, 0, 0, 0);
+					q.push("sinceTs=" + (cut.getTime() - (days - 1) * 86400000));
+				}
+				if (o.cursor) q.push("cursor=" + encodeURIComponent(o.cursor));
+				return q.join("&");
+			}
+			function pull(nextRange) {
+				var useRange = nextRange || range;
+				return fetch("/api/memory/status?" + memoryQuery(useRange), { headers: { "Content-Type": "application/json" } })
 					.then(function (r) { return r.json(); })
-					.then(function (s) { setData(s); setErr(null); return s; })
+					.then(function (s) {
+						setData(s); setErr(null);
+						// 服务端可能因会话没有工作区/记录而回退到 all；跟随它，否则当前范围会渲染成空图。
+						if (s && s.rangeEffective && s.rangeEffective !== useRange) setRange(s.rangeEffective);
+						return s;
+					})
 					.catch(function (x) { setErr(x); return null; });
 			}
+			function loadOlder() {
+				var gs = (data && data.graph && data.graph.stats) || {};
+				if (!gs.focusScope || older.loading) return;
+				var baseFacts = older.sig === listSig ? older.facts : [];
+				var cursor = older.sig === listSig && older.cursor ? older.cursor : gs.nextCursor;
+				if (!cursor) return;
+				setOlder({ sig: listSig, facts: baseFacts, cursor: cursor, hasMore: !!gs.hasMore, pages: older.sig === listSig ? older.pages : 0, loading: true, err: null });
+				fetch("/api/memory/status?" + memoryQuery(range, { cursor: cursor, factLimit: 500 }), { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (!j || j.ok === false) throw new Error((j && (j.error || j.message)) || "加载失败");
+						var st = (j.graph && j.graph.stats) || {};
+						var add = ((j.graph && j.graph.nodes) || []).filter(function (n) { return n.kind === "fact"; });
+						var seen = new Set(baseFacts.map(function (f) { return f.id; }));
+						var merged = baseFacts.slice();
+						add.forEach(function (f) { if (!seen.has(f.id)) { seen.add(f.id); merged.push(f); } });
+						setOlder({ sig: listSig, facts: merged, cursor: st.nextCursor || null, hasMore: !!st.hasMore, pages: (older.sig === listSig ? older.pages : 0) + 1, loading: false, err: null });
+					})
+					.catch(function (x) {
+						setOlder({ sig: listSig, facts: baseFacts, cursor: cursor, hasMore: !!gs.hasMore, pages: older.sig === listSig ? older.pages : 0, loading: false, err: x });
+					});
+			}
+			function pullGraph() {
+				if (tab !== "graph") return;
+				var focusReq = focus && /^(ws|sess):/.test(focus) ? focus : "";
+				var q = [];
+				if (sid) q.push("sessionId=" + encodeURIComponent(sid));
+				q.push("range=" + encodeURIComponent(range));
+				q.push("factLimit=" + (focusReq ? 500 : 200));
+				if (focusReq) q.push("focusScope=" + encodeURIComponent(focusReq));
+				var days = Number(sinceDays) || 0;
+				if (days > 0) {
+					var cut = new Date();
+					cut.setHours(0, 0, 0, 0);
+					q.push("sinceTs=" + (cut.getTime() - (days - 1) * 86400000));
+				}
+				fetch("/api/memory/graph?" + q.join("&"), { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (j && j.ok !== false && j.graph) setGraphData(j.graph);
+					})
+					.catch(function () { /* graph fetch failure is non-fatal */ });
+			}
+			useEffect(function () {
+				setOlder({ sig: listSig, facts: [], cursor: null, hasMore: false, pages: 0, loading: false, err: null });
+			}, [listSig]);
 			useEffect(function () {
 				// 页面不可见时停轮询；切回来立即补一帧（5s 固定间隔在后台纯属浪费）
 				function tick() { if (typeof document !== "undefined" && document.hidden) return; pull(); }
@@ -1237,7 +1680,76 @@ window.__ModuleLoader__.load({
 					clearInterval(iv);
 					if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVis);
 				};
-			}, [sid]);
+			}, [sid, range, focus, sinceDays]);
+			useEffect(function () { setRange(sid ? "current" : "all"); setFocus(null); setSelected([]); }, [sid]);
+			// 图谱 tab 激活时按需拉取独立端点；参数变化时重新拉取。
+			useEffect(function () {
+				if (tab === "graph") pullGraph();
+			}, [tab, sid, range, focus, sinceDays]);
+			// 图谱滚轮缩放：passive:false，避免 React 合成 wheel 不能 preventDefault。
+			// 用 ref 取当前视口：平移后 k 不变，闭包里的旧 x/y 会让缩放把画面拽回旧位置。
+			// 依赖 graphReady：首帧数据未到时不渲染 svg，只挂 [tab] 会让监听永远缺失。
+			var hasGraph = !!graphData;
+			useEffect(function () {
+				var el = svgRef.current;
+				if (!el || !el.addEventListener) return;
+				function onWheel(ev) {
+					ev.preventDefault();
+					var vp = viewRef.current;
+					var nk = Math.max(0.55, Math.min(2.4, vp.k * (ev.deltaY < 0 ? 1.12 : 0.9)));
+					if (nk === vp.k) return;
+					var nx = vp.x, ny = vp.y;
+					try {
+						var ctm = el.getScreenCTM && el.getScreenCTM();
+						if (ctm && el.createSVGPoint) {
+							var pt = el.createSVGPoint();
+							pt.x = ev.clientX; pt.y = ev.clientY;
+							var p = pt.matrixTransform(ctm.inverse());
+							nx = p.x - (p.x - vp.x) * (nk / vp.k);
+							ny = p.y - (p.y - vp.y) * (nk / vp.k);
+						}
+					} catch { /* keep center zoom */ }
+					setViewport({ x: nx, y: ny, k: nk });
+				}
+				el.addEventListener("wheel", onWheel, { passive: false });
+				return function () { el.removeEventListener("wheel", onWheel); };
+			}, [tab, hasGraph]);
+			// 按实际容器比例调整 viewBox（宽度固定 900，高度按容器高宽比换算）。
+			// 不这么做时，宽扁容器会按高度缩放，14px 标签只剩约 5.5px。
+			useEffect(function () {
+				var el = wrapRef.current;
+				if (!el || !el.getBoundingClientRect) return;
+				function fit() {
+					var r = el.getBoundingClientRect();
+					if (!(r.width > 0) || !(r.height > 0)) return;
+					var H = Math.max(280, Math.min(620, Math.round(900 * r.height / r.width)));
+					setGraphBox(function (prev) { return (prev.w === 900 && Math.abs(prev.h - H) < 8) ? prev : { w: 900, h: H }; });
+				}
+				fit();
+				var ro = null;
+				if (typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(fit); ro.observe(el); }
+				return function () { if (ro) ro.disconnect(); };
+			}, [tab, hasGraph]);
+			// 证据链懒加载：只在选中事实时请求，不把证据塞进 5s 轮询的状态响应。
+			// 列表分页载入的旧事实不在首屏图谱里，也要能回查证据。
+			useEffect(function () {
+				if (!selected.length) { setEvData(null); setEvErr(null); return; }
+				if (selected.length > 1) { setEvData(null); setEvErr(null); return; }
+				var pool = ((graphData && graphData.nodes) || []).concat(older.facts || []);
+				var node = pool.filter(function (x) { return x.id === selected[0]; })[0];
+				if (!node || node.kind !== "fact") { setEvData(null); setEvErr(null); return; }
+				var alive = true;
+				setEvData(null); setEvErr(null);
+				fetch("/api/memory/evidence?scope=" + encodeURIComponent(node.scope) + "&key=" + encodeURIComponent(node.key), { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (!alive) return;
+						if (j && j.ok) setEvData(j);
+						else setEvErr(new Error((j && j.error) || "evidence-failed"));
+					})
+					.catch(function (x) { if (alive) setEvErr(x); });
+				return function () { alive = false; };
+			}, [selected, older.facts]);
 			// 首次拿到快照 / 服务端路由变化时同步选择器；用户手动改过后不再覆盖。
 			var memRouteP = data && data.llmRoute ? (data.llmRoute.provider || "") : "";
 			var memRouteM = data && data.llmRoute ? (data.llmRoute.model || "") : "";
@@ -1267,11 +1779,64 @@ window.__ModuleLoader__.load({
 						e("div", null,
 							e("div", { className: "ci-title" }, "外部记忆"),
 							e("div", { className: "ci-sub" }, err ? ("读取失败：" + String(err.message || err)) : "读取中…")),
-						e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: pull }, "重试")));
+						e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: function () { pull(range); } }, "重试")));
 			}
 			var f = data.flags || {};
 			var t = data.totals || {};
 			var db = data.db || {};
+			var co = data.consolidate || {};
+			var coi = co.inflight || null;
+			var col = co.last || null;
+			var coManual = co.manualRoute || null;
+			var coManText = (coManual && coManual.provider)
+				? ("手动模型：" + coManual.provider + " / " + (coManual.model || "—"))
+				: "手动模型：跟随编译/会话模型";
+			var conext = co.next || null;
+			var coIdleMin = Math.max(1, Math.round((Number(co.idleMs) || 900000) / 60000));
+			var coReady = !!(f.enabled && f.llmEnabled);
+			var coStage = coi ? ({ sweep: "核对文件", gather: "收集事件", llm: "模型考证", repair: "修复输出", apply: "写入结果" }[coi.stage] || "整理中") : "";
+			var coSec = coi && Number(coi.startedAt) ? Math.max(0, Math.round((Date.now() - Number(coi.startedAt)) / 1000)) : null;
+			var coNextAt = conext && Number(conext.nextAt) ? Number(conext.nextAt) : null;
+			var coReasonText = {
+				"no-route": "没有可用的模型路由（请在「编译模型」里指定）",
+				"disabled": "记忆层或轻 LLM 编译未开启",
+				"no-workspace": "找不到该会话的工作区",
+				"llm-failed": "模型调用失败",
+				"parse-failed": "模型输出未通过校验",
+				"busy": "已有整理在运行",
+				"error": "整理过程异常",
+			};
+			var coCountdown = !sid ? "打开具体会话后可手动整理"
+				: (co.auto === false ? "自动整理已关闭（仍可手动）"
+					: (!coNextAt ? "空闲时自动整理" : (coNextAt <= Date.now() ? "即将整理" : "约 " + Math.max(1, Math.round((coNextAt - Date.now()) / 60000)) + " 分钟后")));
+			var coParts = [];
+			if (col && col.ok) {
+				if (col.invalidated) coParts.push(col.invalidated + " 条失效");
+				if (col.superseded) coParts.push(col.superseded + " 条取代");
+				if (col.merged) coParts.push(col.merged + " 条合并");
+				if (col.added) coParts.push(col.added + " 条新增");
+				if (col.skipped) coParts.push(col.skipped + " 条未通过校验");
+				if (col.protected) coParts.push(col.protected + " 条约束受保护");
+				if (!coParts.length) coParts.push("没有需要变更的事实");
+			}
+			var coLastText = col ? (col.ok
+				? ("上次整理：" + coParts.join(" · ") + (col.ms != null ? " · " + (col.ms / 1000).toFixed(1) + "s" : "") + (col.model ? " · " + col.model : ""))
+				: ("上次整理失败：" + (coReasonText[col.reason] || col.reason || "未知"))) : null;
+			function consolidateNow() {
+				if (busy || coi || !sid) return;
+				setBusy(true);
+				fetch("/api/memory/consolidate", {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ sessionId: sid }),
+				}).then(function (r) { return r.json(); }).then(function (j) {
+					if (!j || !j.ok) setErr(new Error((j && j.error) || "consolidate failed"));
+					else setErr(null);
+				}).catch(function (x) { setErr(x); }).then(function () {
+					setBusy(false);
+					setTimeout(function () { pull(); }, 800);
+					setTimeout(function () { pull(); }, 3500);
+				});
+			}
 			var lock = data.envLocked || {};
 			var lockN = ["enabled", "llmEnabled", "injectCatalog"].filter(function (k) { return lock[k] === true; }).length;
 			var armed = data.armed === true;
@@ -1317,7 +1882,671 @@ window.__ModuleLoader__.load({
 						e("span", { className: "ci-switch" }),
 						e("span", { className: "mem-flag-state" }, locked ? "锁定" : (on ? "开" : "关"))));
 			}
-			return e("div", { className: "ci-root" },
+			// ---- 当前上下文与图谱视图 ----
+			var cur = data.current || null;
+			var curWs = (cur && cur.workspace) || null;
+			var curSess = (cur && cur.session) || null;
+			var curWsScope = curWs ? curWs.scope : null;
+			var curSessScope = curSess ? curSess.scope : null;
+			var graph = graphData || { nodes: [], edges: [], stats: {} };
+			var olderFacts = older.sig === listSig ? older.facts : [];
+			var visible = visibleMemoryGraph(graph, {
+				range: range, type: type, status: status, query: query, focus: focus,
+				curWsScope: curWsScope, curSessScope: curSessScope,
+				extraFacts: tab === "list" ? olderFacts : [],
+			});
+			var factsVisible = visible.facts || [];
+			var graphFactsVisible = visible.graphFacts || factsVisible;
+			var selectedNode = null, focusNode = null;
+			(graph.nodes || []).forEach(function (n) {
+				if (selected.length === 1 && n.id === selected[0]) selectedNode = n;
+				if (focus && n.scope === focus) focusNode = n;
+			});
+			if (!selectedNode && selected.length === 1) {
+				selectedNode = olderFacts.filter(function (n) { return n.id === selected[0]; })[0] || null;
+			}
+			var factTypeText = { state: "状态", constraint: "约束", task: "任务", history: "历史" };
+			function rangeSelect() {
+				var opts = sid
+					? [["current", "当前上下文"], ["workspace", "本工作区"], ["session", "本会话私有"], ["all", "全部"]]
+					: [["all", "全部"]];
+				return e("select", {
+					className: "ci-sel", value: sid ? range : "all",
+					"aria-label": "范围选择",
+					title: "默认跟随当前选中的会话页；展开可看其他工作区",
+					onChange: function (ev) {
+						setFocus(null); setSelected([]);
+						setRange((ev && ev.target && ev.target.value) || (sid ? "current" : "all"));
+					},
+				}, opts.map(function (o) { return e("option", { key: o[0], value: o[0] }, o[1]); }));
+			}
+			function typeSelect() {
+				var opts = [["all", "全部类型"], ["constraint", "约束"], ["state", "状态"], ["task", "任务"], ["history", "历史"]];
+				return e("select", { className: "ci-sel", value: type, "aria-label": "类型过滤", title: "按事实类型过滤",
+					onChange: function (ev) { setType((ev && ev.target && ev.target.value) || "all"); } },
+					opts.map(function (o) { return e("option", { key: o[0], value: o[0] }, o[1]); }));
+			}
+			function statusSelect() {
+				var opts = [["active", "有效"], ["all", "全部状态"], ["stale", "已失效"], ["superseded", "被取代"]];
+				return e("select", { className: "ci-sel", value: status, "aria-label": "状态过滤", title: "按生命周期状态过滤",
+					onChange: function (ev) { setStatus((ev && ev.target && ev.target.value) || "active"); } },
+					opts.map(function (o) { return e("option", { key: o[0], value: o[0] }, o[1]); }));
+			}
+			function timeSelect() {
+				var opts = [["0", "全部时间"], ["7", "最近 7 天"], ["30", "最近 30 天"], ["90", "最近 90 天"]];
+				return e("select", { className: "ci-sel", value: String(sinceDays || 0), "aria-label": "时间范围", title: "按事实更新时间过滤（只影响事实与最近记录，不改全库计数）",
+					onChange: function (ev) { setSelected([]); setSinceDays(Number((ev && ev.target && ev.target.value) || 0) || 0); } },
+					opts.map(function (o) { return e("option", { key: o[0], value: o[0] }, o[1]); }));
+			}
+			function focusChip() {
+				if (!focus) return null;
+				return e("span", { className: "mem-focus" },
+					e("span", null, "聚焦 " + (focusNode ? memNodeLabel(focusNode) : memScope(focus))),
+					e("button", { className: "mem-focus-x", "aria-label": "清除聚焦", title: "清除聚焦", onClick: function () { setFocus(null); } }, "×"));
+			}
+			function expandButton() {
+				if (range !== "all") {
+					return e("button", { className: "ci-btn", title: "显示其他工作区与会话",
+						onClick: function () { setRange("all"); setFocus(null); } }, "展开全部");
+				}
+				if (sid) {
+					return e("button", { className: "ci-btn", title: "回到当前会话上下文",
+						onClick: function () { setRange("current"); setFocus(null); setSelected([]); } }, "回到当前");
+				}
+				return null;
+			}
+			function selectNode(n, ev) {
+				if (!n) return;
+				var ctrlKey = ev && (ev.ctrlKey || ev.metaKey);
+				var shiftKey = ev && ev.shiftKey;
+				if (ctrlKey) {
+					// Toggle in multi-select
+					var idx = selected.indexOf(n.id);
+					if (idx >= 0) {
+						setSelected(selected.filter(function (id) { return id !== n.id; }));
+					} else {
+						setSelected(selected.concat([n.id]));
+					}
+				} else if (shiftKey && selected.length > 0) {
+					// Range select: add all nodes between last selected and current
+					// For now, just add to selection (proper range requires layout order)
+					if (selected.indexOf(n.id) < 0) {
+						setSelected(selected.concat([n.id]));
+					}
+				} else {
+					// Single select
+					setSelected([n.id]);
+				}
+			}
+			function openNodeInList(n) {
+				if (!n) return;
+				setTab("list");
+				setSelected(n.id);
+				var inCur = n.scope === curWsScope || n.scope === curSessScope;
+				if (n.kind === "fact") {
+					// 可见节点已满足当前过滤；只有从详情栏打开一个被过滤掉的事实时才放宽筛选。
+					var seen = (visible.facts || []).some(function (f) { return f.id === n.id; });
+					if (!seen) { setType("all"); setStatus("all"); setQuery(""); }
+					if (!inCur) setRange("all");
+					setFocus(null);
+					return;
+				}
+				if (n.kind === "session" || n.kind === "workspace") {
+					if (!inCur) setRange("all");
+					setFocus(n.scope);
+				}
+			}
+			function tabButton(id, label) {
+				return e("button", { key: id, className: "mem-tab" + (tab === id ? " on" : ""), role: "tab", "aria-selected": tab === id, onClick: function () { setTab(id); } }, label);
+			}
+			function overviewStrip() {
+				return e("div", { className: "mem-strip" },
+					e("span", null, "全库活跃记录 ", e("b", null, t.active || 0)),
+					e("span", null, "当前上下文记录 ", e("b", null, cur ? cur.records : 0), " 条"),
+					e("span", null, "当前有效洞察 ", e("b", null, cur ? cur.insights : 0)),
+					e("span", null, "本会话私有记录 ", e("b", null, curSess ? curSess.records : 0)),
+					e("span", null, "待处理错误 ", e("b", null, t.errors || 0)));
+			}
+			function memoryToolbar() {
+				return e("div", { className: "mem-toolbar" },
+					e("span", { className: "mem-toolbar-label" }, "范围"), rangeSelect(),
+					e("span", { className: "mem-toolbar-label" }, "时间"), timeSelect(),
+					e("span", { className: "mem-toolbar-label" }, "类型"), typeSelect(),
+					e("span", { className: "mem-toolbar-label" }, "状态"), statusSelect(),
+					e("input", { className: "ci-sel mem-search", type: "search", placeholder: "搜索摘要/键…", value: query,
+						onChange: function (ev) { setQuery((ev && ev.target && ev.target.value) || ""); } }),
+					focusChip(),
+					e("span", { style: { flex: 1 } }),
+					e("span", { className: "ci-sub" }, (tab === "list" ? factsVisible : graphFactsVisible).length + " 条洞察"),
+					expandButton());
+			}
+			function factCard(f) {
+				var cls = "mem-card mem-fact" + (f.status !== "active" ? " muted" : "") + (selected.indexOf(f.id) >= 0 ? " sel" : "");
+				return e("div", { key: f.id, className: cls,
+					onClick: function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); selectNode(f, ev); },
+					onDoubleClick: function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); openNodeInList(f); } },
+					e("div", { className: "mem-card-h" },
+						e("span", { className: "mem-key" }, f.key),
+						e("span", { className: "mem-type " + (f.factType || "") }, factTypeText[f.factType] || f.factType || "?"),
+						e("span", { className: "mem-prov" + (String(f.scope || "").indexOf("sess:") === 0 ? " private" : "") },
+							String(f.scope || "").indexOf("sess:") === 0 ? "本会话私有" : "工作区共享"),
+						e("span", { className: "mem-conf" + ((f.confidence || 0) < 0.6 ? " low" : "") }, "置信 " + Math.round((f.confidence || 0) * 100) + "%"),
+						f.status !== "active" ? e("span", { className: "mem-st " + f.status }, f.status) : null),
+					e("div", { className: "mem-summary" }, f.summary || "(无摘要)"),
+					e("div", { className: "mem-meta", title: f.scope },
+						(String(f.scope || "").indexOf("ws:") === 0 && f.originTitle ? ("来自「" + f.originTitle + "」 · ") : "")
+						+ memAgo(f.updated_ts)));
+			}
+			function limitNotice(withPaging) {
+				var gs = (withPaging ? (data && data.graph && data.graph.stats) : (graphData && graphData.stats)) || {};
+				var same = older.sig === listSig;
+				var extra = withPaging && same ? (older.facts || []).length : 0;
+				var err = same ? older.err : null;
+				if (!gs.truncated && extra === 0 && !err) return null;
+				var shown = (Number(gs.facts) || 0) + extra;
+				var total = Math.max(Number(gs.factTotal) || 0, shown);
+				var win = Number(gs.sinceTs) > 0 ? "（当前时间窗内）" : "";
+				// 分页状态以“已翻过页”的游标为准；否则沿用首页游标，避免翻到底后按钮重新出现。
+				var paged = same && older.pages > 0;
+				var cursor = paged ? older.cursor : gs.nextCursor;
+				var more = paged ? older.hasMore : !!gs.hasMore;
+				var showBtn = !!(withPaging && gs.focusScope && (older.loading || (more && cursor)));
+				var msg = !gs.focusScope ? "点工作区或会话钻取可看全。"
+					: (more ? (withPaging ? "可继续加载更早的事实。" : "切到列表可加载更早的事实。") : "已到最早一条。");
+				return e("div", { className: "mem-limit", role: "status" },
+					e("span", null, "已载入 " + shown + " / 共 " + total + " 条事实" + win
+						+ (paged ? "（含更早 " + extra + " 条）" : "（单次上限 " + (gs.factLimit || 200) + "）")
+						+ "；" + msg),
+					showBtn ? e("button", {
+						className: "ci-btn", disabled: !!older.loading,
+						onClick: loadOlder,
+					}, older.loading ? "加载中…" : "加载更早") : null,
+					err ? e("span", { className: "ci-err" }, "加载失败：" + String((err && err.message) || err)) : null);
+			}
+			function graphBody() {
+				if (err) {
+					return e("div", { className: "ci-sec" },
+						e("div", { className: "ci-err", role: "alert" }, "图谱加载失败：" + String(err.message || err)),
+						e("button", { className: "ci-btn", onClick: function () { pull(); } }, "重试"));
+				}
+				if (!visible.nodes.length) {
+					return e("div", {},
+						limitNotice(),
+						e("div", { className: "ci-sec" },
+							e("div", { className: "mem-empty" }, "当前范围没有可画的节点。"),
+							range !== "all" ? e("button", { className: "ci-btn", onClick: function () { setRange("all"); setFocus(null); } }, "展开全部") : null));
+				}
+				var lay = memoryGraphLayout(visible.nodes, visible.edges, graphBox.w, graphBox.h);
+				var at = new Map(lay.nodes.map(function (n) { return [n.id, n]; }));
+				// 节点标签的计数按当前可见事实算：状态/类型/搜索过滤后不应继续显示全量数字。
+				var visFacts = new Map();
+				(visible.graphFacts || factsVisible || []).forEach(function (f) { visFacts.set(f.scope, (visFacts.get(f.scope) || 0) + 1); });
+				var activeId = selected.length === 1 ? selected[0] : hover;
+			var activeSet = selected.length > 0 ? new Set(selected) : null;
+				// 【v1.10.54 · 路径传播高亮】从选中节点沿边做 BFS，找出所有可达节点用于路径高亮。
+				// 这样选中一个事实时，其来源会话与所属工作区都会被高亮，形成完整的来源链路。
+				var pathSet = null;
+				if (activeSet) {
+					pathSet = new Set(activeSet);
+					var queue = Array.from(activeSet);
+					while (queue.length > 0) {
+						var cur = queue.shift();
+						visible.edges.forEach(function (ed) {
+							var neighbor = ed.source === cur ? ed.target : (ed.target === cur ? ed.source : null);
+							if (neighbor && !pathSet.has(neighbor)) {
+								pathSet.add(neighbor);
+								queue.push(neighbor);
+							}
+						});
+					}
+				}
+				// roving focus：只看当前获得焦点的节点，按方向找“主轴最近、副轴最小”的邻居。
+				function nodeAria(n) {
+					if (n.kind === "workspace") return "工作区 " + (n.label || "") + "，" + (n.n || 0) + " 条记录";
+					if (n.kind === "session") return "会话 " + (n.title || n.sid || "") + "，" + (n.n || 0) + " 条记录";
+					return (n.summary || n.key) + "，" + (factTypeText[n.factType] || n.factType || "事实")
+						+ "，" + (n.status || "") + "，置信 " + Math.round((Number(n.confidence) || 0) * 100) + "%";
+				}
+				function moveFocus(dx, dy) {
+					if (typeof document === "undefined") return;
+					var cur = document.activeElement && document.activeElement.getAttribute
+						? document.activeElement.getAttribute("data-node") : null;
+					var from = cur ? at.get(cur) : null;
+					var best = null, bestScore = Infinity;
+					lay.nodes.forEach(function (n) {
+						if (!from) return;
+						var ddx = n.x - from.x, ddy = n.y - from.y;
+						var primary = ddx * dx + ddy * dy;
+						if (primary <= 2) return;
+						var score = primary + Math.abs(ddx * dy - ddy * dx) * 2.2;
+						if (score < bestScore) { bestScore = score; best = n; }
+					});
+					if (!from) best = lay.nodes[0];
+					if (!best) return;
+					setKbId(best.id);
+					var gs = svgRef.current && svgRef.current.querySelectorAll ? svgRef.current.querySelectorAll("g[data-node]") : [];
+					for (var i = 0; i < gs.length; i++) {
+						if (gs[i].getAttribute("data-node") === best.id) { try { gs[i].focus(); } catch (e) { /* ignore */ } break; }
+					}
+				}
+				// 语义缩放 + 贪心避让：小图直接标事实摘要；大图放大到 1.25× 才标。
+				// 工作区/会话标签永远优先，重叠时先隐藏事实标签，再按重要性保留。
+				var showFactLabels = viewport.k >= 1.25 || graphFactsVisible.length <= 10;
+				// 小图只标最可信的前 6 条事实，避免把画布变成文字墙；放大后全部参与避让。
+				var factRank = new Map();
+				graphFactsVisible.slice().sort(function (a, b) {
+					return ((b.status === "active") - (a.status === "active")) || ((Number(b.confidence) || 0) - (Number(a.confidence) || 0));
+				}).forEach(function (f, i) { factRank.set(f.id, i); });
+				var labelBoxes = [];
+				var labelText = new Map();
+				function labelBox(n, text, size) {
+					var w = 0;
+					for (var i = 0; i < text.length; i++) w += (text.charCodeAt(i) > 255 ? 1 : 0.62) * size;
+					var r = memNodeRadius(n);
+					var baseY = n.y + r + (n.kind === "fact" ? 16 : 15);
+					if (baseY + size * 0.3 > graphBox.h - 6) baseY = Math.max(size + 4, n.y - r - 8);
+					var dx = 0;
+					var left = n.x - w / 2;
+					var right = n.x + w / 2;
+					if (left < 6) dx = 6 - left;
+					else if (right > graphBox.w - 6) dx = (graphBox.w - 6) - right;
+					return {
+						x1: left + dx - 2, x2: right + dx + 2,
+						y1: baseY - size * 0.85 - 2, y2: baseY + size * 0.3 + 2,
+						dx: dx, ty: baseY - n.y,
+					};
+				}
+				function boxHit(a, b) {
+					// 留 2 单位容差：字形上下留白本就不重叠，1px 级的框相交不该整条隐藏。
+					var ix = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
+					var iy = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
+					return ix > 2 && iy > 2;
+				}
+				var labelCandidates = [];
+				lay.nodes.forEach(function (n) {
+					if (n.kind !== "fact") {
+						var cnt = visFacts.get(n.scope) || 0;
+						labelCandidates.push({ n: n, text: memNodeLabel(n) + (cnt ? " · " + cnt : ""), size: 14, pr: n.current ? 0.5 : 1 });
+					} else if (selected.indexOf(n.id) >= 0 || hover === n.id) {
+						labelCandidates.push({ n: n, text: memClip(n.summary || n.key, 16), size: 14, pr: 0 });
+					} else if (showFactLabels) {
+						var rank = factRank.has(n.id) ? factRank.get(n.id) : 99;
+						if (viewport.k < 1.25 && rank >= 6) return;
+						labelCandidates.push({ n: n, text: memClip(n.summary || n.key, 10), size: 14, pr: 2 + rank * 0.01 + (1 - (Number(n.confidence) || 0)) + (n.status !== "active" ? 1 : 0) });
+					}
+				});
+				labelCandidates.sort(function (a, b) { return a.pr - b.pr || a.n.y - b.n.y; });
+				labelCandidates.forEach(function (c) {
+					var box = labelBox(c.n, c.text, c.size);
+					if (labelBoxes.some(function (b) { return boxHit(box, b); })) return;
+					labelBoxes.push(box);
+					labelText.set(c.n.id, { text: c.text, size: c.size, fact: c.n.kind === "fact", dx: box.dx, ty: box.ty });
+				});
+				var edgeEls = visible.edges.map(function (ed, i) {
+					var a = at.get(ed.source), b = at.get(ed.target);
+					if (!a || !b) return null;
+					var on = pathSet && (pathSet.has(ed.source) && pathSet.has(ed.target));
+					return e("line", { key: "e" + i, className: "mem-edge " + ed.kind + (on ? " on" : ""), x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+				});
+				var nodeEls = lay.nodes.map(function (n) {
+					var r = memNodeRadius(n);
+					var linked = !pathSet || pathSet.has(n.id);
+					var cls = "mem-node " + n.kind
+						+ (n.kind === "fact" ? " " + (n.factType || "unknown") : "")
+						+ (n.status && n.status !== "active" ? " muted" : "")
+						+ (n.current ? " current" : "")
+						+ (selected.indexOf(n.id) >= 0 ? " sel" : "")
+						+ (linked ? "" : " dim");
+					return e("g", { key: n.id, className: cls, "data-node": n.id, transform: "translate(" + n.x + "," + n.y + ")",
+							tabIndex: (kbId ? n.id === kbId : lay.nodes[0] && lay.nodes[0].id === n.id) ? 0 : -1,
+							role: "button",
+							"aria-label": nodeAria(n),
+							"aria-pressed": selected.indexOf(n.id) >= 0 ? "true" : "false",
+							"aria-current": n.current ? "true" : undefined,
+							style: { cursor: "pointer" },
+							onFocus: function () { setKbId(n.id); setHover(n.id); },
+							onBlur: function () { setHover(null); },
+							onKeyDown: function (ev) {
+								if (ev.key === "Enter" || ev.key === " " || ev.key === "Spacebar") {
+									ev.preventDefault();
+									selectNode(n);
+								} else if (ev.key === "Escape") {
+									ev.preventDefault();
+									setSelected([]);
+								}
+							},
+						onClick: function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); selectNode(n, ev); },
+						onDoubleClick: function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); openNodeInList(n); },
+						onMouseEnter: function () { setHover(n.id); }, onMouseLeave: function () { setHover(null); } },
+						n.kind === "workspace"
+							? e("rect", { x: -r, y: -r, width: r * 2, height: r * 2, rx: 5 })
+							: e("circle", { r: r }),
+						n.current ? e("circle", { r: r + 4, className: "mem-ring" }) : null,
+						kbId === n.id ? e("circle", { r: r + 7, className: "mem-focus-ring" }) : null,
+						(function () {
+							var lab = labelText.get(n.id);
+							if (!lab) return null;
+							return e("text", { x: lab.dx, y: lab.ty, textAnchor: "middle",
+								className: n.kind === "fact" ? "mem-fact-label" : "mem-node-label" }, lab.text);
+						})(),
+						e("title", null, n.kind === "fact" ? (n.summary || n.key) : (memNodeLabel(n) + (n.path ? ("\n" + n.path) : ""))));
+				});
+				function zoom(delta) {
+					var k = Math.max(0.55, Math.min(2.4, viewport.k * delta));
+					setViewport(Object.assign({}, viewport, { k: k }));
+				}
+				return e("div", {},
+					limitNotice(),
+					e("div", { className: "mem-graph-wrap", ref: wrapRef },
+					e("svg", { ref: svgRef, className: "mem-graph", viewBox: "0 0 " + graphBox.w + " " + graphBox.h,
+						role: "group",
+						"aria-label": "记忆来源图谱：方向键遍历节点，Enter 打开详情，Esc 关闭详情",
+						onKeyDown: function (ev) {
+							var dir = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+							if (dir) { ev.preventDefault(); moveFocus(dir[0], dir[1]); }
+							else if (ev.key === "Escape") { ev.preventDefault(); setSelected([]); }
+						},
+						onPointerDown: function (ev) {
+							var t = ev.target;
+							if (t && t.closest && t.closest("[data-node]")) return;
+							var r = ev.currentTarget.getBoundingClientRect ? ev.currentTarget.getBoundingClientRect() : null;
+							var s = r && r.width && r.height ? Math.min(r.width / graphBox.w, r.height / graphBox.h) : 1;
+							// Ctrl/Shift + 拖拽 = 框选；否则 = 平移。
+							if (ev.ctrlKey || ev.shiftKey || ev.button === 0) {
+								var startX = (ev.clientX - (r ? r.left : 0)) / s;
+								var startY = (ev.clientY - (r ? r.top : 0)) / s;
+								boxRef.current = { x1: startX, y1: startY, x2: startX, y2: startY, s: s, r: r, ctrl: ev.ctrlKey, shift: ev.shiftKey };
+								setBoxSelect({ x1: startX, y1: startY, x2: startX, y2: startY });
+							} else {
+								dragRef.current = { x: ev.clientX, y: ev.clientY, vx: viewport.x, vy: viewport.y, s: s > 0 ? s : 1 };
+							}
+							if (ev.currentTarget && ev.currentTarget.setPointerCapture) { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) { /* ignore */ } }
+						},
+						onPointerMove: function (ev) {
+							var b = boxRef.current;
+							if (b) {
+								var x2 = (ev.clientX - (b.r ? b.r.left : 0)) / b.s;
+								var y2 = (ev.clientY - (b.r ? b.r.top : 0)) / b.s;
+								setBoxSelect({ x1: b.x1, y1: b.y1, x2: x2, y2: y2 });
+								return;
+							}
+							var d = dragRef.current;
+							if (!d) return;
+							setViewport(Object.assign({}, viewport, { x: d.vx + (ev.clientX - d.x) / d.s, y: d.vy + (ev.clientY - d.y) / d.s }));
+						},
+						onPointerUp: function (ev) {
+							var b = boxRef.current;
+							if (b) {
+								// 框选结束：找出矩形内的节点并加入选择。
+								var x1 = Math.min(b.x1, b.x2), x2 = Math.max(b.x1, b.x2);
+								var y1 = Math.min(b.y1, b.y2), y2 = Math.max(b.y1, b.y2);
+								// 太小的拖拽（<5px）视为点击空白，清空选择。
+								if (Math.abs(x2 - x1) < 5 && Math.abs(y2 - y1) < 5) {
+									if (!b.ctrl && !b.shift) setSelected([]);
+								} else {
+									var hit = lay.nodes.filter(function (n) {
+										return n.x >= x1 && n.x <= x2 && n.y >= y1 && n.y <= y2;
+									}).map(function (n) { return n.id; });
+									if (hit.length > 0) {
+										if (b.ctrl) {
+											// Ctrl：追加/移除（已选的取消，未选的加入）
+											var newSel = selected.slice();
+											hit.forEach(function (id) {
+												var idx = newSel.indexOf(id);
+												if (idx >= 0) newSel.splice(idx, 1);
+												else newSel.push(id);
+											});
+											setSelected(newSel);
+										} else {
+											setSelected(hit);
+										}
+									} else if (!b.ctrl && !b.shift) {
+										setSelected([]);
+									}
+								}
+								boxRef.current = null;
+								setBoxSelect(null);
+								return;
+							}
+							dragRef.current = null;
+						},
+						onPointerLeave: function () { dragRef.current = null; boxRef.current = null; setBoxSelect(null); } },
+						e("g", { transform: "translate(" + viewport.x + "," + viewport.y + ") scale(" + viewport.k + ")" }, edgeEls, nodeEls,
+						boxSelect ? e("rect", {
+							x: Math.min(boxSelect.x1, boxSelect.x2),
+							y: Math.min(boxSelect.y1, boxSelect.y2),
+							width: Math.abs(boxSelect.x2 - boxSelect.x1),
+							height: Math.abs(boxSelect.y2 - boxSelect.y1),
+							className: "mem-box-select",
+							fill: "rgba(100, 150, 255, 0.15)",
+							stroke: "rgba(100, 150, 255, 0.6)",
+							strokeWidth: 1,
+							strokeDasharray: "4,2"
+						}) : null)),
+					e("div", { className: "mem-graph-tools" },
+						e("button", { className: "ci-btn", "aria-label": "放大", onClick: function () { zoom(1.18); }, title: "放大" }, "+"),
+						e("button", { className: "ci-btn", "aria-label": "缩小", onClick: function () { zoom(0.85); }, title: "缩小" }, "−"),
+						e("button", { className: "ci-btn", "aria-label": "适配视图", onClick: function () { setViewport({ x: 0, y: 0, k: 1 }); }, title: "适配" }, "适配"),
+						e("button", { className: "ci-btn" + (zen ? " on" : ""), "aria-label": zen ? "退出聚焦模式" : "进入聚焦模式", onClick: function () { setZen(!zen); }, title: "隐藏概览与图例，放大图谱" }, zen ? "退出聚焦" : "聚焦")),
+					e("div", { className: "mem-legend" },
+						e("span", null, e("i", { className: "mem-dot ws" }), "工作区"),
+						e("span", null, e("i", { className: "mem-dot sess" }), "会话"),
+						e("span", null, e("i", { className: "mem-dot fact constraint" }), "约束"),
+						e("span", null, e("i", { className: "mem-dot fact state" }), "状态"),
+						e("span", null, e("i", { className: "mem-dot fact task" }), "任务"),
+						e("span", null, e("i", { className: "mem-dot fact history" }), "历史"),
+						e("span", null, e("i", { className: "mem-line shared" }), "共享"),
+						e("span", null, e("i", { className: "mem-line origin" }), "来源"),
+						e("span", null, e("i", { className: "mem-line private" }), "私有"),
+						e("span", null, e("i", { className: "mem-line member" }), "成员"),
+						e("span", { className: "ci-sub" }, "点/方向键=详情 · 双击=聚焦 · 滚轮缩放标签"))));
+			}
+			function listBody() {
+				if (err) {
+					return e("div", { className: "ci-sec" },
+						e("div", { className: "ci-err", role: "alert" }, "列表加载失败：" + String(err.message || err)),
+						e("button", { className: "ci-btn", onClick: function () { pull(); } }, "重试"));
+				}
+				var groups = new Map();
+				factsVisible.forEach(function (f) {
+					if (!groups.has(f.scope)) groups.set(f.scope, []);
+					groups.get(f.scope).push(f);
+				});
+				var order = Array.from(groups.keys()).sort(function (a, b) {
+					var sa = groups.get(a)[0], sb = groups.get(b)[0];
+					var ca = (a === curSessScope ? 2 : 0) + (a === curWsScope ? 1 : 0);
+					var cb = (b === curSessScope ? 2 : 0) + (b === curWsScope ? 1 : 0);
+					return (cb - ca) || ((sb.updated_ts || 0) - (sa.updated_ts || 0));
+				});
+				var sections = order.map(function (scope) {
+					var list = groups.get(scope);
+					return e("div", { key: scope, className: "ci-sec" },
+						e("div", { className: "ci-sech" }, list[0].scopeLabel || memScope(scope), e("span", { className: "ci-sub" }, list.length + " 条")),
+						list.map(factCard));
+				});
+				var recs = (data.recent || []).filter(function (r) { return r.kind !== "insight"; });
+				return e("div", {},
+					limitNotice(true),
+					factsVisible.length ? sections : e("div", { className: "ci-sec" },
+						e("div", { className: "mem-empty" }, "当前范围没有洞察。"),
+						range !== "all" ? e("button", { className: "ci-btn", onClick: function () { setRange("all"); setFocus(null); } }, "展开全部") : null),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "最近记录", e("span", { className: "ci-sub" }, recs.length + " 条")),
+						recs.length ? e("div", { className: "mem-recent" },
+							e("div", { className: "mem-row mem-head" },
+								e("span", null, "类型"), e("span", null, "键"), e("span", { className: "mem-scope" }, "作用域"),
+								e("span", null, "状态"), e("span", { style: { textAlign: "right" } }, "更新")),
+							recs.map(function (r, i) {
+								return e("div", { key: i, className: "mem-row" },
+									e("span", null, r.kind),
+									e("span", { className: "k", title: r.key }, r.key),
+									e("span", { className: "mem-scope", title: r.scope }, r.scopeLabel || memScope(r.scope)),
+									e("span", { className: "mem-st " + r.status }, r.status),
+									e("span", { className: "mem-time" }, memAgo(r.updated_ts)));
+							})) : e("div", { className: "mem-empty" }, "—")));
+			}
+			function detailRow(k, v) {
+				return e("div", { className: "mem-detail-row" }, e("span", null, k), e("b", null, v));
+			}
+			function evidenceBody() {
+				if (evErr) return e("div", { className: "ci-sub" }, "证据加载失败：" + String((evErr && evErr.message) || evErr));
+				if (!evData) return e("div", { className: "ci-sub" }, "证据加载中…");
+				var list = evData.evidence || [];
+				if (!list.length) return e("div", { className: "ci-sub" }, "没有可回查的事件证据。");
+				return e("div", { className: "mem-evs" }, list.map(function (x, i) {
+					return e("details", { key: x.id || i, className: "mem-ev" },
+						e("summary", null,
+							e("span", { className: "mem-ev-k" }, x.kind || "ref"),
+							e("span", { className: "mem-ev-c", title: x.content || "" }, x.content || "—"),
+							e("span", { className: "mem-ev-t" }, memAgo(x.ts))),
+						e("div", { className: "mem-ev-meta" },
+							(x.sessionTitle ? ("来源会话：" + x.sessionTitle) : (x.sid ? ("会话 " + String(x.sid).slice(0, 8)) : "无会话来源"))
+							+ (x.seq != null ? (" · seq " + x.seq) : "")),
+						x.raw ? e("pre", { className: "mem-ev-raw" }, x.raw) : null);
+				}));
+			}
+			function railBody() {
+				// 多选：显示摘要而非单个节点详情。
+				if (selected.length > 1) {
+					var close = e("button", { className: "ci-btn", style: { marginLeft: "auto", padding: "2px 9px" }, "aria-label": "清除选择", onClick: function () { setSelected([]); } }, "清除");
+					var allNodes = (graphData && graphData.nodes) || [];
+					var selNodes = allNodes.filter(function (n) { return selected.indexOf(n.id) >= 0; });
+					var byKind = { workspace: 0, session: 0, fact: 0 };
+					selNodes.forEach(function (n) { byKind[n.kind] = (byKind[n.kind] || 0) + 1; });
+					return e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "多选摘要", close),
+						e("div", { className: "ci-sub" }, "已选 " + selected.length + " 个节点"),
+						e("div", { className: "mem-detail-row" }, e("span", null, "工作区"), e("b", null, byKind.workspace || 0)),
+						e("div", { className: "mem-detail-row" }, e("span", null, "会话"), e("b", null, byKind.session || 0)),
+						e("div", { className: "mem-detail-row" }, e("span", null, "洞察"), e("b", null, byKind.fact || 0)),
+						e("div", { className: "ci-sub", style: { marginTop: 8 } }, "Ctrl+点击=追加/取消 · 拖拽空白=框选"));
+				}
+				if (selectedNode) {
+					var n = selectedNode;
+					var close = e("button", { className: "ci-btn", style: { marginLeft: "auto", padding: "2px 9px" }, onClick: function () { setSelected([]); } }, "关闭");
+					if (n.kind === "fact") {
+						return e("div", { className: "ci-sec" },
+							e("div", { className: "ci-sech" }, "洞察详情", close),
+							e("div", { className: "mem-key" }, n.key),
+							e("div", { className: "mem-summary", style: { marginBottom: 8 } }, n.summary || "(无摘要)"),
+							detailRow("事实类型", factTypeText[n.factType] || n.factType || "—"),
+							detailRow("生命周期", n.status || "—"),
+							detailRow("置信", Math.round((n.confidence || 0) * 100) + "%"),
+							detailRow("范围", n.scopeLabel || memScope(n.scope)),
+							detailRow("来源会话", n.originTitle || "—"),
+							detailRow("更新", memAgo(n.updated_ts)),
+							detailRow("模型", n.model || "—"),
+							e("div", { className: "mem-detail-sub" }, "证据链 · " + (n.evidence || 0) + " 条"),
+							evidenceBody(),
+							e("div", { className: "mem-detail-actions" },
+								e("button", { className: "ci-btn", onClick: function () { openNodeInList(n); } }, "在列表中查看"),
+								n.originSid ? e("button", { className: "ci-btn", onClick: function () { setFocus("sess:" + n.originSid); setTab("list"); } }, "只看来源会话") : null));
+					}
+					if (n.kind === "workspace") {
+						var sessN = (graph.nodes || []).filter(function (x) { return x.kind === "session" && x.workspaceScope === n.scope; }).length;
+						return e("div", { className: "ci-sec" },
+							e("div", { className: "ci-sech" }, "工作区详情", close),
+							e("div", { className: "ci-title" }, n.label || "工作区", n.current ? e("span", { className: "mem-cur" }, "当前") : null),
+							e("div", { className: "ci-sub", style: { wordBreak: "break-all" } }, n.path || n.scope),
+							detailRow("记录", n.n || 0),
+							detailRow("洞察", (n.facts || 0) + (Number(n.factTotal) > (n.facts || 0) ? (" / " + n.factTotal) : "")),
+							detailRow("会话", sessN),
+							e("div", { className: "mem-detail-actions" },
+								e("button", { className: "ci-btn", onClick: function () { setFocus(n.scope); setTab("list"); } }, "只看此工作区"),
+								n.current ? null : e("button", { className: "ci-btn", onClick: function () { setRange("all"); }, title: "展开全部后才能聚焦其他工作区" }, "展开全部")));
+					}
+					return e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "会话详情", close),
+						e("div", { className: "ci-title" }, n.title || ("会话 " + String(n.sid || "").slice(0, 8)), n.current ? e("span", { className: "mem-cur" }, "当前") : null),
+						e("div", { className: "ci-sub" }, n.workspace ? ("工作区 " + n.workspace) : "未定位工作区"),
+						detailRow("记录", n.n || 0),
+						detailRow("私有洞察", (n.facts || 0) + (Number(n.factTotal) > (n.facts || 0) ? (" / " + n.factTotal) : "")),
+						detailRow("来源洞察", n.originFacts || 0),
+						e("div", { className: "mem-detail-actions" },
+							e("button", { className: "ci-btn", onClick: function () { setFocus(n.scope); setTab("list"); } }, "只看此会话"),
+							e("button", { className: "ci-btn", onClick: function () { setSelected([]); } }, "返回概览")));
+				}
+				return e("div", { className: "ci-sec" },
+					e("div", { className: "ci-sech" }, "当前上下文"),
+					curWs ? e("div", { className: "mem-detail-row" }, e("span", null, "工作区"), e("b", null, curWs.title)) : null,
+					curSess ? e("div", { className: "mem-detail-row" }, e("span", null, "会话"), e("b", null, curSess.title || curSess.scope)) : null,
+					e("div", { className: "mem-detail-row" }, e("span", null, "上下文记录"), e("b", null, cur ? cur.records : 0)),
+					e("div", { className: "mem-detail-row" }, e("span", null, "上下文有效洞察"), e("b", null, cur ? cur.insights : 0)),
+					e("div", { className: "mem-detail-row" }, e("span", null, "本会话私有记录"), e("b", null, curSess ? curSess.records : 0)),
+					e("div", { className: "ci-sub", style: { marginTop: 8 } }, "默认跟随当前选中的会话页显示；点「展开全部」查看其他工作区。"),
+					e("div", { className: "mem-legend", style: { marginTop: 10 } },
+						e("span", null, e("i", { className: "mem-dot ws" }), "工作区"),
+						e("span", null, e("i", { className: "mem-dot sess" }), "会话"),
+						e("span", null, e("i", { className: "mem-dot fact constraint" }), "约束"),
+						e("span", null, e("i", { className: "mem-dot fact state" }), "状态")),
+					data.session ? InjectionReceipt(data.session.injection) : null);
+			}
+			function settingsBody() {
+				return e("div", {},
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "全库概览"),
+						e("div", { className: "mem-kpis" },
+							kpi("全部活跃", t.active || 0, false, "另有已解决 " + (t.resolved || 0) + " 条"),
+							kpi("全部有效洞察", t.insights || 0, false, "轻 LLM 提炼且仍 active 的持久事实"),
+							kpi("工作区", t.workspaces || 0, false, "按 cwd 共享的 ws:* 作用域数"),
+							kpi("待处理错误", t.errors || 0, (t.errors || 0) > 0, "status=active 的 error 记录"))),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "开关"),
+						flagRow("memoryEnabled", "记忆层", "订阅事件流，写入 SQLite，注册 memory_* 工具", f.enabled),
+						flagRow("memoryLlmEnabled", "轻 LLM 编译", "每轮结束把新事件编译为 insight（模型见下方「编译模型」）", f.llmEnabled),
+						flagRow("memoryInjectCatalog", "目录注入", "会话首次 pre-step 注入一次记忆目录（每步重读开关）", f.injectCatalog),
+						flagRow("memoryHandoff", "会话交接", "每轮结束写交接卡；同工作区新会话首次注入最近一张", f.handoff),
+						flagRow("memoryConsolidateAuto", "自动整理", "空闲 " + coIdleMin + " 分钟后自动整理；无新事件不跑（手动不受影响）", f.consolidateAuto),
+						e("div", { className: "ci-sub", style: { marginTop: 6 } }, "已武装进程内，未被环境变量锁定的开关即时生效；启动时未加载记忆层则需重启。环境变量（DSH_MEMORY / DSH_MEMORY_LLM / DSH_MEMORY_INJECT / DSH_MEMORY_HANDOFF / DSH_MEMORY_CONSOLIDATE）优先级高于此面板。")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "整理"),
+						e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "核对目录重置、失效旧状态与合并重复事实。约束（端口/规则/偏好）受保护，不会因整理被删。"),
+						e("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+							e("button", {
+								className: "ci-btn", disabled: busy || !!coi || !sid || !coReady,
+								title: !coReady ? "需先开启「记忆层」与「轻 LLM 编译」"
+									: (!sid ? "打开具体会话后可手动整理" : (coi ? ("整理中：" + coStage) : "立即执行一次整理")),
+								onClick: consolidateNow,
+							}, coi ? ("整理中 " + (coSec != null ? coSec + "s" : "") + " · " + coStage) : "立即整理"),
+							e("span", { className: "ci-sub" }, coCountdown)),
+						coReady ? null : e("div", { className: "ci-sub", style: { marginTop: 6 } }, "需先开启「记忆层」与「轻 LLM 编译」"),
+						e("div", { className: "ci-sub", style: { marginTop: 6 } }, coManText),
+						coLastText ? e("div", { className: "ci-sub", style: { marginTop: 6 } }, coLastText) : null),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "编译模型"),
+						e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "轻 LLM 编译使用的模型；留空 = 跟随会话当前模型。可选本地轻模型（如 qwen3:4b）。"),
+						(memMdlErr ? e("div", { className: "ci-err" }, "⚠ " + memMdlErr) : null),
+						e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
+							e("select", { className: "ci-sel", value: memP, disabled: busy, onChange: onMemProviderChange,
+								title: "记忆编译用 provider；「跟随会话模型」= 清除覆盖" },
+								e("option", { value: "" }, "跟随会话模型"),
+								memProviders.map(function (p) { return e("option", { key: p.id, value: p.id }, (p.name || p.id)); })),
+							e("select", { className: "ci-sel", value: memM, disabled: busy || !memP, onChange: onMemModelChange,
+								title: "选定即保存 provider/model 成对覆盖；清除 provider 即恢复跟随会话" },
+								e("option", { value: "" }, memP ? "选择模型…" : "—"),
+								memModels.map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
+						e("div", { className: "ci-sub", style: { marginTop: 6 } },
+							(data.llmRoute && data.llmRoute.provider)
+								? "当前覆盖：" + data.llmRoute.provider + " / " + (data.llmRoute.model || "—")
+								: "当前：跟随会话模型（每轮重新读取 control.json）")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "记录构成"),
+						(data.kinds && data.kinds.length) ? e("div", { className: "mem-bars" }, data.kinds.map(function (k) {
+							return e("div", { key: k.kind, className: "mem-bar" },
+								e("span", { className: "k", title: k.kind }, k.kind),
+								e("span", { className: "mem-track" }, e("span", { className: "mem-fill", style: { width: Math.max(2, Math.round(100 * k.n / maxKind)) + "%" } })),
+								e("span", { className: "n" }, k.n));
+						})) : e("div", { className: "mem-empty" }, "还没有记录。")),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "数据库"),
+						e("div", { className: "ci-sub", style: { wordBreak: "break-all" } }, "DB " + (db.exists ? memBytes(db.bytes) : "未创建") + " · " + (db.path || "")),
+						e("div", { className: "ci-sub" }, "已编译会话 " + ((data.compile && data.compile.cursors) || 0)
+							+ (data.compile && data.compile.last ? (" · 最近编译 " + String(data.compile.last.sid).slice(0, 8) + "… @ " + data.compile.last.through) : "")),
+						e("div", { className: "ci-sub" }, "只读快照 · 5s 轮询"),
+						data.error ? e("div", { className: "ci-err" }, "读取异常：" + data.error) : null,
+						(db.exists && data.sqlite === false) ? e("div", { className: "ci-err" }, "Node 缺少 node:sqlite，面板无法读取") : null));
+			}
+			return e("div", { className: "ci-root" + (zen && tab === "graph" ? " mem-zen" : "") },
 				e("div", { className: "ci-hd" },
 					e("span", { className: "ci-badge " + (st === "on" ? "ci-on" : st === "pending" ? "mem-dot-pending" : "ci-off") }),
 					e("div", null,
@@ -1326,100 +2555,22 @@ window.__ModuleLoader__.load({
 							e("span", { className: "mem-state " + st }, stText),
 							(lockN ? e("span", { className: "mem-evidence", title: "环境变量优先级高于面板：被锁定的开关不可点击" }, "env 锁定 " + lockN + " 项") : null)),
 						e("div", { className: "ci-sub" }, "SQLite · 工作区共享事实 · 只读工具 memory_catalog / search / get")),
-					e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: pull }, "刷新")),
+					e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: function () { pull(); } }, "刷新")),
 				banner ? e("div", { className: "mem-off" }, banner) : null,
 				err ? e("div", { className: "ci-err" }, "读取失败：" + String(err.message || err)) : null,
-				e("div", { className: "ci-sec" },
-					e("div", { className: "ci-sech" }, "开关"),
-					flagRow("memoryEnabled", "记忆层", "订阅事件流，写入 SQLite，注册 memory_* 工具", f.enabled),
-					flagRow("memoryLlmEnabled", "轻 LLM 编译", "每轮结束把新事件编译为 insight（模型见下方「编译模型」）", f.llmEnabled),
-					flagRow("memoryInjectCatalog", "目录注入", "会话首次 pre-step 注入一次记忆目录（每步重读开关）", f.injectCatalog),
-					e("div", { className: "ci-sub", style: { marginTop: 6 } }, "已武装进程内，未被环境变量锁定的开关即时生效；启动时未加载记忆层则需重启。环境变量（DSH_MEMORY / DSH_MEMORY_LLM / DSH_MEMORY_INJECT）优先级高于此面板。")),
-				e("div", { className: "ci-sec" },
-					e("div", { className: "ci-sech" }, "编译模型"),
-					e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "轻 LLM 编译使用的模型；留空 = 跟随会话当前模型。可选本地轻模型（如 qwen3:4b）。"),
-					(memMdlErr ? e("div", { className: "ci-err" }, "⚠ " + memMdlErr) : null),
-					e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
-						e("select", { className: "ci-sel", value: memP, disabled: busy, onChange: onMemProviderChange,
-							title: "记忆编译用 provider；「跟随会话模型」= 清除覆盖" },
-							e("option", { value: "" }, "跟随会话模型"),
-							memProviders.map(function (p) { return e("option", { key: p.id, value: p.id }, (p.name || p.id)); })),
-						e("select", { className: "ci-sel", value: memM, disabled: busy || !memP, onChange: onMemModelChange,
-							title: "选定即保存 provider/model 成对覆盖；清除 provider 即恢复跟随会话" },
-							e("option", { value: "" }, memP ? "选择模型…" : "—"),
-							memModels.map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
-					e("div", { className: "ci-sub", style: { marginTop: 6 } },
-						(data.llmRoute && data.llmRoute.provider)
-							? "当前覆盖：" + data.llmRoute.provider + " / " + (data.llmRoute.model || "—")
-							: "当前：跟随会话模型（每轮重新读取 control.json）")),
-				e("div", { className: "mem-kpis" },
-					kpi("活跃记录", t.active || 0, false, "另有已解决 " + (t.resolved || 0) + " 条"),
-					kpi("知识洞察", t.insights || 0, false, "轻 LLM 提炼的持久事实"),
-					kpi("工作区", t.workspaces || 0, false, "按 cwd 共享的 ws:* 作用域数"),
-					kpi("待处理错误", t.errors || 0, (t.errors || 0) > 0, "status=active 的 error 记录")),
-				data.session ? e("div", { className: "ci-sec" },
-					e("div", { className: "ci-sech" }, "当前会话",
-						data.inflight ? e("span", { className: "ci-fin", style: { fontWeight: 400, letterSpacing: 0, textTransform: "none" },
-							title: "轻 LLM 正在编译本会话的新事件；完成后写入 memory.sqlite" },
-							e("span", { className: "ci-pulse" }),
-							"记忆编译中" + (Number.isFinite(data.inflight.startedAt)
-								? " " + Math.max(0, Math.round((Date.now() - data.inflight.startedAt) / 1000)) + "s" : "")) : null),
-					e("div", { className: "ci-metrics" },
-						e("span", null, "记录 ", e("b", null, data.session.records)),
-						e("span", null, "真人轮 ", e("b", null, data.session.turns)),
-						e("span", { title: "目录注入是一次性：成功后本会话不再注入" }, "已注目录 ", e("b", null, data.session.injected ? "是" : "否")),
-						e("span", { title: "compiledThrough：本会话已归并进 records 的最大事件序号" }, "写入游标 ", e("b", null, memCursor(data.session.compiledThrough))),
-						e("span", { title: "llmThrough：轻 LLM 已编译到的最大事件序号" }, "编译游标 ", e("b", null, memCursor(data.session.llmThrough))))) : null,
-				e("div", { className: "ci-sec" },
-					e("div", { className: "ci-sech" }, "记录构成"),
-					(data.kinds && data.kinds.length) ? e("div", { className: "mem-bars" }, data.kinds.map(function (k) {
-						return e("div", { key: k.kind, className: "mem-bar" },
-							e("span", { className: "k", title: k.kind }, k.kind),
-							e("span", { className: "mem-track" }, e("span", { className: "mem-fill", style: { width: Math.max(2, Math.round(100 * k.n / maxKind)) + "%" } })),
-							e("span", { className: "n" }, k.n));
-					})) : e("div", { className: "mem-empty" }, "还没有记录。开启记忆层并正常对话后，工具结果与真人轮会落库。")),
-					e("div", { className: "ci-sec" },
-						e("div", { className: "ci-sech" }, "作用域分布",
-							e("span", { className: "ci-sub", style: { fontWeight: 400, letterSpacing: 0, textTransform: "none" } }, "ws = 跨会话共享 · sess = 本会话私有")),
-						(data.workspaces && data.workspaces.length) ? e("div", { className: "mem-ws" }, data.workspaces.map(function (w) {
-							return e("div", { key: w.scope, className: "mem-ws-row", title: w.scope },
-								e("span", { className: "k" }, memScope(w.scope)),
-								e("span", { className: "n" }, w.n),
-								e("span", { className: "t" }, memAgo(w.last)));
-						})) : e("div", { className: "mem-empty" }, "—")),
-					e("div", { className: "ci-sec" },
-						e("div", { className: "ci-sech" }, "知识洞察"),
-						(data.insights && data.insights.length) ? e("div", { className: "mem-ins" }, data.insights.map(function (x) {
-							return e("div", { key: x.key, className: "mem-card" },
-								e("div", { className: "mem-card-h" },
-									e("span", { className: "mem-key" }, x.key),
-									e("span", { className: "mem-conf" + ((x.confidence || 0) < 0.6 ? " low" : "") }, "置信 " + Math.round((x.confidence || 0) * 100) + "%"),
-									x.evidence ? e("span", { className: "mem-evidence", title: "证据事件行号 #" + (x.evidenceIds || []).join(", #") }, "证据 " + x.evidence) : null),
-								e("div", { className: "mem-summary" }, x.summary || "(无摘要)"),
-								e("div", { className: "mem-meta", title: x.scope }, memScope(x.scope) + " · " + memAgo(x.updated_ts) + (x.model ? " · " + x.model : "")));
-						})) : e("div", { className: "mem-empty" }, "还没有洞察。开启轻 LLM 编译后，每轮结束会提炼最多 4 条持久事实。")),
-					e("div", { className: "ci-sec" },
-						e("div", { className: "ci-sech" }, "最近记录"),
-						(data.recent && data.recent.length) ? e("div", { className: "mem-recent" },
-							e("div", { className: "mem-row mem-head" },
-								e("span", null, "类型"), e("span", null, "键"), e("span", { className: "mem-scope" }, "作用域"),
-								e("span", null, "状态"), e("span", { style: { textAlign: "right" } }, "更新")),
-							data.recent.map(function (r, i) {
-								return e("div", { key: i, className: "mem-row" },
-									e("span", null, r.kind),
-									e("span", { className: "k", title: r.key }, r.key),
-									e("span", { className: "mem-scope", title: r.scope }, memScope(r.scope)),
-									e("span", { className: "mem-st " + r.status }, r.status),
-									e("span", { className: "mem-time" }, memAgo(r.updated_ts)));
-							})) : e("div", { className: "mem-empty" }, "—")),
-					e("div", { className: "mem-foot" },
-						e("span", { title: db.path }, "DB " + (db.exists ? memBytes(db.bytes) : "未创建") + " · " + (db.path || "")),
-						e("span", null, "已编译会话 " + ((data.compile && data.compile.cursors) || 0)),
-						data.compile && data.compile.last ? e("span", { title: data.compile.last.sid }, "最近编译 " + String(data.compile.last.sid).slice(0, 8) + "… @ " + data.compile.last.through) : null,
-						e("span", null, "只读快照 · 5s 轮询"),
-						data.error ? e("span", { className: "ci-err" }, "读取异常：" + data.error) : null,
-						(db.exists && data.sqlite === false) ? e("span", { className: "ci-err" }, "Node 缺少 node:sqlite，面板无法读取") : null));
+				e("div", { className: "mem-tabs", role: "tablist" },
+					tabButton("graph", "图谱"), tabButton("list", "列表"), tabButton("settings", "设置"),
+					e("span", { className: "mem-tabs-note" }, tab === "settings" ? "写入、模型与诊断" : "默认跟随当前选中的会话页")),
+				tab === "settings"
+					? e("div", { className: "mem-settings" }, settingsBody())
+					: e("div", { className: "ci-cols" },
+						e("div", { className: "ci-main" },
+							overviewStrip(),
+							memoryToolbar(),
+							tab === "graph" ? graphBody() : listBody()),
+						e("div", { className: "ci-rail" }, railBody())));
 		}
+
 		var inject = ["slots"];
 		function apply(ctx) {
 			var slots = ctx.get("slots");
