@@ -12,7 +12,7 @@
 //
 // 开关：DSH_MEMORY=1 或 control.json { memoryEnabled: true }；默认关。
 // 数据：$STATE_DIR/memory/memory.sqlite（memoryEnabled 打开后创建）。
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -26,6 +26,36 @@ const DSH_HOME = process.env.DSH_HOME || join(homedir(), '.dsh')
 const STATE_DIR = process.env.DSH_CONTEXTINJECTOR_STATE_DIR || join(DSH_HOME, 'state-compiler')
 const MEMORY_DIR = join(STATE_DIR, 'memory')
 const DB_FILE = process.env.DSH_MEMORY_DB || join(MEMORY_DIR, 'memory.sqlite')
+const BACKUP_DIR = join(MEMORY_DIR, 'backups')
+const BACKUP_KEEP = Number(process.env.DSH_MEMORY_BACKUP_KEEP) || 5
+
+// 数据库备份（0.1.55）：破坏性操作前自动备份，保留最近 N 份。
+// 观测面失败不影响主流程；返回备份路径或 null。
+export function backupDatabase(dbFile = DB_FILE, opts = {}) {
+  const keep = Math.max(1, Math.min(50, Number(opts.keep ?? BACKUP_KEEP) || BACKUP_KEEP))
+  const backupDir = opts.dir ?? BACKUP_DIR
+  try {
+    if (!existsSync(dbFile)) return null
+    mkdirSync(backupDir, { recursive: true })
+    // 时间戳精确到毫秒，避免同秒内多次备份覆盖
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 23)
+    const backupFile = join(backupDir, `memory_${ts}.sqlite`)
+    copyFileSync(dbFile, backupFile)
+    // 清理旧备份：按文件名排序（时间戳在文件名里），保留最新的 keep 份
+    const backups = readdirSync(backupDir)
+      .filter((f) => f.startsWith('memory_') && f.endsWith('.sqlite'))
+      .sort()
+    while (backups.length > keep) {
+      const oldest = backups.shift()
+      try { rmSync(join(backupDir, oldest), { force: true }) } catch { /* ignore */ }
+    }
+    return backupFile
+  } catch (err) {
+    console.error('[MEMORY] backup failed:', err?.message ?? err)
+    return null
+  }
+}
+
 // v1.10.39：编译状态标记（WebUI 自绘「记忆编译中」脉冲 /「记忆 +N」）。
 //   与折叠的 fold-inflight 同款语义：开始时写、finally 删；last 文件留最近一次结果。
 const COMPILE_INFLIGHT_DIR = join(STATE_DIR, '.memory', 'compile-inflight')
@@ -628,6 +658,8 @@ export class MemoryStore {
   addReset({ workspace, at = Date.now(), seq = null, sid = null, cmd = '', marker = null } = {}) {
     const ws = this._normWs(workspace)
     if (!ws) return false
+    // 破坏性操作前备份数据库（0.1.55）
+    backupDatabase()
     const mk = String(marker ?? (seq != null ? 'seq:' + seq : 'at:' + at + ':' + sha1(cmd).slice(0, 8)))
     const r = this.db.prepare(`INSERT OR IGNORE INTO resets (workspace, marker, at, seq, sid, cmd) VALUES (?,?,?,?,?,?)`)
       .run(ws, mk, Number(at) || Date.now(), seq == null ? null : Number(seq), sid == null ? null : String(sid), String(cmd ?? '').slice(0, 500))

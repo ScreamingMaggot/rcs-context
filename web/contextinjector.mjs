@@ -2447,13 +2447,10 @@ try {
             if (TRACE) {
               try { log('trace', { step: stepNo, turn, claimed, transcript: transcriptNodesOf(session.deriveMessages()) }) } catch { /* best-effort */ }
             }
-            // 【v1.10.53 · 非阻塞 join】不再 await 折叠完成——后台折叠再慢也不拖住本轮请求。
-            // 折叠结果稍后落地，下一轮 pre-step 自然看到折叠后的 surface。
-            // 旧实现：await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
-            //        导致用户看到"压缩中"最多 3s，主对话被阻滞。
-            joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo).catch((err) => {
-              log('join-fold-error', { error: String(err?.message ?? err) })
-            })
+            // 【v1.10.56 · 阻塞 join 回归】用户开压缩就是为了吃增益，新消息必须等压缩完再发。
+            // 旧实现（v1.10.53）：非阻塞 join，新消息不等压缩完 ⇒ 本轮吃不到增益，压缩白做。
+            // 现改回 await：pre-step 等压缩完成（带超时闸）再放行请求，保证每轮都吃到压缩增益。
+            await joinFoldInFlight(sid, foldJoinTimeoutMs(ctrl), stepNo)
             // 回归通道（缺省关）：headless 单轮没有 turn/end 事件，仍允许在 pre-step 同步折一次。
             // 必须在 next() **之后**折（那时本轮 [A] 才在 surface 上）；生产路径不会走到这里。
             if (TEST_ROUND) testFold = { session, surface, sid, ctrl, gate, stepNo, turn, claimed }

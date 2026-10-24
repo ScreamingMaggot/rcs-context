@@ -42,7 +42,9 @@
 - 屏幕阅读器审计：所有交互元素补全 ARIA 属性与键盘支持（会话/记录 chip、组头、tab、select、缩放按钮、可折叠文本、错误消息）。
 - 失败态内嵌：图谱/列表加载失败时在画布/列表区域内显示错误原因与重试按钮，而非只在顶部显示 err。
 - DSH 版本兼容：已验证兼容 DSH 0.2.1-rc.3（2026-10-23 发布），全套测试通过。
-- 回归：`node tests/run-all.mjs` → 40/40 套、994/994 断言、13.8s。
+- 阻塞 join 回归（v1.10.57）：`agent/pre-step` 改回 `await joinFoldInFlight()`，新消息必须等压缩完成（带 3s 超时闸）再放行，保证每轮都吃到压缩增益；非阻塞版本（v1.10.53）导致用户开压缩但吃不到增益。
+- 数据库备份机制（v0.5.7）：`backupDatabase()` 在破坏性操作（workspace reset）前自动备份 SQLite，备份存放在 `memory/backups/`，时间戳精确到毫秒，默认保留最近 5 份（`DSH_MEMORY_BACKUP_KEEP` 可调）。
+- 回归：`node tests/run-all.mjs` → 42/42 套、994/994 断言、16.0s。
 
 ## 已修复缺陷（真机复核）
 
