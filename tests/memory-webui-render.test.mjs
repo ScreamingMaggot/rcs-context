@@ -96,12 +96,21 @@ const snapshot = {
   compile: { cursors: 1, last: null },
   llmRoute: { provider: null, model: null },
   consolidate: { auto: true, idleMs: 900000, next: null, inflight: null, last: null, manualRoute: { provider: 'spark', model: 'spark-x2.6' } },
+  janitor: {
+    enabled: true, intervalMs: 1800000, route: { provider: 'ollama-local', model: 'qwen3:4b' },
+    last: { ok: true, skipped: false, at: now - 60000, trigger: 'manual', workspace: 'c:/work/alpha', facts: 10,
+      ops: { refresh: 7, forget: 2, rejected: 1, failed: 0 }, model: { provider: 'ollama-local', model: 'qwen3:4b', via: 'janitor' }, ms: 1234 },
+    inflight: null,
+  },
+  vector: { enabled: false, mode: 'off', state: 'off', model: '', dim: 0, rows: 0, pending: 0, lastError: '', failAt: null },
   inflight: null, envLocked: {}, armed: true, sqlite: true, error: null, timestamp: now,
 }
 
 // 钩子顺序：data, err, busy, range, tab, type, status, query, selected, focus, viewport, hover,
-//           memP, memM, memProviders, memModels, memMdlErr, evData, evErr, graphBox, kbId, zen, sinceDays, older, graphData, boxSelect
-seed = [snapshot, null, false, 'current', 'graph', 'all', 'active', '', [], null, { x: 0, y: 0, k: 1 }, null, '', '', [], [], null, null, null, { w: 900, h: 560 }, null, false, 0, { sig: '', facts: [], cursor: null, hasMore: false, pages: 0, loading: false, err: null }, snapshot.graph, null]
+//           memP, memM, memProviders, memModels, memMdlErr, evData, evErr, graphBox, kbId, zen, sinceDays, older, graphData, boxSelect,
+//           traces, traceTrigger, traceDetail, traceDetailErr, metrics, janitorMsg
+seed = [snapshot, null, false, 'current', 'graph', 'all', 'active', '', [], null, { x: 0, y: 0, k: 1 }, null, '', '', [], [], null, null, null, { w: 900, h: 560 }, null, false, 0, { sig: '', facts: [], cursor: null, hasMore: false, pages: 0, loading: false, err: null }, snapshot.graph, null,
+  { sig: '', rows: [], cursor: null, hasMore: false, loading: false, err: null }, '', null, null, null, null]
 hook = 0
 function renderTree(n) {
   if (Array.isArray(n)) return n.map(renderTree)
@@ -255,6 +264,98 @@ check('㉖ 聚焦时向服务端下钻并放宽上限', /focusScope=/.test(clien
 check('㉗ 时间窗按天换算为 sinceTs', /sinceTs=/.test(clientSrc) && /setSinceDays/.test(clientSrc))
 check('㉘ 游标分页只追加到列表', /cursor=/.test(clientSrc) && /extraFacts: tab === "list"/.test(clientSrc)
   && /limitNotice\(true\)/.test(clientSrc) && /concat\(older\.facts \|\| \[\]\)/.test(clientSrc))
+
+// 轨迹页（Phase 4）：当前会话列表 + 点开详情；查询文本按不可信数据显示。
+const traceRows = [
+  { id: 11, ts: now - 5000, trigger: 'tool', mode: 'fts-bi', candTotal: 12, selTotal: 3, ms: 4.2, preview: '端口 8848', uri: 'rcs://ws/x/insight/port', truncated: 0 },
+  { id: 10, ts: now - 9000, trigger: 'inject', mode: 'catalog', candTotal: 0, selTotal: 0, ms: 0.4, preview: '', uri: '', truncated: 0 },
+]
+seed[26] = { sig: '70b1abe8|', rows: traceRows, cursor: '100:11', hasMore: true, loading: false, err: null }
+seed[27] = ''
+const ttree = render('traces')
+const ttext = walkText(ttree)
+const tbuttons = collect(ttree, (n) => n.type === 'button')
+check('㉙ 轨迹页签与列表', !!collect(ttree, (n) => n.type === 'button').find((b) => btnText(b) === '轨迹')
+  && ttext.includes('检索轨迹') && ttext.includes('端口 8848') && ttext.includes('工具') && ttext.includes('注入')
+  && ttext.includes('3/12') && ttext.includes('加载更早')
+  && collect(ttree, (n) => n.type === 'div' && String(n.props && n.props.className).includes('mem-trace')).length >= 2,
+  ttext.slice(0, 200))
+const triggerSel = collect(ttree, (n) => n.type === 'select')[0]
+check('㉙b 轨迹按触发类型筛选', !!triggerSel && triggerSel.props.value === ''
+  && triggerSel.children.some((o) => o && o.props && o.props.value === 'handover'),
+  triggerSel && triggerSel.children.map((o) => o && o.props && o.props.value).join(','))
+seed[28] = {
+  id: 11, ts: now, trigger: 'tool', uri: 'rcs://ws/x/insight/port',
+  query: { hash: 'abc123', text: '端口 8848', len: 7 }, mode: 'fts-bi',
+  widened: ['kinddir→rootdir'], steps: [{ stage: 'fts-bi', n: 12, ms: 1.2, why: 'and' }, { stage: 'select', n: 3, ms: 0.3 }],
+  candidates: [{ rank: 1, kind: 'insight', uri: 'rcs://ws/x/insight/port', score: 1.2, src: 'fts' }],
+  selected: [{ rank: 1, kind: 'insight', uri: 'rcs://ws/x/insight/port' }],
+  candTotal: 12, selTotal: 3, ms: 4.2, error: '', truncated: 5, ref: 'rcs-trace://s/11',
+}
+const tdetail = walkText(render('traces'))
+check('㉚ 轨迹详情含阶段/候选/选中与回退', tdetail.includes('轨迹 #11') && tdetail.includes('阶段 · 2')
+  && tdetail.includes('候选 · 显示 1 / 共 12') && tdetail.includes('选中 · 显示 1 / 共 3')
+  && tdetail.includes('回退：kinddir→rootdir') && tdetail.includes('端口 8848')
+  && tdetail.includes('详情已裁剪'), tdetail.slice(0, 260))
+seed[28] = null
+
+// 设置页巡检与诊断：开关/间隔/立即巡检/上次结果 + 向量状态与成功率。
+const s2tree = render('settings')
+const s2text = walkText(s2tree)
+const s2buttons = collect(s2tree, (n) => n.type === 'button')
+check('㉛ 设置页文件巡检入口', s2text.includes('文件巡检') && s2text.includes('立即巡检')
+  && s2text.includes('30 分钟') && s2text.includes('刷新 7') && s2text.includes('失效 2')
+  && s2text.includes('ollama-local / qwen3:4b'),
+  s2text.slice(0, 260))
+seed[30] = {
+  compile: { success: 3, failure: 1, total: 4 }, retrieval: { success: 1, failure: 1, total: 2 },
+  injection: { hit: 1, miss: 1, total: 2 }, vector: { armHit: 2, armMiss: 1, embedFail: 0, skippedExact: 3 }, lastUpdated: now,
+}
+const savedVector = snapshot.vector
+snapshot.vector = { enabled: true, mode: 'on', state: 'ok', model: 'bge-m3', dim: 1024, rows: 9, pending: 1, lastError: '', failAt: null }
+const s3text = walkText(render('settings'))
+check('㉜ 设置页向量与指标诊断', s3text.includes('检索与向量') && s3text.includes('已嵌')
+  && s3text.includes('bge-m3') && s3text.includes('1024')
+  && s3text.includes('75%') && s3text.includes('50%') && s3text.includes('编译成功率')
+  && s3text.includes('向量臂命中 2'), s3text.slice(0, 260))
+snapshot.vector = savedVector
+seed[30] = null
+seed[26] = { sig: '', rows: [], cursor: null, hasMore: false, loading: false, err: null }
+seed[27] = ''
+check('㉝ 轨迹/巡检/向量数据面已接线', /\/api\/memory\/traces\?/.test(clientSrc)
+  && /\/api\/memory\/traces\/clear/.test(clientSrc)
+  && /\/api\/memory\/janitor/.test(clientSrc)
+  && /memoryJanitorEnabled/.test(clientSrc)
+  && /data\.janitor/.test(clientSrc) && /data\.vector/.test(clientSrc))
+
+// 注入页「请求结构」：一次折叠可能有数百个同质节点，平铺会把面板撑成字墙（实测 303 节点）。
+// 契约：一行摘要（节点数/总字节/最大的四组）+ 默认收起的明细（分组统计 + 逐节点）。保持逐节点可核验。
+const frameFixture = [
+  { role: 'system', src: 'system-prompt', bytes: 5787 },
+  { role: 'assistant', src: 'model', bytes: 1000 },
+  { role: 'assistant', src: 'model', bytes: 2500 },
+  { role: 'tool', src: 'tool', bytes: 400 },
+  { role: 'tool', src: 'tool', bytes: 600 },
+  { role: 'user', src: 'compact-checkpoint', bytes: 9000 },
+  { role: 'user', src: 'human', bytes: 300 },
+]
+const fs1 = mod.__test.frameSummary(frameFixture)
+check('㉞ 请求结构按 role/src 聚合且总数正确', fs1.n === 7 && fs1.total === 19587
+  && fs1.groups.length === 5
+  && fs1.groups[0].k === 'user/compact-checkpoint' && fs1.groups[0].n === 1 && fs1.groups[0].b === 9000
+  && fs1.groups.find((g) => g.k === 'assistant/model').n === 2
+  && fs1.groups.find((g) => g.k === 'tool/tool').b === 1000,
+  JSON.stringify(fs1))
+check('㉟ 摘要只列前四组、明细保留逐节点', fs1.top.length === 4 && fs1.top[3].k === 'tool/tool'
+  && fs1.text.split('\n').length === 7 && fs1.text.includes('tool/tool:400B'))
+const fsEmpty = mod.__test.frameSummary(null)
+check('㊱ 空/非法结构安全', fsEmpty.n === 0 && fsEmpty.total === 0 && fsEmpty.groups.length === 0
+  && fsEmpty.text === '' && mod.__test.fmtB(1535) === '1.5KB' && mod.__test.fmtB(471859) === '460.8KB')
+check('㊲ 注入页请求结构默认收起', /ci-frames/.test(clientSrc)
+  && /e\("details", \{ key: "n", className: "ci-sub ci-frames" \}/.test(clientSrc)
+  && !/lf\.afterNodes\.map\(/.test(clientSrc))
+check('㊳ 轨迹详情对非 JSON 响应给出可读错误', /return r\.text\(\)\.then\(function \(t\)/.test(clientSrc)
+  && /接口未匹配（404）/.test(clientSrc))
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

@@ -229,6 +229,24 @@ const rows = (r) => (r.results || []).map((x) => x.rowid)
   check('D20 DSH_MEMORY_DIR_SEARCH=0 可关（无需回滚数据）', off.ok === false && off.error === 'dir-search-disabled')
 }
 
+// DSH 0.2.1 的工具 schema 校验只接受单一 type 字符串；`type: ['string','null']`
+// 会让整批 memory_* 工具注册失败（真机隔离实例实测）。这里对所有参数/输出 schema 做递归哨兵。
+{
+  const typeArrayAt = (x, path = '') => {
+    if (!x || typeof x !== 'object') return null
+    if (Array.isArray(x.type)) return path + '.type'
+    for (const [k, v] of Object.entries(x)) {
+      const hit = typeArrayAt(v, path + '.' + k)
+      if (hit) return hit
+    }
+    return null
+  }
+  const offenders = Object.values(tools)
+    .map((t) => [t.name, typeArrayAt(t.parameters, 'parameters'), typeArrayAt(t.output && t.output.schema, 'output')])
+    .filter((x) => x[1] || x[2])
+  check('D-schema 工具 schema 不含 type 数组（DSH 0.2.1 只接受单一类型）', offenders.length === 0, JSON.stringify(offenders))
+}
+
 store.close()
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

@@ -27,6 +27,16 @@ window.__ModuleLoader__.load({
 			".ci-off{background:rgba(120,120,140,.45)}",
 			".ci-title{font-size:13px;font-weight:650;letter-spacing:.01em}",
 			".ci-sub{font-size:11px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.75))}",
+			// 「请求结构」默认收成一行摘要（节点数/总字节/前四组），明细按需展开，避免几百个节点铺满面板
+			".ci-frames summary{cursor:pointer;list-style:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+			".ci-frames summary::-webkit-details-marker{display:none}",
+			".ci-frames summary::before{content:'\\25B8';display:inline-block;width:10px;margin-right:3px;opacity:.7}",
+			".ci-frames[open] summary::before{content:'\\25BE'}",
+			".ci-frames[open] summary{white-space:normal;margin-bottom:4px}",
+			".ci-frame-body{max-height:200px;overflow:auto;border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.22));border-radius:7px;padding:4px 6px;margin-top:2px}",
+			".ci-frame-body .g{display:flex;gap:8px;font-variant-numeric:tabular-nums}",
+			".ci-frame-body .g b{margin-left:auto;font-weight:600}",
+			".ci-frame-list{white-space:pre-wrap;word-break:break-all;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);font-size:10px;line-height:1.45;margin-top:4px;padding-top:4px;border-top:1px solid rgba(127,127,150,.15)}",
 			".ci-sec{background:rgba(127,127,150,.06);border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.22));border-radius:12px;padding:10px 12px;margin:10px 0}",
 			".ci-sech{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.75))}",
 			".ci-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}",
@@ -270,7 +280,31 @@ window.__ModuleLoader__.load({
 			".mem-type.constraint{border-color:rgba(226,163,59,.5);background:rgba(226,163,59,.1)}",
 			".mem-type.state{border-color:rgba(91,157,255,.45)}",
 			".mem-type.task{border-color:rgba(167,139,250,.45)}",
-			"@media (max-width:720px){.mem-tabs-note{display:none}.mem-graph{height:30vh}.mem-toolbar .ci-sel{flex:1 1 96px;max-width:none}.mem-search{flex:1 1 100%;max-width:none}}",
+			// 检索轨迹（Phase 4）：列表 + 详情；查询文本已由服务端脱敏，仍按不可信数据显示。
+			".mem-trace-list{display:flex;flex-direction:column;gap:3px;max-height:360px;overflow:auto;overscroll-behavior:contain}",
+			".mem-trace{display:grid;grid-template-columns:64px 56px minmax(0,1fr) 74px 72px 62px;gap:8px;align-items:center;font-size:11px;padding:5px 7px;border:1px solid transparent;border-radius:7px;background:rgba(127,127,150,.035);cursor:pointer}",
+			".mem-trace:hover{background:rgba(100,140,255,.07)}",
+			".mem-trace.on{border-color:rgba(100,140,255,.55);background:rgba(100,140,255,.1)}",
+			".mem-trace .t{font-size:10px;color:var(--dsw-alias-label-secondary,rgba(180,180,195,.72));font-variant-numeric:tabular-nums;white-space:nowrap}",
+			".mem-trace .q{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary,rgba(205,205,220,.92))}",
+			".mem-trace .n{text-align:right;font-variant-numeric:tabular-nums;font-size:10px}",
+			".mem-trigger{font-size:9px;line-height:16px;padding:0 5px;border-radius:999px;border:1px solid rgba(127,127,150,.35);text-align:center;white-space:nowrap}",
+			".mem-trigger.tool{border-color:rgba(100,140,255,.5);background:rgba(100,140,255,.1)}",
+			".mem-trigger.ls{border-color:rgba(88,196,107,.45)}",
+			".mem-trigger.recall{border-color:rgba(226,163,59,.5)}",
+			".mem-trigger.inject{border-color:rgba(167,139,250,.45)}",
+			".mem-trigger.handover{border-color:rgba(127,127,150,.3)}",
+			".mem-trace-detail{margin-top:10px;border-top:1px solid rgba(127,127,150,.15);padding-top:8px}",
+			".mem-stage-row{display:grid;grid-template-columns:80px 44px 60px minmax(0,1fr);gap:8px;font-size:10px;padding:2px 0;border-bottom:1px solid rgba(127,127,150,.06);align-items:baseline}",
+			".mem-stage-row .why{color:var(--dsw-alias-label-secondary,rgba(180,180,195,.7));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+			".mem-uri{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);font-size:10px;word-break:break-all}",
+			".mem-code{white-space:pre-wrap;word-break:break-word;font-size:10px;line-height:1.5;max-height:180px;overflow:auto;background:rgba(127,127,150,.07);padding:6px 8px;border-radius:6px;margin:5px 0 0;font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace)}",
+			".mem-diag{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}",
+			"@media (max-width:900px){.mem-diag{grid-template-columns:repeat(2,minmax(0,1fr))}}",
+			// 向量/指标诊断只读块：状态色与图谱一致（amber=降级，green=可用，灰=关闭）。
+			".mem-vec{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;align-items:center}",
+			".mem-vec b{font-variant-numeric:tabular-nums;margin-left:3px}",
+			"@media (max-width:720px){.mem-tabs-note{display:none}.mem-graph{height:30vh}.mem-toolbar .ci-sel{flex:1 1 96px;max-width:none}.mem-search{flex:1 1 100%;max-width:none}.mem-trace{grid-template-columns:54px minmax(0,1fr) 54px}.mem-trace .t.mode,.mem-trace .n.cand,.mem-trace .n.ms{display:none}}",
 			"@media (max-width:900px){.mem-node-label{font-size:17px}.mem-fact-label{font-size:15px}.mem-toolbar-label{display:none}}",
 			"@media (prefers-color-scheme:light){.mem-edge{stroke:rgba(60,75,110,.5)}.mem-edge.shared{stroke:rgba(40,90,215,.8);stroke-width:1.6}.mem-edge.origin{stroke:rgba(110,70,205,.8)}.mem-edge.private{stroke:rgba(25,145,70,.85)}.mem-edge.member{stroke:rgba(90,100,120,.45)}.mem-node circle,.mem-node rect{fill:rgba(90,105,130,.16);stroke:rgba(60,75,105,.75)}.mem-node.workspace rect{fill:rgba(50,95,215,.14);stroke:rgba(40,90,215,.95)}.mem-node.session circle{fill:rgba(25,145,70,.12);stroke:rgba(25,145,70,.9)}.mem-node.fact.constraint circle{fill:rgba(200,140,30,.25);stroke:#b7791f}.mem-node.fact.state circle{fill:rgba(40,110,220,.2);stroke:#2b6cd4}.mem-node.fact.task circle{fill:rgba(120,85,200,.22);stroke:#6d4bc0}.mem-node.fact.history circle{fill:rgba(100,110,125,.18);stroke:#5d6674}.mem-node .mem-ring{stroke:rgba(40,90,215,.7)}.mem-node-label{fill:#1b1f27}.mem-fact-label{fill:#3a4150}.mem-focus-ring{stroke:#1b64c8}}",
 			"@media (prefers-reduced-motion:reduce){.ci-switch,.ci-caret,.cim-chip{transition:none}.ci-pulse{animation:none;opacity:.9}}"
@@ -285,6 +319,35 @@ window.__ModuleLoader__.load({
 		}
 
 		function shortId(id) { return String(id || "").replace(/^session-/, "").slice(0, 8); }
+		function fmtB(n) {
+			var v = Number(n) || 0;
+			if (v < 1024) return v + "B";
+			if (v < 1048576) return (v / 1024).toFixed(1) + "KB";
+			return (v / 1048576).toFixed(2) + "MB";
+		}
+		// 折叠后请求结构：给面板一行摘要（节点数/总字节/最大的几组），明细按需展开。
+		// 为什么按 role/src 聚合：一次折叠常有数百个同质节点（assistant/model、tool/tool），
+		//   逐节点平铺会把面板撑成一面字墙（实测 303 节点）。分组后仍保留逐节点明细供核验。
+		function frameSummary(nodes) {
+			var list = Array.isArray(nodes) ? nodes : [];
+			var groups = {}, order = [], total = 0;
+			list.forEach(function (x) {
+				var b = Number(x && x.bytes) || 0;
+				var role = String((x && x.role) || "?");
+				var src = x && x.src ? String(x.src) : "";
+				var k = src ? role + "/" + src : role;
+				total += b;
+				if (!groups[k]) { groups[k] = { k: k, n: 0, b: 0 }; order.push(k); }
+				groups[k].n += 1; groups[k].b += b;
+			});
+			var gs = order.map(function (k) { return groups[k]; }).sort(function (a, b) { return b.b - a.b || (a.k < b.k ? -1 : 1); });
+			return {
+				n: list.length, total: total, groups: gs, top: gs.slice(0, 4),
+				text: list.map(function (x) {
+					return String((x && x.role) || "?") + (x && x.src ? "/" + x.src : "") + ":" + (Number(x && x.bytes) || 0) + "B";
+				}).join("\n")
+			};
+		}
 		function parseTranscript(text) {
 			var rounds = [], cur = null;
 			(text || "").split("\n").forEach(function (line) {
@@ -850,7 +913,15 @@ window.__ModuleLoader__.load({
 										e("span", null, "档 ", e("b", null, lf.mode || "off")),
 										e("span", null, "hash ", e("b", null, String(lf.transcriptHash || "").slice(0, 8))),
 										e("span", null, "monotonic ", e("b", null, lf.monotonic === true ? "✓" : lf.monotonic || "?"))),
-									e("div", { key: "n", className: "ci-sub" }, "请求结构：" + (lf.afterNodes && lf.afterNodes.length ? lf.afterNodes.map(function (x) { return x.role + (x.src ? "/" + x.src : "") + ":" + x.bytes + "B"; }).join(" · ") : "—")),
+									(lf.afterNodes && lf.afterNodes.length ? (function () {
+										var fs = frameSummary(lf.afterNodes);
+										var summary = "\u8BF7\u6C42\u7ED3\u6784\uFF1A" + fs.n + " \u8282\u70B9 / " + fmtB(fs.total) + " \u00B7 " + fs.top.map(function (g) { return g.k + "\u00D7" + g.n + " " + fmtB(g.b); }).join(" \u00B7 ") + (fs.groups.length > fs.top.length ? " \u2026" : "");
+										return e("details", { key: "n", className: "ci-sub ci-frames" },
+											e("summary", { title: summary }, summary),
+											e("div", { className: "ci-frame-body" },
+												fs.groups.map(function (g) { return e("div", { key: "g:" + g.k, className: "g" }, e("span", null, g.k), e("b", null, g.n + " \u00D7 " + fmtB(g.b))); }),
+												e("div", { className: "ci-frame-list" }, fs.text)));
+									})() : e("div", { key: "n", className: "ci-sub" }, "\u8BF7\u6C42\u7ED3\u6784\uFF1A\u2014")),
 									e("hr", { key: "r", className: "ci-hr" }),
 									timeline(shown),
 									(rounds.length > 3 ? e("div", { key: "ra", className: "ci-actions" }, e("button", { className: "ci-btn", onClick: function () { setAllRounds(!allRounds); } }, allRounds ? "仅显示最近 3 轮" : "显示全部 " + rounds.length + " 轮")) : null)
@@ -1494,8 +1565,8 @@ window.__ModuleLoader__.load({
 			var edges = (graph.edges || []).filter(function (x) { return ids.has(x.source) && ids.has(x.target); });
 			return { nodes: nodes, edges: edges, facts: facts, graphFacts: graphFacts };
 		}
-		var MEM_ENV = { memoryEnabled: "DSH_MEMORY", memoryLlmEnabled: "DSH_MEMORY_LLM", memoryInjectCatalog: "DSH_MEMORY_INJECT", memoryHandoff: "DSH_MEMORY_HANDOFF", memoryConsolidateAuto: "DSH_MEMORY_CONSOLIDATE" };
-		var MEM_LOCK = { memoryEnabled: "enabled", memoryLlmEnabled: "llmEnabled", memoryInjectCatalog: "injectCatalog", memoryHandoff: "handoff", memoryConsolidateAuto: "consolidateAuto" };
+		var MEM_ENV = { memoryEnabled: "DSH_MEMORY", memoryLlmEnabled: "DSH_MEMORY_LLM", memoryInjectCatalog: "DSH_MEMORY_INJECT", memoryHandoff: "DSH_MEMORY_HANDOFF", memoryConsolidateAuto: "DSH_MEMORY_CONSOLIDATE", memoryJanitorEnabled: "DSH_MEMORY_JANITOR" };
+		var MEM_LOCK = { memoryEnabled: "enabled", memoryLlmEnabled: "llmEnabled", memoryInjectCatalog: "injectCatalog", memoryHandoff: "handoff", memoryConsolidateAuto: "consolidateAuto", memoryJanitorEnabled: "janitorEnabled" };
 		// 注入回执：把“模型这轮到底看到了什么”从 console 搬到面板。全文是不可信数据，不执行。
 		function InjectionReceipt(inj) {
 			if (!inj) return null;
@@ -1544,6 +1615,18 @@ window.__ModuleLoader__.load({
 			// 框选：在图谱空白处拖拽画矩形，松开时选中矩形内所有节点。
 			var _bs = useState(null), boxSelect = _bs[0], setBoxSelect = _bs[1];
 			var boxRef = useRef(null);
+			// 检索轨迹（Phase 4）：按当前会话加载，详情懒加载；5s 轮询只在轨迹页可见时进行。
+			// 注意：新增 useState 一律追加在既有状态之后，渲染冒烟测试按钩子顺序播种。
+			var _tr = useState({ sig: "", rows: [], cursor: null, hasMore: false, loading: false, err: null }), traces = _tr[0], setTraces = _tr[1];
+			var _tt = useState(""), traceTrigger = _tt[0], setTraceTrigger = _tt[1];
+			var _trd = useState(null), traceDetail = _trd[0], setTraceDetail = _trd[1];
+			var _trx = useState(null), traceDetailErr = _trx[0], setTraceDetailErr = _trx[1];
+			// 指标（/api/memory/metrics）与巡检操作提示：只在设置页按需拉取，不参与 5s 轮询。
+			var _mtr = useState(null), metrics = _mtr[0], setMetrics = _mtr[1];
+			var _jmsg = useState(null), janitorMsg = _jmsg[0], setJanitorMsg = _jmsg[1];
+			var traceSig = sid + "|" + traceTrigger;
+			var tracesRef = useRef(traces);
+			tracesRef.current = traces;
 			var listSig = [sid, range, focus || "", sinceDays].join("|");
 			var wrapRef = useRef(null);
 			var memPicked = useRef(false); // 用户手动改过后，轮询不再覆盖选择
@@ -1645,6 +1728,72 @@ window.__ModuleLoader__.load({
 						setOlder({ sig: listSig, facts: baseFacts, cursor: cursor, hasMore: !!gs.hasMore, pages: older.sig === listSig ? older.pages : 0, loading: false, err: x });
 					});
 			}
+			// ---- 检索轨迹：列表/详情/导出/清空（后端已脱敏 + 单会话隔离） ----
+			function loadTraces(more) {
+				if (!sid) return;
+				var sig = traceSig;
+				var prev = tracesRef.current;
+				var base = prev.sig === sig ? prev : { sig: sig, rows: [], cursor: null, hasMore: false, loading: false, err: null };
+				if (base.loading || (more && !base.cursor)) return;
+				setTraces({ sig: sig, rows: base.rows, cursor: base.cursor, hasMore: base.hasMore, loading: true, err: null });
+				var q = ["sessionId=" + encodeURIComponent(sid), "limit=50"];
+				if (traceTrigger) q.push("trigger=" + encodeURIComponent(traceTrigger));
+				if (more && base.cursor) q.push("cursor=" + encodeURIComponent(base.cursor));
+				fetch("/api/memory/traces?" + q.join("&"), { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) {
+						if (!j || j.ok === false) throw new Error((j && (j.error || j.message)) || "轨迹加载失败");
+						var seen = new Set(base.rows.map(function (x) { return x.id; }));
+						var add = (j.traces || []).filter(function (x) { return !seen.has(x.id); });
+						setTraces({ sig: sig, rows: base.rows.concat(add), cursor: j.nextCursor || null, hasMore: !!j.hasMore, loading: false, err: null });
+					})
+					.catch(function (x) {
+						setTraces({ sig: sig, rows: base.rows, cursor: base.cursor, hasMore: base.hasMore, loading: false, err: x });
+					});
+			}
+			function openTrace(id) {
+				setTraceDetail(null); setTraceDetailErr(null);
+				fetch("/api/memory/traces/" + encodeURIComponent(id), { headers: { "Content-Type": "application/json" } })
+					.then(function (r) {
+						// 宿主未匹配到路由时返回纯文本 "not found"；直接 r.json() 会把
+						// 面板错误变成 `Unexpected token 'o'`。先读文本，给出可读原因。
+						return r.text().then(function (t) {
+							var j = null;
+							try { j = JSON.parse(t); } catch (e) { /* 非 JSON */ }
+							if (!j) {
+								var why = r.status === 404 ? "接口未匹配（404）" : ("HTTP " + r.status);
+								throw new Error(why + (t ? "：" + String(t).slice(0, 120) : ""));
+							}
+							return j;
+						});
+					})
+					.then(function (j) {
+						if (!j || j.ok === false) throw new Error((j && j.error) || "轨迹加载失败");
+						if (!j.trace) throw new Error("轨迹不存在或已清理");
+						setTraceDetail(j.trace);
+					})
+					.catch(function (x) { setTraceDetailErr(x); });
+			}
+			function clearTraceHistory() {
+				if (!sid || traces.loading) return;
+				fetch("/api/memory/traces/clear", {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ sessionId: sid }),
+				}).then(function (r) { return r.json(); }).then(function (j) {
+					if (!j || !j.ok) throw new Error((j && j.error) || "清空失败");
+					setTraceDetail(null);
+					// 不要紧接着 loadTraces：tracesRef 还是旧行，合并会把刚清掉的轨迹又加回来。
+					// 下一次 5s 轮询会从空状态重新拉取。
+					setTraces({ sig: traceSig, rows: [], cursor: null, hasMore: false, loading: false, err: null });
+				}).catch(function (x) { setTraceDetailErr(x); });
+			}
+			function exportTraceHistory() {
+				if (!sid || typeof document === "undefined") return;
+				var a = document.createElement("a");
+				a.href = "/api/memory/traces/export?sessionId=" + encodeURIComponent(sid) + "&format=jsonl";
+				a.download = "";
+				document.body.appendChild(a); a.click(); a.remove();
+			}
 			function pullGraph() {
 				if (tab !== "graph") return;
 				var focusReq = focus && /^(ws|sess):/.test(focus) ? focus : "";
@@ -1669,6 +1818,27 @@ window.__ModuleLoader__.load({
 			useEffect(function () {
 				setOlder({ sig: listSig, facts: [], cursor: null, hasMore: false, pages: 0, loading: false, err: null });
 			}, [listSig]);
+			// 会话或触发筛选变化：清空轨迹列表与详情，避免旧会话轨迹短暂串台。
+			useEffect(function () {
+				setTraceDetail(null); setTraceDetailErr(null);
+				setTraces({ sig: traceSig, rows: [], cursor: null, hasMore: false, loading: false, err: null });
+			}, [traceSig]);
+			// 轨迹页可见时才轮询；切走立即停（与主状态轮询同口径）。
+			useEffect(function () {
+				if (tab !== "traces" || !sid) return;
+				loadTraces(false);
+				function tick() { if (typeof document !== "undefined" && document.hidden) return; loadTraces(false); }
+				var iv = setInterval(tick, 5000);
+				return function () { clearInterval(iv); };
+			}, [tab, traceSig]);
+			// 指标只在设置页拉一次；失败不影响其它区（metrics.json 可能尚未生成）。
+			useEffect(function () {
+				if (tab !== "settings") return;
+				fetch("/api/memory/metrics", { headers: { "Content-Type": "application/json" } })
+					.then(function (r) { return r.json(); })
+					.then(function (j) { setMetrics(j && j.ok ? j.metrics : null); })
+					.catch(function () { setMetrics(null); });
+			}, [tab]);
 			useEffect(function () {
 				// 页面不可见时停轮询；切回来立即补一帧（5s 固定间隔在后台纯属浪费）
 				function tick() { if (typeof document !== "undefined" && document.hidden) return; pull(); }
@@ -1759,11 +1929,10 @@ window.__ModuleLoader__.load({
 				setMemM(memRouteM);
 			}, [memRouteP, memRouteM]);
 			useEffect(function () { loadMemModels(memP); }, [memP]);
-			function applyFlag(key, value) {
+			function applyConfig(patch) {
 				if (busy) return;
 				setBusy(true);
-				var body = {}; body[key] = value;
-				fetch("/api/memory/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+				fetch("/api/memory/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch || {}) })
 					.then(function (r) { return r.json(); })
 					.then(function (s) {
 						if (!s || !s.ok) setErr(new Error((s && s.error) || "config failed"));
@@ -1771,6 +1940,10 @@ window.__ModuleLoader__.load({
 					})
 					.catch(function (x) { setErr(x); })
 					.then(function () { setBusy(false); pull(); });
+			}
+			function applyFlag(key, value) {
+				var body = {}; body[key] = value;
+				applyConfig(body);
 			}
 			if (!data) {
 				return e("div", { className: "ci-root" },
@@ -1822,6 +1995,66 @@ window.__ModuleLoader__.load({
 			var coLastText = col ? (col.ok
 				? ("上次整理：" + coParts.join(" · ") + (col.ms != null ? " · " + (col.ms / 1000).toFixed(1) + "s" : "") + (col.model ? " · " + col.model : ""))
 				: ("上次整理失败：" + (coReasonText[col.reason] || col.reason || "未知"))) : null;
+			// ---- 文件巡检管家（Phase A）：开关、间隔、立即巡检与上次结果 ----
+			var jn = data.janitor || {};
+			var jlast = jn.last || null;
+			var jinf = jn.inflight || null;
+			var jReady = !!(f.enabled && f.llmEnabled && jn.enabled);
+			var jIntervalMin = Math.max(1, Math.round((Number(jn.intervalMs) || 1800000) / 60000));
+			// 环境变量/control.json 可能给非预设值（如 15 分钟）；保留当前值，避免下拉框显示空白。
+			var jIntervalOpts = [10, 30, 60, 360, 1440];
+			if (jIntervalOpts.indexOf(jIntervalMin) < 0) {
+				jIntervalOpts.push(jIntervalMin);
+				jIntervalOpts.sort(function (a, b) { return a - b; });
+			}
+			var jStage = jinf ? ({ collect: "收集候选", llm: "模型检查", apply: "写入结果" }[jinf.stage] || "巡检中") : "";
+			var jSec = jinf && (jinf.startedAt || jinf.at) ? Math.max(0, Math.round((Date.now() - Number(jinf.startedAt || jinf.at)) / 1000)) : null;
+			var jReasonText = {
+				"no-candidates": "没有超过 24 小时未验证的文件事实",
+				"disabled": "记忆层、轻 LLM 编译或文件巡检未开启",
+				"no-route": "没有可用的模型路由",
+				"no-workspace": "找不到该会话的工作区",
+				"busy": "已有巡检在运行",
+				"no-operations": "模型没有给出可执行操作",
+				"llm-failed": "模型调用失败",
+				"timeout": "模型调用超时",
+				"parse-failed": "模型输出未通过校验",
+			};
+			var jOps = (jlast && jlast.ops) || null;
+			// 自动巡检记在工作区最近会话名下：跨会话回退时标明来源，避免误以为是本会话刚跑过。
+			var jFrom = jlast && jlast.fromSid ? ("（工作区会话 " + String(jlast.fromSid).slice(0, 8) + "）") : "";
+			var jLastText = jlast ? (jlast.skipped
+				? ("上次巡检" + jFrom + "：" + (jReasonText[jlast.reason] || jlast.reason || "跳过"))
+				: (jlast.ok
+					? ("上次巡检" + jFrom + "：刷新 " + (jOps ? (jOps.refresh || 0) : 0) + " · 失效 " + (jOps ? (jOps.forget || 0) : 0)
+						+ " · 拒绝 " + (jOps ? (jOps.rejected || 0) : 0) + (jlast.facts ? (" · 候选 " + jlast.facts) : "")
+						+ (jlast.ms != null ? " · " + (jlast.ms / 1000).toFixed(1) + "s" : "")
+						+ (jlast.model && jlast.model.model ? " · " + jlast.model.model : ""))
+					: ("上次巡检失败" + jFrom + "：" + (jReasonText[jlast.reason] || jlast.reason || "未知")))) : null;
+			function janitorNow() {
+				if (!sid || busy || jinf) return;
+				setJanitorMsg(null);
+				setBusy(true);
+				fetch("/api/memory/janitor", {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ sessionId: sid }),
+				}).then(function (r) { return r.json(); }).then(function (j) {
+					if (!j || !j.ok) throw new Error((j && j.error) || "触发失败");
+					setJanitorMsg("已排队：2 秒内开始，完成后自动刷新");
+					setTimeout(function () { pull(); }, 2500);
+					setTimeout(function () { pull(); }, 9000);
+				}).catch(function (x) { setJanitorMsg("触发失败：" + String((x && x.message) || x)); })
+					.then(function () { setBusy(false); });
+			}
+			// ---- 只读诊断：向量层当前状态 + metrics.json 成功率 ----
+			var mv = data.vector || null;
+			var mtr = metrics || null;
+			function rateOf(o) {
+				return o && Number(o.total) > 0 ? Math.round(100 * Number(o.success || 0) / Number(o.total)) + "%" : "—";
+			}
+			function hitOf(o) {
+				return o && Number(o.total) > 0 ? Math.round(100 * Number(o.hit || 0) / Number(o.total)) + "%" : "—";
+			}
 			function consolidateNow() {
 				if (busy || coi || !sid) return;
 				setBusy(true);
@@ -2385,6 +2618,108 @@ window.__ModuleLoader__.load({
 									e("span", { className: "mem-time" }, memAgo(r.updated_ts)));
 							})) : e("div", { className: "mem-empty" }, "—")));
 			}
+			// ---- 轨迹页：当前会话的检索轨迹（Phase 4） ----
+			var TRACE_TRIGGER_TEXT = { tool: "工具", ls: "目录", recall: "召回", inject: "注入", handover: "交接" };
+			function traceRow(t) {
+				var on = traceDetail && traceDetail.id === t.id;
+				return e("div", {
+					key: t.id, className: "mem-trace" + (on ? " on" : ""), role: "button", tabIndex: 0,
+					"aria-pressed": !!on, title: t.preview || t.uri || "",
+					onClick: function () { openTrace(t.id); },
+					onKeyDown: function (ev) {
+						if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openTrace(t.id); }
+					},
+				},
+					e("span", { className: "t" }, memAgo(t.ts)),
+					e("span", { className: "mem-trigger " + (t.trigger || "") }, TRACE_TRIGGER_TEXT[t.trigger] || t.trigger || "?"),
+					e("span", { className: "q" }, t.preview || (t.uri ? t.uri : "(无查询文本)")),
+					e("span", { className: "t mode" }, t.mode || "—"),
+					e("span", { className: "n cand" }, (t.selTotal || 0) + "/" + (t.candTotal || 0)),
+					e("span", { className: "n ms" }, t.ms != null ? (Number(t.ms).toFixed(1) + "ms") : "—"));
+			}
+			function traceDetailBody() {
+				if (traceDetailErr) return e("div", { className: "ci-err", style: { marginTop: 8 } }, "轨迹详情加载失败：" + String((traceDetailErr && traceDetailErr.message) || traceDetailErr));
+				if (!traceDetail) return e("div", { className: "ci-sub", style: { marginTop: 8 } }, "点一条轨迹查看阶段、候选与选中。");
+				var tr = traceDetail;
+				return e("div", { className: "mem-trace-detail" },
+					e("div", { className: "ci-sech" }, "轨迹 #" + tr.id, e("span", { className: "ci-sub" }, tr.ref || "")),
+					detailRow("时间", new Date(tr.ts).toLocaleString()),
+					detailRow("触发", TRACE_TRIGGER_TEXT[tr.trigger] || tr.trigger || "—"),
+					detailRow("模式", tr.mode || "—"),
+					detailRow("耗时", tr.ms != null ? (Number(tr.ms).toFixed(2) + " ms") : "—"),
+					detailRow("候选 → 选中", (tr.candTotal || 0) + " → " + (tr.selTotal || 0)),
+					detailRow("工作区", tr.workspace || "—"),
+					tr.truncated ? e("div", { className: "ci-sub", style: { marginTop: 4 } }, "详情已裁剪（标记 " + tr.truncated + "）：候选/选中/阶段超出单条上限。") : null,
+					tr.uri ? e("div", { className: "ci-sub", style: { marginTop: 6, wordBreak: "break-all" } }, "URI ", e("span", { className: "mem-uri" }, tr.uri)) : null,
+					tr.query && tr.query.text
+						? e("div", { className: "ci-sub", style: { marginTop: 6 } },
+							"查询（已脱敏 · " + (tr.query.len || 0) + " 字 · hash " + (tr.query.hash || "—") + "）",
+							e("pre", { className: "mem-code" }, tr.query.text))
+						: e("div", { className: "ci-sub", style: { marginTop: 6 } }, "查询文本未记录（DSH_MEMORY_TRACE_TEXT=0）"),
+					(tr.widened && tr.widened.length) ? e("div", { className: "ci-sub", style: { marginTop: 6 } }, "回退：" + tr.widened.join(" → ")) : null,
+					(tr.steps && tr.steps.length)
+						? e("div", null,
+							e("div", { className: "mem-detail-sub" }, "阶段 · " + tr.steps.length),
+							tr.steps.map(function (s, i) {
+								return e("div", { key: i, className: "mem-stage-row" },
+									e("span", null, s.stage || "—"),
+									e("span", null, s.n != null ? s.n : "—"),
+									e("span", null, s.ms != null ? (s.ms + " ms") : "—"),
+									e("span", { className: "why", title: s.why || s.uri || "" }, s.why || s.uri || ""));
+							}))
+						: null,
+					(tr.selected && tr.selected.length)
+						? e("div", null,
+							e("div", { className: "mem-detail-sub" }, "选中 · 显示 " + tr.selected.length + " / 共 " + (tr.selTotal || 0)),
+							e("pre", { className: "mem-code" }, tr.selected.map(function (c) {
+								return "#" + (c.rank != null ? c.rank : "?") + "  " + (c.kind || "") + (c.why ? ("  [" + c.why + "]") : "") + "  " + (c.uri || "");
+							}).join("\n")))
+						: null,
+					(tr.candidates && tr.candidates.length)
+						? e("div", null,
+							e("div", { className: "mem-detail-sub" }, "候选 · 显示 " + tr.candidates.length + " / 共 " + (tr.candTotal || 0)),
+							e("pre", { className: "mem-code" }, tr.candidates.map(function (c) {
+								return "#" + (c.rank != null ? c.rank : "?") + "  " + (c.kind || "") + "  " + (c.src || "") + (c.score != null ? ("  " + c.score) : "") + (c.why ? ("  [" + c.why + "]") : "") + "  " + (c.uri || "");
+							}).join("\n")))
+						: null,
+					tr.error ? e("div", { className: "ci-err", style: { marginTop: 6 } }, "错误：" + tr.error) : null);
+			}
+			function tracesBody() {
+				if (!sid) {
+					return e("div", { className: "ci-sec" },
+						e("div", { className: "mem-empty" }, "打开具体会话后查看检索轨迹。"));
+				}
+				return e("div", {},
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "检索轨迹", e("span", { className: "ci-sub" }, traces.rows.length + " 条" + (traces.hasMore ? "（还有更早）" : ""))),
+						e("div", { className: "ci-sub", style: { marginBottom: 6 } },
+							"记录检索入口、阶段、候选与选中（查询已脱敏）；只在当前会话内查看，导出 JSONL 会二次脱敏。"),
+						e("div", { className: "mem-toolbar" },
+							e("span", { className: "mem-toolbar-label" }, "触发"),
+							e("select", {
+								className: "ci-sel", value: traceTrigger,
+								onChange: function (ev) { setTraceTrigger((ev && ev.target && ev.target.value) || ""); },
+							},
+								e("option", { value: "" }, "全部"),
+								["tool", "ls", "recall", "inject", "handover"].map(function (k) {
+									return e("option", { key: k, value: k }, TRACE_TRIGGER_TEXT[k]);
+								})),
+							e("button", { className: "ci-btn", disabled: traces.loading, onClick: function () { loadTraces(false); } },
+								traces.loading ? "加载中…" : "刷新"),
+							e("button", { className: "ci-btn", disabled: !traces.rows.length, onClick: exportTraceHistory, title: "下载当前会话 JSONL" }, "导出"),
+							e("button", { className: "ci-btn", disabled: !traces.rows.length || traces.loading, onClick: clearTraceHistory, title: "只清空本会话轨迹" }, "清空"),
+							e("span", { style: { flex: 1 } }),
+							e("span", { className: "ci-sub" }, traces.rows.length + " 条")),
+						traces.err ? e("div", { className: "ci-err" }, "轨迹加载失败：" + String((traces.err && traces.err.message) || traces.err)) : null,
+						!traces.rows.length && !traces.loading
+							? e("div", { className: "mem-empty" }, "还没有轨迹。发出一次检索/注入后点「刷新」。")
+							: e("div", { className: "mem-trace-list" }, traces.rows.map(traceRow)),
+						traces.hasMore ? e("button", {
+							className: "ci-btn", style: { marginTop: 6 }, disabled: traces.loading,
+							onClick: function () { loadTraces(true); },
+						}, traces.loading ? "加载中…" : "加载更早") : null),
+					traceDetailBody());
+			}
 			function detailRow(k, v) {
 				return e("div", { className: "mem-detail-row" }, e("span", null, k), e("b", null, v));
 			}
@@ -2530,6 +2865,58 @@ window.__ModuleLoader__.load({
 								? "当前覆盖：" + data.llmRoute.provider + " / " + (data.llmRoute.model || "—")
 								: "当前：跟随会话模型（每轮重新读取 control.json）")),
 					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "文件巡检"),
+						e("div", { className: "ci-sub", style: { marginBottom: 6 } },
+							"每 " + jIntervalMin + " 分钟选出超过 24 小时未验证的文件事实（每次最多 10 条；事实段超过 400 tokens 时只检最旧的 5 条），由轻模型检查后刷新或标记失效；"
+							+ "宿主在写入前重新 stat 复核。与每会话首步的确定性巡检互补。"),
+						flagRow("memoryJanitorEnabled", "文件巡检管家", "LLM 驱动的定期巡检；默认关", jn.enabled),
+						e("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 } },
+							e("span", { className: "ci-sub" }, "间隔"),
+							e("select", {
+								className: "ci-sel", value: String(jIntervalMin), disabled: busy || lock.janitorEnabled,
+								title: "巡检间隔（分钟）；也可用 DSH_MEMORY_JANITOR_INTERVAL_MS 覆盖",
+								onChange: function (ev) {
+									var n = Number(ev && ev.target && ev.target.value);
+									if (Number.isFinite(n) && n > 0) applyConfig({ memoryJanitorIntervalMs: n * 60000 });
+								},
+							}, jIntervalOpts.map(function (n, i) {
+								return e("option", { key: i, value: String(n) }, n < 60 ? (n + " 分钟") : (n / 60 + " 小时"));
+							})),
+							e("button", {
+								className: "ci-btn",
+								disabled: busy || !sid || !jReady || !!jinf,
+								title: !sid ? "打开具体会话后可立即巡检"
+									: (!jReady ? "需先开启记忆层、轻 LLM 编译与文件巡检"
+										: (jinf ? ("巡检进行中：" + jStage) : "立即执行一次巡检")),
+								onClick: janitorNow,
+							}, jinf ? ("巡检中 " + (jSec != null ? jSec + "s" : "") + " · " + jStage) : "立即巡检"),
+							e("span", { className: "ci-sub" },
+								jn.route ? ("模型：" + jn.route.provider + " / " + (jn.route.model || "—")) : "模型：跟随自动整理/编译路由")),
+						jReady ? null : e("div", { className: "ci-sub", style: { marginTop: 6 } }, "需先开启「记忆层」「轻 LLM 编译」与「文件巡检」。"),
+						jLastText ? e("div", { className: "ci-sub", style: { marginTop: 6 } }, jLastText) : null,
+						janitorMsg ? e("div", { className: "ci-sub", style: { marginTop: 6 } }, janitorMsg) : null),
+					e("div", { className: "ci-sec" },
+						e("div", { className: "ci-sech" }, "检索与向量"),
+						e("div", { className: "ci-sub", style: { marginBottom: 6 } },
+							"向量语义臂默认关闭；开启需本机 embedding 模型（DSH_MEMORY_VEC=on）。词法检索始终可用，向量只作为排序信号。"),
+						e("div", { className: "mem-vec" },
+							e("span", null, "状态 ", e("b", null, mv ? ({ off: "关闭", degraded: "降级", ok: "可用" }[mv.state] || mv.state) : "—")),
+							e("span", null, "模式 ", e("b", null, mv ? (mv.mode || "off") : "—")),
+							e("span", null, "模型 ", e("b", null, mv && mv.model ? mv.model : "—")),
+							e("span", null, "维度 ", e("b", null, mv && mv.dim ? mv.dim : "—")),
+							e("span", null, "已嵌 ", e("b", null, mv ? mv.rows : 0)),
+							e("span", null, "待处理 ", e("b", null, mv ? mv.pending : 0))),
+						mv && mv.lastError ? e("div", { className: "ci-err", style: { marginTop: 6 } }, "向量层最近错误：" + mv.lastError) : null,
+						e("div", { className: "mem-diag" },
+							kpi("编译成功率", mtr && mtr.compile ? rateOf(mtr.compile) : "—", false, "metrics.json：轻 LLM 编译成功 / 总数"),
+							kpi("检索成功率", mtr && mtr.retrieval ? rateOf(mtr.retrieval) : "—", false, "metrics.json：查询条件化召回有命中 / 总数"),
+							kpi("注入命中率", mtr && mtr.injection ? hitOf(mtr.injection) : "—", false, "metrics.json：自动注入实际产生内容的次数 / 总数")),
+						mtr && mtr.vector ? e("div", { className: "ci-sub" },
+							"向量臂命中 " + (mtr.vector.armHit || 0) + " · 未命中 " + (mtr.vector.armMiss || 0)
+							+ " · 嵌入失败 " + (mtr.vector.embedFail || 0) + " · 精确跳过 " + (mtr.vector.skippedExact || 0)) : null,
+						e("div", { className: "ci-sub", style: { marginTop: 6 } },
+							mtr ? ("指标更新 " + memAgo(mtr.lastUpdated)) : "指标文件尚未生成（首次编译/检索后出现）")),
+					e("div", { className: "ci-sec" },
 						e("div", { className: "ci-sech" }, "记录构成"),
 						(data.kinds && data.kinds.length) ? e("div", { className: "mem-bars" }, data.kinds.map(function (k) {
 							return e("div", { key: k.kind, className: "mem-bar" },
@@ -2554,21 +2941,24 @@ window.__ModuleLoader__.load({
 							e("div", { className: "ci-title" }, "外部记忆"),
 							e("span", { className: "mem-state " + st }, stText),
 							(lockN ? e("span", { className: "mem-evidence", title: "环境变量优先级高于面板：被锁定的开关不可点击" }, "env 锁定 " + lockN + " 项") : null)),
-						e("div", { className: "ci-sub" }, "SQLite · 工作区共享事实 · 只读工具 memory_catalog / search / get")),
+						e("div", { className: "ci-sub" }, "SQLite · 工作区共享事实 · memory_catalog / search / get / ls（+ 受控写入）")),
 					e("button", { className: "ci-btn", style: { marginLeft: "auto" }, onClick: function () { pull(); } }, "刷新")),
 				banner ? e("div", { className: "mem-off" }, banner) : null,
 				err ? e("div", { className: "ci-err" }, "读取失败：" + String(err.message || err)) : null,
 				e("div", { className: "mem-tabs", role: "tablist" },
-					tabButton("graph", "图谱"), tabButton("list", "列表"), tabButton("settings", "设置"),
-					e("span", { className: "mem-tabs-note" }, tab === "settings" ? "写入、模型与诊断" : "默认跟随当前选中的会话页")),
+					tabButton("graph", "图谱"), tabButton("list", "列表"), tabButton("traces", "轨迹"), tabButton("settings", "设置"),
+					e("span", { className: "mem-tabs-note" }, tab === "settings" ? "写入、巡检与诊断"
+						: (tab === "traces" ? "当前会话的检索轨迹（本机）" : "默认跟随当前选中的会话页"))),
 				tab === "settings"
 					? e("div", { className: "mem-settings" }, settingsBody())
-					: e("div", { className: "ci-cols" },
-						e("div", { className: "ci-main" },
-							overviewStrip(),
-							memoryToolbar(),
-							tab === "graph" ? graphBody() : listBody()),
-						e("div", { className: "ci-rail" }, railBody())));
+					: tab === "traces"
+						? e("div", { className: "mem-settings" }, tracesBody())
+						: e("div", { className: "ci-cols" },
+							e("div", { className: "ci-main" },
+								overviewStrip(),
+								memoryToolbar(),
+								tab === "graph" ? graphBody() : listBody()),
+							e("div", { className: "ci-rail" }, railBody())));
 		}
 
 		var inject = ["slots"];
@@ -2623,6 +3013,7 @@ window.__ModuleLoader__.load({
 		}
 		exports.apply = apply;
 		exports.inject = inject;
+		exports.__test = { frameSummary: frameSummary, fmtB: fmtB };
 		return module.exports;
 	}
 });

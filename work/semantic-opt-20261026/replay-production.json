@@ -1,0 +1,242 @@
+{
+  "policyVersion": "durable-v1",
+  "generatedAt": "2026-10-26T04:49:38.446Z",
+  "attribution": {
+    "qwen3:4b": {
+      "model": "qwen3:4b",
+      "rows": 288,
+      "negativeSamples": 120,
+      "negativeAcceptedSamples": 0,
+      "positiveSamples": 168,
+      "contentHits": 168,
+      "predicateHits": 168,
+      "accepted": 168,
+      "rejected": 120,
+      "rejectionReasons": {
+        "evidence-not-durable:task-assignment": 72,
+        "evidence-not-durable:transient": 24,
+        "evidence-not-durable:question": 24
+      },
+      "predicateAdjustments": 12,
+      "fpExamples": [],
+      "missExamples": [],
+      "contentRate": 1,
+      "predicateRate": 1,
+      "negativeFPRate": 0
+    },
+    "spark-x2.6": {
+      "model": "spark-x2.6",
+      "rows": 576,
+      "negativeSamples": 240,
+      "negativeAcceptedSamples": 0,
+      "positiveSamples": 336,
+      "contentHits": 332,
+      "predicateHits": 332,
+      "accepted": 332,
+      "rejected": 52,
+      "rejectionReasons": {
+        "evidence-not-durable:task-assignment": 52
+      },
+      "predicateAdjustments": 33,
+      "fpExamples": [],
+      "missExamples": [
+        {
+          "id": "P4",
+          "expected": [
+            {
+              "predicate": "project.preference",
+              "phrase": "先提问"
+            }
+          ],
+          "accepted": [],
+          "rejected": []
+        },
+        {
+          "id": "P4",
+          "expected": [
+            {
+              "predicate": "project.preference",
+              "phrase": "先提问"
+            }
+          ],
+          "accepted": [],
+          "rejected": []
+        },
+        {
+          "id": "P4",
+          "expected": [
+            {
+              "predicate": "project.preference",
+              "phrase": "先提问"
+            }
+          ],
+          "accepted": [],
+          "rejected": []
+        },
+        {
+          "id": "P4",
+          "expected": [
+            {
+              "predicate": "project.preference",
+              "phrase": "先提问"
+            }
+          ],
+          "accepted": [],
+          "rejected": []
+        }
+      ],
+      "contentRate": 0.9880952380952381,
+      "predicateRate": 0.9880952380952381,
+      "negativeFPRate": 0
+    }
+  },
+  "baseline": {
+    "cases": 85,
+    "tp": 64,
+    "fp": 2,
+    "fn": 6,
+    "negativeFPs": 0,
+    "accepted": 65,
+    "rejected": 22,
+    "rejectionReasons": {
+      "unknown-evidence-event": 1,
+      "quote-boundary": 1,
+      "unsupported-operation": 1,
+      "evidence-not-durable:task-assignment": 2,
+      "evidence-not-durable:uncertain": 2,
+      "evidence-not-human": 5,
+      "evidence-not-durable:code-dump": 1,
+      "evidence-not-durable:transient": 4,
+      "evidence-not-durable:file-observation": 2,
+      "evidence-not-durable:question": 2,
+      "evidence-not-durable:plan": 1
+    },
+    "predicateAdjustments": 3,
+    "predicateOnlyErrors": 0,
+    "fpDetails": [
+      {
+        "id": "dec-06",
+        "accepted": {
+          "op": "assert",
+          "predicate": "project.decision",
+          "quote": "上次那个选择作废，改为采用 SQLite 归档账本。",
+          "adjustment": null
+        },
+        "expected": [
+          {
+            "op": "correct",
+            "predicate": "project.decision",
+            "eventKey": "dec-06:e1",
+            "quote": "上次那个选择作废，改为采用 SQLite 归档账本。",
+            "targetAssertionId": "dec-old-1"
+          }
+        ]
+      },
+      {
+        "id": "pref-09",
+        "accepted": {
+          "op": "assert",
+          "predicate": "project.preference",
+          "quote": "语言偏好改为英文，之前的偏好不再适用。",
+          "adjustment": null
+        },
+        "expected": [
+          {
+            "op": "correct",
+            "predicate": "project.preference",
+            "eventKey": "pref-09:e1",
+            "quote": "语言偏好改为英文，之前的偏好不再适用。",
+            "targetAssertionId": "pref-old-1"
+          }
+        ]
+      }
+    ],
+    "fnDetails": [
+      {
+        "id": "dec-06",
+        "expected": {
+          "op": "correct",
+          "predicate": "project.decision",
+          "eventKey": "dec-06:e1",
+          "quote": "上次那个选择作废，改为采用 SQLite 归档账本。",
+          "targetAssertionId": "dec-old-1"
+        },
+        "accepted": [
+          {
+            "op": "assert",
+            "predicate": "project.decision",
+            "quote": "上次那个选择作废，改为采用 SQLite 归档账本。",
+            "adjustment": null
+          }
+        ]
+      },
+      {
+        "id": "dec-08",
+        "expected": {
+          "op": "assert",
+          "predicate": "project.decision",
+          "eventKey": "dec-08:e2",
+          "quote": "决定缓存 TTL 用 300 秒。"
+        },
+        "accepted": [
+          {
+            "op": "assert",
+            "predicate": "project.decision",
+            "quote": "决定缓存 TTL 用 60 秒。",
+            "adjustment": null
+          }
+        ]
+      },
+      {
+        "id": "con-19",
+        "expected": {
+          "op": "assert",
+          "predicate": "project.constraint",
+          "eventKey": "con-19:e1",
+          "quote": "quote 必须是完整子句，不能从中间截断。"
+        },
+        "accepted": []
+      },
+      {
+        "id": "con-20",
+        "expected": {
+          "op": "assert",
+          "predicate": "project.constraint",
+          "eventKey": "con-20:e1",
+          "quote": "同一事件里重复的 quote 视为无效证据。"
+        },
+        "accepted": []
+      },
+      {
+        "id": "pref-09",
+        "expected": {
+          "op": "correct",
+          "predicate": "project.preference",
+          "eventKey": "pref-09:e1",
+          "quote": "语言偏好改为英文，之前的偏好不再适用。",
+          "targetAssertionId": "pref-old-1"
+        },
+        "accepted": [
+          {
+            "op": "assert",
+            "predicate": "project.preference",
+            "quote": "语言偏好改为英文，之前的偏好不再适用。",
+            "adjustment": null
+          }
+        ]
+      },
+      {
+        "id": "pref-20",
+        "expected": {
+          "op": "assert",
+          "predicate": "project.preference",
+          "eventKey": "pref-20:e1",
+          "quote": "我倾向于把评测语料放在 work 目录。"
+        },
+        "accepted": []
+      }
+    ],
+    "precision": 0.9696969696969697,
+    "recall": 0.9142857142857143
+  }
+}

@@ -1,0 +1,2148 @@
+{
+  "audit": "task-6-testspace-shadow-audit",
+  "label": "SHADOW-ONLY: results describe the isolated copy and shadow ledger; live injection is unchanged",
+  "generatedAt": "2026-10-25T17:24:02.154Z",
+  "verdict": "PASS",
+  "failedChecks": [],
+  "paths": {
+    "source": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite",
+    "sourceAsGiven": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite",
+    "sourceStateDirectory": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory",
+    "sourceCopy": "D:\\RCS\\src\\work\\memory-ledger-20261025\\source-copy.sqlite",
+    "shadowLedger": "D:\\RCS\\src\\work\\memory-ledger-20261025\\shadow-ledger.sqlite",
+    "auditJson": "D:\\RCS\\src\\work\\memory-ledger-20261025\\audit.json",
+    "outputDirectory": "D:\\RCS\\src\\work\\memory-ledger-20261025",
+    "workspaceRoot": "C:\\Users\\Administrator\\Desktop\\TESTSPACE",
+    "workspaceScope": "ws:c:/users/administrator/desktop/testspace"
+  },
+  "isolation": {
+    "liveDatabaseOpenedReadOnly": true,
+    "liveConnectionMode": "DatabaseSync(source, { readOnly: true })",
+    "liveWritableConnections": 0,
+    "sourceWriteProbe": {
+      "attempted": true,
+      "rejected": true,
+      "stage": "create",
+      "code": "ERR_SQLITE_ERROR",
+      "message": "attempt to write a readonly database"
+    },
+    "copyMethod": "SQLite VACUUM INTO",
+    "migrationSource": "isolated copy only",
+    "sourceClosedBeforeMigration": true,
+    "sourceFileBefore": {
+      "size": 10457088,
+      "mtimeMs": 1792912459427.9133,
+      "sha256": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a"
+    },
+    "sourceFileAfter": {
+      "size": 10457088,
+      "mtimeMs": 1792912459427.9133,
+      "sha256": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a"
+    },
+    "sourceFileBytesUnchanged": true,
+    "liveDatabase": {
+      "path": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite",
+      "before": {
+        "size": 10457088,
+        "mtimeMs": 1792912459427.9133,
+        "sha256": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a"
+      },
+      "after": {
+        "size": 10457088,
+        "mtimeMs": 1792912459427.9133,
+        "sha256": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a"
+      },
+      "bytesUnchanged": true
+    },
+    "liveSidecars": {
+      "before": {
+        "wal": {
+          "exists": true,
+          "path": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite-wal",
+          "size": 5009952,
+          "mtimeMs": 1792912554897.1326,
+          "sha256": "2298484c256c0157a3c8cd0bce61885fd210a322ae20b2fc1be8fab858193009"
+        },
+        "shm": {
+          "exists": true,
+          "path": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite-shm",
+          "size": 32768,
+          "mtimeMs": 1792948560711.9912,
+          "sha256": "3549fcb3dc36f454bc46c8ffded65e021c579254ced104ad6afdffac227399eb"
+        }
+      },
+      "after": {
+        "wal": {
+          "exists": true,
+          "path": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite-wal",
+          "size": 5009952,
+          "mtimeMs": 1792912554897.1326,
+          "sha256": "2298484c256c0157a3c8cd0bce61885fd210a322ae20b2fc1be8fab858193009"
+        },
+        "shm": {
+          "exists": true,
+          "path": "C:\\Users\\Administrator\\.dsh\\state-compiler\\memory\\memory.sqlite-shm",
+          "size": 32768,
+          "mtimeMs": 1792949042241.8694,
+          "sha256": "3549fcb3dc36f454bc46c8ffded65e021c579254ced104ad6afdffac227399eb"
+        }
+      },
+      "readOnlyOpenMayCreateOrTouchShm": true,
+      "sidecarsClaimedUnchanged": false,
+      "note": "SQLite can create or touch the -shm file even for a read-only open, and -wal may be changed by another live process. Sidecars are recorded as observed evidence only; no claim is made that they are unchanged. Only the main database hash is asserted unchanged."
+    },
+    "copyFile": {
+      "size": 10092544
+    },
+    "assertions": [
+      {
+        "name": "live-profile-unchanged",
+        "measured": false,
+        "includedInVerdict": false,
+        "statement": "No profile file is read or written here. The measured proxy is the live database SHA-256 before/after."
+      },
+      {
+        "name": "no-live-injection-call",
+        "measured": false,
+        "includedInVerdict": false,
+        "statement": "Production rendering is invoked on the shadow ledger only; no live injection path is called."
+      }
+    ]
+  },
+  "counts": {
+    "oldLiveInjection": {
+      "label": "OLD LIVE INJECTION (read-only counts from the isolated copy; unchanged)",
+      "copyRecords": 721,
+      "fileState": 79,
+      "fileStateByStatus": {
+        "stale": 55,
+        "active": 24
+      },
+      "insights": 25,
+      "insightsByStatus": {
+        "active": 23,
+        "stale": 2
+      },
+      "injectedSessions": 13
+    },
+    "shadow": {
+      "label": "SHADOW LEDGER (new; shadow-only)",
+      "archivedObservations": 158,
+      "migratedLegacySnapshots": 79,
+      "probeObservations": 79,
+      "archivedAssertions": 0,
+      "unplacedLegacySnapshots": 79,
+      "currentFacts": 151,
+      "currentEntities": 79,
+      "legacyDerivedCurrentFacts": 0,
+      "nonProbeCurrentFacts": 0,
+      "reducerVersion": "r1",
+      "projectionHash": "1ba92797a578c7e186604fdc8e966ae8824aa38d662f9aa9f2a5f9f2833e1e32",
+      "projectionHashKind": "snapshot-fingerprint",
+      "projectionHashNote": "Includes audit-time probe recordedAt values; a per-snapshot fingerprint, not a cross-run reproducibility constant. The deterministic replay gate lives in tests/memory-ledger-eval.test.mjs with fixed times."
+    }
+  },
+  "proposalLayer": {
+    "measured": true,
+    "tablesPresent": true,
+    "source": "shadow-ledger",
+    "unmeasuredReason": null,
+    "runs": 0,
+    "proposals": 0,
+    "accepted": 0,
+    "candidate": 0,
+    "rejected": 0,
+    "routesEnabled": 0,
+    "liveIngestion": false,
+    "label": "SHADOW-ONLY proposal journal status measured from the isolated shadow ledger after journal initialization; no live proposal ingestion and no live read-path switch"
+  },
+  "reconciliation": {
+    "uniqueMigratedPaths": 79,
+    "probesAttempted": 79,
+    "uniqueProbedPaths": 79,
+    "present": 24,
+    "presentHashed": 24,
+    "missing": 55,
+    "errors": 0,
+    "forcedHashCount": 24,
+    "changedHash": 3,
+    "unchangedHash": 19,
+    "unverifiableLegacyHash": 2,
+    "changedSize": 3,
+    "missingPaths": [
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_probe2.cjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\ui-eval.txt",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_probe9.cjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_replay.cjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\envcheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\bootcheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck2.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck3.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck4.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\make-verify-debug.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-mobile.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week2.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week3.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week4.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-console.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-settings.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-check.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-synced.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\check-ps.ps1",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-file-mode.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-file.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-file.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-launch.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\argcheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\argtest.ps1",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-cmd.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-host.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-stop.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-real.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-svc.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\pollcheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\verdict400.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalcheck.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalcheck2.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalui.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\realprobe.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-real-urls.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\net-probe.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-reload.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\plain-probe.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-probe.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-detect-test.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-flow.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-offline.mjs",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-offline.py",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-cdp.py",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-main.py",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\启动课表（用主Edge登录态）.bat",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\_warrior.svgpart",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\index.html",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\index.html",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\_hero-block.txt",
+      "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\fish-ride.svg"
+    ],
+    "errorPaths": [],
+    "probeResults": [
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/_probe2.cjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_probe2.cjs",
+        "legacyStatus": "stale",
+        "legacySha8": "6db78e9a",
+        "legacySize": 1701,
+        "probeId": "shadow-probe:1:70194527e022",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/ui-eval.txt",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\ui-eval.txt",
+        "legacyStatus": "stale",
+        "legacySha8": null,
+        "legacySize": null,
+        "probeId": "shadow-probe:2:2a68e5282331",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/_probe9.cjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_probe9.cjs",
+        "legacyStatus": "stale",
+        "legacySha8": "ca358493",
+        "legacySize": 2315,
+        "probeId": "shadow-probe:3:2c8f54eefc9d",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/_replay.cjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_replay.cjs",
+        "legacyStatus": "stale",
+        "legacySha8": "0295ce74",
+        "legacySize": 17412,
+        "probeId": "shadow-probe:4:f3af95512ee4",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/_lib.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_lib.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "9d0614eb",
+        "legacySize": 2354,
+        "probeId": "shadow-probe:5:d821264eb1ad",
+        "outcome": "present",
+        "size": 2354,
+        "sha256": "9d0614eb422a1278148f5a3cc390e434b9d3db56bbb4f7a298fa8183a6189e43",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/validate.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\validate.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "3b053daa",
+        "legacySize": 6575,
+        "probeId": "shadow-probe:6:9e37e232321b",
+        "outcome": "present",
+        "size": 6575,
+        "sha256": "3b053daab3bb3ffab72c401734930748990f92db9154078b270f20f34fa27b66",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/package.json",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\package.json",
+        "legacyStatus": "active",
+        "legacySha8": "3769fffa",
+        "legacySize": 368,
+        "probeId": "shadow-probe:7:bcb1963ddf2e",
+        "outcome": "present",
+        "size": 368,
+        "sha256": "3769fffa6a8c3ac0d5d4af641411a632c433f349b558e22e44a6cb1c87858f48",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/core/errors.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\core\\errors.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "a3234723",
+        "legacySize": 1054,
+        "probeId": "shadow-probe:8:37d0e1d70be0",
+        "outcome": "present",
+        "size": 1054,
+        "sha256": "a32347231ad71a089eccea8e40ece7d7a314ae29d54695ed1a3d87bed4b7b721",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/portal.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\portal.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "6f1fdd1f",
+        "legacySize": 3415,
+        "probeId": "shadow-probe:9:89694f91a839",
+        "outcome": "present",
+        "size": 3415,
+        "sha256": "6f1fdd1f54c5c896e62d36f8a7165df67aabcc38d614dfc93dcc3745a8ede230",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/email.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\email.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "31ce1184",
+        "legacySize": 2813,
+        "probeId": "shadow-probe:10:f48cd1a9f5e1",
+        "outcome": "present",
+        "size": 2813,
+        "sha256": "31ce1184ab0b60992a9b8460e5d9dd954173836652b462efda6e23a0b35a767c",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/envcheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\envcheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "f88d0f9b",
+        "legacySize": 333,
+        "probeId": "shadow-probe:11:d0ca7bc407b7",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/bootcheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\bootcheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "7fb204cb",
+        "legacySize": 747,
+        "probeId": "shadow-probe:12:f499e7e25177",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/parsecheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "1e822cbf",
+        "legacySize": 977,
+        "probeId": "shadow-probe:13:6b81f1cc1947",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/parsecheck2.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck2.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "60b3c940",
+        "legacySize": 724,
+        "probeId": "shadow-probe:14:f8ca218929b3",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/parsecheck3.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck3.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "13d0dfb5",
+        "legacySize": 842,
+        "probeId": "shadow-probe:15:1e36e591f5b6",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/parsecheck4.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\parsecheck4.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "169471e5",
+        "legacySize": 1404,
+        "probeId": "shadow-probe:16:03436f827b0c",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/make-verify-debug.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\make-verify-debug.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "482c63d7",
+        "legacySize": 927,
+        "probeId": "shadow-probe:17:f14df6fd4fa9",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/verify.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\verify.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "cca219e1",
+        "legacySize": 45806,
+        "probeId": "shadow-probe:18:ee8d8cef5c58",
+        "outcome": "present",
+        "size": 45806,
+        "sha256": "cca219e10ded81b881b9cb9721ed40364dbec3069201bd5a073c7b456c91c12c",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-mobile.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-mobile.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "70cea86f",
+        "legacySize": 2417,
+        "probeId": "shadow-probe:19:1ef407216bd4",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-week.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "c909b08d",
+        "legacySize": 1904,
+        "probeId": "shadow-probe:20:6ff32f951e08",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-week2.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week2.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "e6fad56f",
+        "legacySize": 1850,
+        "probeId": "shadow-probe:21:a08a0608f7ee",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-week3.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week3.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "19702373",
+        "legacySize": 1662,
+        "probeId": "shadow-probe:22:0098721741ee",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-week4.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-week4.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "59e6f9ec",
+        "legacySize": 1789,
+        "probeId": "shadow-probe:23:b0db6af67f11",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/probe-console.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-console.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "6a2123eb",
+        "legacySize": 714,
+        "probeId": "shadow-probe:24:47a87f936cfb",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/shot-settings.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-settings.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "abf8a264",
+        "legacySize": 1138,
+        "probeId": "shadow-probe:25:397863476b81",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/login-check.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-check.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "f7ab5baa",
+        "legacySize": 2200,
+        "probeId": "shadow-probe:26:de8159c77485",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/shot-synced.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-synced.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "d2c828a1",
+        "legacySize": 2491,
+        "probeId": "shadow-probe:27:d9db25c89ae3",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/run-tests.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\run-tests.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "5bc784f5",
+        "legacySize": 2407,
+        "probeId": "shadow-probe:28:0306598fa815",
+        "outcome": "present",
+        "size": 2407,
+        "sha256": "5bc784f5cdec72e8cacc3566ea7699f77601065bbbee3e7043657b6545326c27",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/check-ps.ps1",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\check-ps.ps1",
+        "legacyStatus": "stale",
+        "legacySha8": "ff762e15",
+        "legacySize": 313,
+        "probeId": "shadow-probe:29:e24c9a8f50a2",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/check-file-mode.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-file-mode.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "7d8f3e47",
+        "legacySize": 1636,
+        "probeId": "shadow-probe:30:a007074bf56b",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/diag-file.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-file.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "48fb8836",
+        "legacySize": 1309,
+        "probeId": "shadow-probe:31:59c52266a0e6",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/e2e-file.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-file.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "9dac005d",
+        "legacySize": 3814,
+        "probeId": "shadow-probe:32:23900ca79a00",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/e2e-launch.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-launch.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "3fc0e06b",
+        "legacySize": 2454,
+        "probeId": "shadow-probe:33:804c05e14763",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/argcheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\argcheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "21f1b2ea",
+        "legacySize": 546,
+        "probeId": "shadow-probe:34:702c1a7d9ab0",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/argtest.ps1",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\argtest.ps1",
+        "legacyStatus": "stale",
+        "legacySha8": "65f406ab",
+        "legacySize": 475,
+        "probeId": "shadow-probe:35:e038dd8c32e6",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/diag-cmd.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-cmd.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "0d63b322",
+        "legacySize": 1613,
+        "probeId": "shadow-probe:36:7ac80892e59d",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/diag-host.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\diag-host.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "ad7ffb7a",
+        "legacySize": 1485,
+        "probeId": "shadow-probe:37:aae2f6424610",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/service-host.cmd",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\service-host.cmd",
+        "legacyStatus": "active",
+        "legacySha8": null,
+        "legacySize": null,
+        "probeId": "shadow-probe:38:70b05551d91a",
+        "outcome": "present",
+        "size": 1375,
+        "sha256": "0bd6a132385b55eca09a6af021e5c0a363795238c34d53e6078e751e2da65242",
+        "changedHash": null,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/service-host-runner.ps1",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\service-host-runner.ps1",
+        "legacyStatus": "active",
+        "legacySha8": "b11b449b",
+        "legacySize": 3549,
+        "probeId": "shadow-probe:39:514529b2adba",
+        "outcome": "present",
+        "size": 3649,
+        "sha256": "a1a3694f727e322aa49986b20ca803e4b82a0a3a2ed1ecbd79ecbafe451269b9",
+        "changedHash": true,
+        "changedSize": true
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/service-host.ps1",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\service-host.ps1",
+        "legacyStatus": "active",
+        "legacySha8": "6ab28dfe",
+        "legacySize": 1705,
+        "probeId": "shadow-probe:40:fea37279bee2",
+        "outcome": "present",
+        "size": 1754,
+        "sha256": "a296aed2e22fd039f3fd95f110a29a971b7b30d5206fa6fb8fc9e9d62874e45e",
+        "changedHash": true,
+        "changedSize": true
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/e2e-stop.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\e2e-stop.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "9de684dc",
+        "legacySize": 2546,
+        "probeId": "shadow-probe:41:6fd9e7702b2c",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/probe-real.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-real.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "c4c278f4",
+        "legacySize": 3102,
+        "probeId": "shadow-probe:42:22e5c26c6c30",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/probe-svc.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-svc.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "86f60ad3",
+        "legacySize": 1049,
+        "probeId": "shadow-probe:43:6f7a2db62bcf",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/pollcheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\pollcheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "037cb740",
+        "legacySize": 4943,
+        "probeId": "shadow-probe:44:ca81c12cfb92",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/verdict400.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\verdict400.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "3d7e2e1b",
+        "legacySize": 2862,
+        "probeId": "shadow-probe:45:ba42926f7a98",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/portalcheck.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalcheck.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "fc89e21a",
+        "legacySize": 621,
+        "probeId": "shadow-probe:46:88a43413dc3f",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/portalcheck2.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalcheck2.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "b7771b7f",
+        "legacySize": 1849,
+        "probeId": "shadow-probe:47:ccaf481ed994",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/portalui.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\portalui.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "e1a9a80d",
+        "legacySize": 2669,
+        "probeId": "shadow-probe:48:0219ef452658",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/realprobe.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\realprobe.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "b3c5b236",
+        "legacySize": 1737,
+        "probeId": "shadow-probe:49:4a50fa28da26",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/probe-real-urls.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\probe-real-urls.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "7483a995",
+        "legacySize": 2533,
+        "probeId": "shadow-probe:50:5e259f749b28",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/net-probe.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\net-probe.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "8ddc4000",
+        "legacySize": 2820,
+        "probeId": "shadow-probe:51:d5a9fc1df94c",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/jwxt.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\jwxt.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "97b64a18",
+        "legacySize": 21486,
+        "probeId": "shadow-probe:52:78ae982df511",
+        "outcome": "present",
+        "size": 21486,
+        "sha256": "97b64a18e4e1fbed2c68488c7d4c0442f86f3c5c9b0b97d9c24540f2c9be109c",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/repro-reload.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\repro-reload.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "2d590ac2",
+        "legacySize": 2799,
+        "probeId": "shadow-probe:53:fd9f9609adb8",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/_service-client.js",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\_service-client.js",
+        "legacyStatus": "active",
+        "legacySha8": "e86ebb62",
+        "legacySize": 26638,
+        "probeId": "shadow-probe:54:1f0e5f94b7fd",
+        "outcome": "present",
+        "size": 26940,
+        "sha256": "d7e3c2cd40831cb22b07422cbf138723ac5c307e424d5d12ac55c6ac87ce80de",
+        "changedHash": true,
+        "changedSize": true
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/index.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\index.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "3863389c",
+        "legacySize": 7921,
+        "probeId": "shadow-probe:55:08135d08ecde",
+        "outcome": "present",
+        "size": 7921,
+        "sha256": "3863389c76a6641f0aa28f5431c4a0bae9a078a18ff348e1e5c2b1e7d2ee281c",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/plain-probe.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\plain-probe.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "74add6dd",
+        "legacySize": 1610,
+        "probeId": "shadow-probe:56:7661bac87a1a",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/login-probe.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-probe.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "7371722c",
+        "legacySize": 2928,
+        "probeId": "shadow-probe:57:4a8766bf51a3",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/core/html.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\core\\html.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "c05387c7",
+        "legacySize": 3267,
+        "probeId": "shadow-probe:58:7709fb6791e1",
+        "outcome": "present",
+        "size": 3267,
+        "sha256": "c05387c7b81c792266c907e303e5f7c3ea7a74fd1e21bc418d58778e6c895e60",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/login-detect-test.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-detect-test.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "f4b7a767",
+        "legacySize": 2014,
+        "probeId": "shadow-probe:59:410d3fe1a6f2",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/login-flow.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\login-flow.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "6c6a9219",
+        "legacySize": 3270,
+        "probeId": "shadow-probe:60:66fd170711d3",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/config.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\config.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "2ccc3a43",
+        "legacySize": 4301,
+        "probeId": "shadow-probe:61:77b76fae9480",
+        "outcome": "present",
+        "size": 4301,
+        "sha256": "2ccc3a435758d6bd9874c2a404fc9e7d59a7cff483dd7b9496a4a8bd18a6517f",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/mock-jwxt.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\mock-jwxt.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "982f15af",
+        "legacySize": 9260,
+        "probeId": "shadow-probe:62:e7abab72d481",
+        "outcome": "present",
+        "size": 9260,
+        "sha256": "982f15aff85fc284c3ea1a0843fdc464a7ea25cfa4160fbaeb0ca84ba2538324",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/test-server.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\test-server.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "9ad2eb84",
+        "legacySize": 16510,
+        "probeId": "shadow-probe:63:c14428d62813",
+        "outcome": "present",
+        "size": 16510,
+        "sha256": "9ad2eb84bb77e283fcacdd2d8b89a6e655f9cae83b36f6107f8f97c567f06518",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/app.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\app.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "be1e90ab",
+        "legacySize": 14209,
+        "probeId": "shadow-probe:64:558ef573a0f8",
+        "outcome": "present",
+        "size": 14209,
+        "sha256": "be1e90abf56cb96aeb50c8104a5477e174d9515f1d447d22954920601e6607f5",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/tools/test-service.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\tools\\test-service.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "2f4f295c",
+        "legacySize": 13680,
+        "probeId": "shadow-probe:65:7e6fe7693dab",
+        "outcome": "present",
+        "size": 13680,
+        "sha256": "2f4f295cf5e1ea43b9574834b085d4163f628731bdadc97d696f7fc66cf2d399",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/server/session.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\server\\session.mjs",
+        "legacyStatus": "active",
+        "legacySha8": "0bd03dae",
+        "legacySize": 28261,
+        "probeId": "shadow-probe:66:4085f1c18e23",
+        "outcome": "present",
+        "size": 28261,
+        "sha256": "0bd03dae710aecb7589c782115bd20fc1be2fc9e785a036623690390da664b6e",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/课表.html",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\课表.html",
+        "legacyStatus": "active",
+        "legacySha8": "72a866dc",
+        "legacySize": 128226,
+        "probeId": "shadow-probe:67:2c96535f722a",
+        "outcome": "present",
+        "size": 128226,
+        "sha256": "72a866dc639991ff9fcbed74e30a5eed4deca14bb22e6bf6f86dc60a71bfd3cb",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/check-offline.mjs",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-offline.mjs",
+        "legacyStatus": "stale",
+        "legacySha8": "2767efee",
+        "legacySize": 2006,
+        "probeId": "shadow-probe:68:cfcc288148ca",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/check-offline.py",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-offline.py",
+        "legacyStatus": "stale",
+        "legacySha8": "27a6d402",
+        "legacySize": 2261,
+        "probeId": "shadow-probe:69:34a3d8e15f91",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/check-cdp.py",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\check-cdp.py",
+        "legacyStatus": "stale",
+        "legacySha8": "e02443e4",
+        "legacySize": 2347,
+        "probeId": "shadow-probe:70:86012d890dbc",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/启动课表.bat",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\启动课表.bat",
+        "legacyStatus": "active",
+        "legacySha8": null,
+        "legacySize": null,
+        "probeId": "shadow-probe:71:7ce01e45cc51",
+        "outcome": "present",
+        "size": 628,
+        "sha256": "993af739bfe2448d91e251e1d55aff9578ed065c7b62a57c7039ed6237444bd3",
+        "changedHash": null,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/readme.md",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\README.md",
+        "legacyStatus": "active",
+        "legacySha8": "e215149d",
+        "legacySize": 2017,
+        "probeId": "shadow-probe:72:a5e4ff6a1e85",
+        "outcome": "present",
+        "size": 2017,
+        "sha256": "e215149dec96cd49f52e175cab9dc361800a53522606ce3a2ac5b300a4bb56ba",
+        "changedHash": false,
+        "changedSize": false
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/.tmp/shot-main.py",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\.tmp\\shot-main.py",
+        "legacyStatus": "stale",
+        "legacySha8": "ba5a1c83",
+        "legacySize": 1195,
+        "probeId": "shadow-probe:73:a822bd65195f",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/timetable/启动课表（用主edge登录态）.bat",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\启动课表（用主Edge登录态）.bat",
+        "legacyStatus": "stale",
+        "legacySha8": null,
+        "legacySize": null,
+        "probeId": "shadow-probe:74:49ecf8f9e008",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/terracotta-carrier/_warrior.svgpart",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\_warrior.svgpart",
+        "legacyStatus": "stale",
+        "legacySha8": "78925ab1",
+        "legacySize": 12302,
+        "probeId": "shadow-probe:75:6d44d794d89c",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/terracotta-carrier/index.html",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\index.html",
+        "legacyStatus": "stale",
+        "legacySha8": "fc7c5021",
+        "legacySize": 38962,
+        "probeId": "shadow-probe:76:5149ca44a10b",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/deepseek-fish/index.html",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\index.html",
+        "legacyStatus": "stale",
+        "legacySha8": "fd5b2c05",
+        "legacySize": 1513,
+        "probeId": "shadow-probe:77:224a916259af",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/deepseek-fish/_hero-block.txt",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\_hero-block.txt",
+        "legacyStatus": "stale",
+        "legacySha8": "b95af5d1",
+        "legacySize": 13722,
+        "probeId": "shadow-probe:78:ae99e374d3ea",
+        "outcome": "missing"
+      },
+      {
+        "entityId": "c:/users/administrator/desktop/testspace/deepseek-fish/fish-ride.svg",
+        "displayPath": "C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\fish-ride.svg",
+        "legacyStatus": "stale",
+        "legacySha8": "7ed6df10",
+        "legacySize": 29621,
+        "probeId": "shadow-probe:79:0020715d99df",
+        "outcome": "missing"
+      }
+    ]
+  },
+  "rejectedLegacyInsights": {
+    "total": 25,
+    "byStatus": {
+      "active": 23,
+      "stale": 2
+    },
+    "reasons": [
+      "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence"
+    ],
+    "contentInspected": 25,
+    "rowIdsMatch": true,
+    "sourceRowIds": [
+      355,
+      356,
+      361,
+      1061,
+      1637,
+      1638,
+      1636,
+      354,
+      360,
+      1062,
+      1482,
+      1662,
+      1663,
+      1664,
+      1665,
+      1725,
+      1726,
+      1727,
+      1728,
+      1737,
+      1738,
+      1739,
+      1740,
+      177,
+      178
+    ],
+    "entries": [
+      {
+        "rowid": 355,
+        "key": "file-size-history",
+        "status": "active",
+        "sid": "70b1abe8-3780-4ad6-bf89-277674d8ba57",
+        "updatedAt": 1792820001737,
+        "summary": "课表.html 文件大小从 90956 字节逐步增长至 100749 字节，最后编辑时为 100749 字节",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 356,
+        "key": "edit-action-failure",
+        "status": "active",
+        "sid": "de773760-65c7-4900-893c-e1beb8d46573",
+        "updatedAt": 1792820117087,
+        "summary": "最后一次编辑操作失败，错误为 Error: cannot edit \"C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\课表.html\"",
+        "evidenceCount": 1,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(1)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 361,
+        "key": "tool-unknown-reads",
+        "status": "active",
+        "sid": "de773760-65c7-4900-893c-e1beb8d46573",
+        "updatedAt": 1792822382286,
+        "summary": "Read images from desktop-course-modal.png and mobile-course-modal.png and mobile-detail.png",
+        "evidenceCount": 4,
+        "inspectedFields": [
+          "citations",
+          "confidence",
+          "consolidatedAt",
+          "evidence",
+          "origin",
+          "summary",
+          "type",
+          "validFrom"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(4)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1061,
+        "key": "exit-plan-mode-error",
+        "status": "active",
+        "sid": "64963da1-86cf-4bb1-ad79-aa76fe6d5fe1",
+        "updatedAt": 1792839241974,
+        "summary": "退出计划模式操作失败，错误为 exit_plan_mode 是仅在计划模式下可用的命令",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1637,
+        "key": "edit-action-failure-terracotta",
+        "status": "active",
+        "sid": "9cb1c197-bc82-439d-9c24-e515385cd6e1",
+        "updatedAt": 1792911239689,
+        "summary": "最后一次编辑操作失败，错误为 Error: cannot edit \"C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\index.html\": file changed since it was read — re-read the file, then retry",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1638,
+        "key": "file-write-warrior-svgpart",
+        "status": "active",
+        "sid": "9cb1c197-bc82-439d-9c24-e515385cd6e1",
+        "updatedAt": 1792911239689,
+        "summary": "成功写入文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\_warrior.svgpart，大小为 12302 字节，SHA8 为 78925ab1",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1636,
+        "key": "file-path-terracotta-index",
+        "status": "active",
+        "sid": "d8428d13-d87d-4049-b76f-bf0bde307903",
+        "updatedAt": 1792911531289,
+        "summary": "文件路径为 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\terracotta-carrier\\index.html",
+        "evidenceCount": 4,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(4)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 354,
+        "key": "file-path",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911544439,
+        "summary": "文件路径为 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\课表.html",
+        "evidenceCount": 1,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(1)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 360,
+        "key": "user-recognizes-no-tools",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911544439,
+        "summary": "用户明确要求不要调用任何工具，当前工作区不执行工具调用操作",
+        "evidenceCount": 1,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(1)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1062,
+        "key": "file-path-read-status",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911544439,
+        "summary": "文件路径 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\课表.html 被成功读取，当前大小为 124517 字节，共 3641 行",
+        "evidenceCount": 1,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(1)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1482,
+        "key": "user-cancels-school-connection",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911544439,
+        "summary": "用户决定取消连接学校教务的意图，收束到纯离线版本",
+        "evidenceCount": 1,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(1)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1662,
+        "key": "deepseek-fish-dir-path",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911742461,
+        "summary": "新创建的目录路径为 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish",
+        "evidenceCount": 9,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(9)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1663,
+        "key": "deepseek-fish-svg-file",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911742461,
+        "summary": "文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\fish-ride.svg 被成功写入并编辑，最终大小为 25978 字节，SHA8 为 c7a0c0b3",
+        "evidenceCount": 9,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(9)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1664,
+        "key": "deepseek-fish-index-html",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911742461,
+        "summary": "文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\index.html 被成功写入，大小为 1513 字节，SHA8 为 fd5b2c05",
+        "evidenceCount": 9,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(9)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1665,
+        "key": "user-request-deepseek-fish-animation",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792911742461,
+        "summary": "用户要求制作一个DEEPSEEK大肥鱼骑着用户撒欢的SVG动画，该请求已触发文件创建与编辑流程",
+        "evidenceCount": 9,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(9)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1725,
+        "key": "deepseek-fish-svg-read-status",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912125312,
+        "summary": "文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\fish-ride.svg 被成功读取，当前大小为 28716 字节，共 550 行，SHA8 为 20ccbba0",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1726,
+        "key": "deepseek-fish-svg-edit-success",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912125312,
+        "summary": "文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\fish-ride.svg 成功编辑，最终大小为 29254 字节，SHA8 为 d74a0212",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1727,
+        "key": "deepseek-fish-hero-block-write",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912125312,
+        "summary": "文件 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish\\_hero-block.txt 被成功写入，大小为 13722 字节，SHA8 为 b95af5d1",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1728,
+        "key": "deepseek-fish-edge-launch",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912125312,
+        "summary": "命令成功启动 Microsoft Edge 浏览器，路径为 C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1737,
+        "key": "file-path-deepseek-fish",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912459173,
+        "summary": "文件路径为 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish，包含 fish-ride.svg、index.html 和 storyboard 相关文件",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1738,
+        "key": "deepseek-fish-file-sizes",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912459173,
+        "summary": "deepseek-fish 目录下文件大小：fish-ride.svg 29653 字节，index.html 1531 字节，preview-storyboard.png 860391 字节",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1739,
+        "key": "user-request-clear-svgs",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912459173,
+        "summary": "用户要求清除 TESTSPACE 除课表和 RCS 之外的所有 SVG 动画文件，包括 deepseek-fish 目录下的所有 SVG 文件",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 1740,
+        "key": "deepseek-fish-deletion-success",
+        "status": "active",
+        "sid": "3b43957e-b335-4274-9140-d4fd91c44a2a",
+        "updatedAt": 1792912459173,
+        "summary": "成功删除目录 C:\\Users\\Administrator\\Desktop\\TESTSPACE\\deepseek-fish 及其所有内容，包括 fish-ride.svg 和其他 SVG 文件",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": true,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 177,
+        "key": "test-command",
+        "status": "stale",
+        "sid": "70b1abe8-3780-4ad6-bf89-277674d8ba57",
+        "updatedAt": 1792817535734,
+        "summary": "执行的PowerShell命令用于读取C:\\Users\\Administrator\\Desktop\\TESTSPACE\\timetable\\课表.html文件中的JSON数据",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": false,
+        "insertedAsAssertion": false
+      },
+      {
+        "rowid": 178,
+        "key": "canary-deployment-ratio",
+        "status": "stale",
+        "sid": "70b1abe8-3780-4ad6-bf89-277674d8ba57",
+        "updatedAt": 1792817535734,
+        "summary": "灰度发布初始比例为 5%",
+        "evidenceCount": 20,
+        "inspectedFields": [
+          "compiledAt",
+          "confidence",
+          "evidence",
+          "model",
+          "summary"
+        ],
+        "inspected": {
+          "entityFieldsPresent": [],
+          "predicateFieldsPresent": [],
+          "evidenceType": "array(20)",
+          "structuredEvidence": false
+        },
+        "missingFields": [
+          "entity-reference",
+          "predicate",
+          "structured-evidence"
+        ],
+        "contentReason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "reason": "legacy-insight-content-unverifiable:entity-reference+predicate+structured-evidence",
+        "statusEligible": false,
+        "insertedAsAssertion": false
+      }
+    ]
+  },
+  "shadowRendering": {
+    "label": "SHADOW-ONLY production renderCurrent over the shadow ledger; never injected live",
+    "policy": "core renderer suppresses file.exists=false; legacy snapshots and non-probe facts are not current; conflicted facts are not injectable",
+    "budget": 4000,
+    "candidateFacts": 151,
+    "renderedFacts": 39,
+    "renderedLines": 39,
+    "renderedChars": 3982,
+    "renderedTextSha256": "98604a4bbb2eed5b09f0f9b81598747004ac069f6fd3b01dfeab93d8e0d2de08",
+    "overflowCount": 57,
+    "suppressedCount": 55,
+    "absenceMarkersInText": 0,
+    "missingPathLeakage": 0,
+    "missingPathTextLeakage": 0,
+    "probeErrorLeakage": 0,
+    "unverifiedInsightRows": 0,
+    "insightFactsInLedger": 0,
+    "legacyFactsInLedger": 0,
+    "missingContentFacts": 0,
+    "errorContentFacts": 0,
+    "missingPathFactsInLedger": 55,
+    "absenceMarkerFactsInLedger": 55,
+    "counterfactualAuditPresentOnlyFilter": {
+      "selectedFacts": 39,
+      "textSha256": "98604a4bbb2eed5b09f0f9b81598747004ac069f6fd3b01dfeab93d8e0d2de08",
+      "identicalToProduction": true
+    },
+    "text": "文件路径为 c:/users/administrator/desktop/testspace/timetable/package.json，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/package.json 的修改时间为 1792834434466.0088\n文件 c:/users/administrator/desktop/testspace/timetable/package.json 的 SHA-256 为 3769fffa6a8c3ac0d5d4af641411a632c433f349b558e22e44a6cb1c87858f48\n文件 c:/users/administrator/desktop/testspace/timetable/package.json 的大小为 368 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/readme.md，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/readme.md 的修改时间为 1792904751616.1816\n文件 c:/users/administrator/desktop/testspace/timetable/readme.md 的 SHA-256 为 e215149dec96cd49f52e175cab9dc361800a53522606ce3a2ac5b300a4bb56ba\n文件 c:/users/administrator/desktop/testspace/timetable/readme.md 的大小为 2017 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/app.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/app.mjs 的修改时间为 1792843380777.463\n文件 c:/users/administrator/desktop/testspace/timetable/server/app.mjs 的 SHA-256 为 be1e90abf56cb96aeb50c8104a5477e174d9515f1d447d22954920601e6607f5\n文件 c:/users/administrator/desktop/testspace/timetable/server/app.mjs 的大小为 14209 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/config.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/config.mjs 的修改时间为 1792843193508.01\n文件 c:/users/administrator/desktop/testspace/timetable/server/config.mjs 的 SHA-256 为 2ccc3a435758d6bd9874c2a404fc9e7d59a7cff483dd7b9496a4a8bd18a6517f\n文件 c:/users/administrator/desktop/testspace/timetable/server/config.mjs 的大小为 4301 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/core/errors.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/errors.mjs 的修改时间为 1792834444216.2236\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/errors.mjs 的 SHA-256 为 a32347231ad71a089eccea8e40ece7d7a314ae29d54695ed1a3d87bed4b7b721\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/errors.mjs 的大小为 1054 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/core/html.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/html.mjs 的修改时间为 1792843104910.1985\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/html.mjs 的 SHA-256 为 c05387c7b81c792266c907e303e5f7c3ea7a74fd1e21bc418d58778e6c895e60\n文件 c:/users/administrator/desktop/testspace/timetable/server/core/html.mjs 的大小为 3267 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/email.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/email.mjs 的修改时间为 1792834490172.71\n文件 c:/users/administrator/desktop/testspace/timetable/server/email.mjs 的 SHA-256 为 31ce1184ab0b60992a9b8460e5d9dd954173836652b462efda6e23a0b35a767c\n文件 c:/users/administrator/desktop/testspace/timetable/server/email.mjs 的大小为 2813 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/index.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/index.mjs 的修改时间为 1792841392078.6667\n文件 c:/users/administrator/desktop/testspace/timetable/server/index.mjs 的 SHA-256 为 3863389c76a6641f0aa28f5431c4a0bae9a078a18ff348e1e5c2b1e7d2ee281c\n文件 c:/users/administrator/desktop/testspace/timetable/server/index.mjs 的大小为 7921 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/jwxt.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/jwxt.mjs 的修改时间为 1792840159391.2085\n文件 c:/users/administrator/desktop/testspace/timetable/server/jwxt.mjs 的 SHA-256 为 97b64a18e4e1fbed2c68488c7d4c0442f86f3c5c9b0b97d9c24540f2c9be109c\n文件 c:/users/administrator/desktop/testspace/timetable/server/jwxt.mjs 的大小为 21486 字节\n文件路径为 c:/users/administrator/desktop/testspace/timetable/server/portal.mjs，当前存在\n文件 c:/users/administrator/desktop/testspace/timetable/server/portal.mjs 的修改时间为 1792834485197.6487\n文件 c:/users/administrator/desktop/testspace/timetable/server/portal.mjs 的 SHA-256 为 6f1fdd1f54c5c896e62d36f8a7165df67aabcc38d614dfc93dcc3745a8ede230"
+  },
+  "syntheticContentProof": {
+    "label": "isolated owned-directory counterexample; removed after measurement",
+    "sameSize": true,
+    "sameMtime": true,
+    "hashesDiffer": true,
+    "forceHashCurrentFactUpdated": true,
+    "sha256Before": "61be55a8e2f6b4e172338bddf184d6dbee29c98853e0a0485ecee7f27b9af0b4",
+    "sha256After": "81cc5b17018674b401b42f35ba07bb79e211239c23bffe658da1577e3e646877",
+    "size": 4,
+    "mtime": 1767225600000,
+    "error": null
+  },
+  "evidence": {
+    "migratedRows": 79,
+    "probesAttempted": 79,
+    "uniqueProbedPaths": 79,
+    "present": 24,
+    "presentHashed": 24,
+    "missing": 55,
+    "errors": 0,
+    "missingContentFacts": 0,
+    "errorContentFacts": 0,
+    "candidateFacts": 151,
+    "productionSelected": 39,
+    "productionTextLength": 3982,
+    "absenceMarkersInText": 0,
+    "productionMissingLeaks": 0,
+    "productionErrorLeaks": 0,
+    "productionUnverified": 0,
+    "missingPathFactsInLedger": 55,
+    "absenceMarkerFactsInLedger": 55,
+    "sourceInsightRows": 25,
+    "rejectedInsights": 25,
+    "insightsWithContentReasons": 25,
+    "insightRowIdsMatch": true,
+    "archiveAssertions": 0,
+    "legacyCurrentFacts": 0,
+    "unplacedLegacy": 79,
+    "sourceFileBytesUnchanged": true,
+    "sourceSha256Before": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a",
+    "sourceSha256After": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a",
+    "sourceSizeBefore": 10457088,
+    "sourceSizeAfter": 10457088,
+    "sourceWriteRejected": true,
+    "sourceWriteProbe": {
+      "attempted": true,
+      "rejected": true,
+      "stage": "create",
+      "code": "ERR_SQLITE_ERROR",
+      "message": "attempt to write a readonly database"
+    },
+    "sourceClosedRejectsQueries": true,
+    "migrationStartedAfterClose": true,
+    "outputsDistinctFromSource": true,
+    "syntheticSameSize": true,
+    "syntheticSameMtime": true,
+    "syntheticHashesDiffer": true,
+    "syntheticForceHashPassed": true,
+    "syntheticSha256Before": "61be55a8e2f6b4e172338bddf184d6dbee29c98853e0a0485ecee7f27b9af0b4",
+    "syntheticSha256After": "81cc5b17018674b401b42f35ba07bb79e211239c23bffe658da1577e3e646877"
+  },
+  "preconditions": [
+    {
+      "name": "migrated-rows-present",
+      "kind": "precondition",
+      "required": "migrated legacy file_state rows > 0",
+      "observed": {
+        "migratedRows": 79
+      },
+      "ok": true
+    },
+    {
+      "name": "probe-outcomes-partition-migrated",
+      "kind": "precondition",
+      "required": "probesAttempted === migratedRows and present + missing + errors === migratedRows",
+      "observed": {
+        "migratedRows": 79,
+        "probesAttempted": 79,
+        "present": 24,
+        "missing": 55,
+        "errors": 0,
+        "outcomeSum": 79
+      },
+      "ok": true
+    },
+    {
+      "name": "unique-probed-paths-equal-migrated",
+      "kind": "precondition",
+      "required": "unique probed paths === migratedRows (not path group count)",
+      "observed": {
+        "uniqueProbedPaths": 79,
+        "migratedRows": 79
+      },
+      "ok": true
+    },
+    {
+      "name": "present-paths-force-hashed",
+      "kind": "precondition",
+      "required": "present > 0 and present force-hash count === present",
+      "observed": {
+        "present": 24,
+        "presentHashed": 24
+      },
+      "ok": true
+    }
+  ],
+  "checks": [
+    {
+      "name": "missing-content-facts-not-current",
+      "kind": "content",
+      "ok": true,
+      "observed": {
+        "missingContentFacts": 0,
+        "missingPaths": 55,
+        "missingPathFactsInLedger": 55
+      }
+    },
+    {
+      "name": "probe-errors-do-not-leak-content",
+      "kind": "content",
+      "ok": true,
+      "observed": {
+        "errorContentFacts": 0,
+        "productionErrorLeaks": 0
+      }
+    },
+    {
+      "name": "production-render-no-absence-markers",
+      "kind": "render",
+      "ok": true,
+      "observed": {
+        "absenceMarkerFactsInLedger": 55,
+        "absenceMarkersInText": 0
+      }
+    },
+    {
+      "name": "production-render-no-missing-path-leakage",
+      "kind": "render",
+      "ok": true,
+      "observed": {
+        "missingPaths": 55,
+        "missingPathFactsInLedger": 55,
+        "productionMissingLeaks": 0
+      }
+    },
+    {
+      "name": "production-render-verified-facts-only",
+      "kind": "render",
+      "ok": true,
+      "observed": {
+        "productionUnverified": 0
+      }
+    },
+    {
+      "name": "production-render-nonempty",
+      "kind": "render",
+      "ok": true,
+      "observed": {
+        "candidateFacts": 151,
+        "productionSelected": 39,
+        "productionTextLength": 3982
+      }
+    },
+    {
+      "name": "insights-not-inserted-as-assertions",
+      "kind": "content",
+      "ok": true,
+      "observed": {
+        "sourceInsightRows": 25,
+        "rejectedInsights": 25,
+        "insightsWithContentReasons": 25,
+        "archiveAssertions": 0,
+        "insightRowIdsMatch": true
+      }
+    },
+    {
+      "name": "legacy-snapshots-derive-no-current-facts",
+      "kind": "content",
+      "ok": true,
+      "observed": {
+        "legacyCurrentFacts": 0,
+        "unplacedLegacy": 79,
+        "migratedRows": 79
+      }
+    },
+    {
+      "name": "source-file-bytes-unchanged",
+      "kind": "isolation",
+      "ok": true,
+      "observed": {
+        "sha256Before": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a",
+        "sha256After": "7d39bb122dd585f568ed85538a150668ffb762d024f812302b364ea6f207894a",
+        "sizeBefore": 10457088,
+        "sizeAfter": 10457088
+      }
+    },
+    {
+      "name": "source-connection-rejects-write",
+      "kind": "isolation",
+      "ok": true,
+      "observed": {
+        "attempted": true,
+        "rejected": true,
+        "stage": "create",
+        "code": "ERR_SQLITE_ERROR",
+        "message": "attempt to write a readonly database"
+      }
+    },
+    {
+      "name": "source-closed-before-migration",
+      "kind": "isolation",
+      "ok": true,
+      "observed": {
+        "sourceClosedRejectsQueries": true,
+        "migrationStartedAfterClose": true
+      }
+    },
+    {
+      "name": "output-databases-distinct-from-source",
+      "kind": "isolation",
+      "ok": true,
+      "observed": {
+        "outputsDistinctFromSource": true
+      }
+    },
+    {
+      "name": "same-size-same-mtime-content-change-detected",
+      "kind": "reconciliation",
+      "ok": true,
+      "observed": {
+        "syntheticSameSize": true,
+        "syntheticSameMtime": true,
+        "syntheticHashesDiffer": true,
+        "syntheticForceHashPassed": true,
+        "syntheticSha256Before": "61be55a8e2f6b4e172338bddf184d6dbee29c98853e0a0485ecee7f27b9af0b4",
+        "syntheticSha256After": "81cc5b17018674b401b42f35ba07bb79e211239c23bffe658da1577e3e646877"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "name": "live-profile-unchanged",
+      "measured": false,
+      "includedInVerdict": false,
+      "statement": "No profile file is read or written here. The measured proxy is the live database SHA-256 before/after."
+    },
+    {
+      "name": "no-live-injection-call",
+      "measured": false,
+      "includedInVerdict": false,
+      "statement": "Production rendering is invoked on the shadow ledger only; no live injection path is called."
+    }
+  ],
+  "checkSummary": {
+    "preconditionsPassed": 4,
+    "preconditionsTotal": 4,
+    "checksPassed": 13,
+    "checksTotal": 13,
+    "assertionsExcludedFromVerdict": 2
+  }
+}

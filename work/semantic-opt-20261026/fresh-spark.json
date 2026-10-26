@@ -1,0 +1,345 @@
+{
+  "policyVersion": "durable-v1",
+  "promptVersion": "p2-durable",
+  "model": "spark-x2.6",
+  "negatives": 10,
+  "negativesSkipped": 10,
+  "modelCalls": 14,
+  "positives": 14,
+  "contentRate": 1,
+  "predicateRate": 1,
+  "predicateAdjustments": 1,
+  "rows": [
+    {
+      "id": "T1",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "T2",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "T3",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "T4",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "T5",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "T6",
+      "class": "task",
+      "status": "skipped",
+      "reason": "transient"
+    },
+    {
+      "id": "T7",
+      "class": "task",
+      "status": "skipped",
+      "reason": "transient"
+    },
+    {
+      "id": "T8",
+      "class": "task",
+      "status": "skipped",
+      "reason": "task-assignment"
+    },
+    {
+      "id": "C1",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3068,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "业务规则：金额一律使用整数分。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C1:m1\",\"quote\":\"业务规则：金额一律使用整数分。\"}}]}"
+    },
+    {
+      "id": "C2",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3386,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "项目约定：折扣统一用基点，10000 表示 100%。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C2:m1\",\"quote\":\"项目约定：折扣统一用基点，10000 表示 100%。\"}}]}"
+    },
+    {
+      "id": "C3",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3119,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "业务规则：折扣金额四舍五入到分。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C3:m1\",\"quote\":\"业务规则：折扣金额四舍五入到分。\"}}]}"
+    },
+    {
+      "id": "C4",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3361,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "结算顺序约定：先应用折扣再扣固定优惠券。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C4:m1\",\"quote\":\"结算顺序约定：先应用折扣再扣固定优惠券。\"}}]}"
+    },
+    {
+      "id": "C5",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3090,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "优惠券最多抵扣折扣后金额的 50%",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C5:m1\",\"quote\":\"优惠券最多抵扣折扣后金额的 50%\"}}]}"
+    },
+    {
+      "id": "C6",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3249,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "不在生产代码引入第三方依赖。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C6:m1\",\"quote\":\"不在生产代码引入第三方依赖。\"}}]}"
+    },
+    {
+      "id": "C7",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3020,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "测试约定：所有测试统一使用 node:test。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C7:m1\",\"quote\":\"测试约定：所有测试统一使用 node:test。\"}}]}"
+    },
+    {
+      "id": "C8",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 2521,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "以后所有金额字段都以 cents 结尾。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C8:m1\",\"quote\":\"以后所有金额字段都以 cents 结尾。\"}}]}"
+    },
+    {
+      "id": "C9",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3169,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "接口约定：错误响应统一使用 JSON。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C9:m1\",\"quote\":\"接口约定：错误响应统一使用 JSON。\"}}]}"
+    },
+    {
+      "id": "C10",
+      "class": "constraint",
+      "status": "scored",
+      "elapsedMs": 3062,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.constraint",
+          "quote": "部署约定：生产环境不允许写入本地磁盘。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"C10:m1\",\"quote\":\"部署约定：生产环境不允许写入本地磁盘。\"}}]}"
+    },
+    {
+      "id": "P1",
+      "class": "preference",
+      "status": "scored",
+      "elapsedMs": 2980,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.preference",
+          "quote": "以后回答先给结论，再给细节。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.preference\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"P1:m1\",\"quote\":\"以后回答先给结论，再给细节。\"}}]}"
+    },
+    {
+      "id": "P2",
+      "class": "preference",
+      "status": "scored",
+      "elapsedMs": 3030,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.decision",
+          "quote": "我们决定数据库使用 SQLite，不引入 PostgreSQL。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.decision\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"P2:m1\",\"quote\":\"我们决定数据库使用 SQLite，不引入 PostgreSQL。\"}}]}"
+    },
+    {
+      "id": "P3",
+      "class": "preference",
+      "status": "scored",
+      "elapsedMs": 3260,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.preference",
+          "quote": "文件命名统一用 kebab-case。",
+          "adjustment": {
+            "from": "project.constraint",
+            "to": "project.preference",
+            "rule": "interaction-cue",
+            "policyVersion": "durable-v1"
+          }
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.constraint\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"P3:m1\",\"quote\":\"文件命名统一用 kebab-case。\"}}]}"
+    },
+    {
+      "id": "P4",
+      "class": "preference",
+      "status": "scored",
+      "elapsedMs": 3350,
+      "finish": "stop",
+      "rawProposals": 1,
+      "accepted": [
+        {
+          "predicate": "project.preference",
+          "quote": "遇到不确定时先提问，不要猜。",
+          "adjustment": null
+        }
+      ],
+      "rejected": [],
+      "content": true,
+      "predicate": true,
+      "raw": "{\"proposals\":[{\"op\":\"assert\",\"predicate\":\"project.preference\",\"targetAssertionId\":null,\"evidence\":{\"eventKey\":\"P4:m1\",\"quote\":\"遇到不确定时先提问，不要猜。\"}}]}"
+    },
+    {
+      "id": "Q1",
+      "class": "question",
+      "status": "skipped",
+      "reason": "question"
+    },
+    {
+      "id": "Q2",
+      "class": "question",
+      "status": "skipped",
+      "reason": "question"
+    }
+  ]
+}

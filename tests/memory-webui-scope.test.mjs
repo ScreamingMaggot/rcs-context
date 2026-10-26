@@ -1,6 +1,6 @@
 // 记忆面板的“会话 / 工作区”维度：标签、当前标记、范围筛选。
 // 运行：node tests/memory-webui-scope.test.mjs
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -67,6 +67,8 @@ mod.default.apply({
 const statusRoute = routes.find((r) => r.path === '/api/memory/status')
 const evidenceRoute = routes.find((r) => r.path === '/api/memory/evidence')
 const graphRoute = routes.find((r) => r.path === '/api/memory/graph')
+const configRoute = routes.find((r) => r.path === '/api/memory/config')
+const janitorRoute = routes.find((r) => r.path === '/api/memory/janitor')
 const call = (route, url) => new Promise((resolve) => {
   const req = Readable.from([])
   req.method = 'GET'; req.url = url; req.headers = { host: '127.0.0.1:8080' }
@@ -258,6 +260,117 @@ const keys = (xs) => (xs || []).map((x) => x.key)
   const gLimit = (await getGraph('/api/memory/graph?range=all&factLimit=2')).body
   check('⑫ 图谱端点支持 factLimit 分页', gLimit.graph.stats.factLimit === 2 && gLimit.graph.stats.facts <= 2,
     JSON.stringify({ limit: gLimit.graph.stats.factLimit, facts: gLimit.graph.stats.facts }))
+}
+
+// ⑬ Phase A 文件巡检 + Phase 3 向量诊断：status/config/手动触发数据面。
+const post = (route, url, body, host = '127.0.0.1:8080') => new Promise((resolve) => {
+  const req = Readable.from([Buffer.from(JSON.stringify(body || {}))])
+  req.method = 'POST'
+  req.url = url
+  req.headers = { host, 'content-type': 'application/json' }
+  const res = {
+    code: 0,
+    writeHead(c) { this.code = c },
+    end(buf) { resolve({ code: this.code, body: JSON.parse(String(buf || '{}')) }) },
+  }
+  route.handler(req, res)
+})
+{
+  const s = (await get('/api/memory/status?sessionId=session-s1')).body
+  check('⑬ 向量诊断默认关闭', !!s.vector && s.vector.state === 'off' && s.vector.rows === 0 && s.vector.pending === 0,
+    JSON.stringify(s.vector))
+  check('⑬ 巡检默认关闭且 30 分钟', !!s.janitor && s.janitor.enabled === false && s.janitor.intervalMs === 1800000,
+    JSON.stringify(s.janitor))
+}
+{
+  const dir = join(state, '.memory')
+  mkdirSync(join(dir, 'janitor-last'), { recursive: true })
+  mkdirSync(join(dir, 'janitor-inflight'), { recursive: true })
+  writeFileSync(join(dir, 'janitor-last', 's1.json'), JSON.stringify({
+    ok: true, skipped: false, at: Date.now(), trigger: 'manual', workspace: 'c:/work/alpha', facts: 10,
+    ops: { refresh: 2, forget: 1, rejected: 0, failed: 0 }, model: { provider: 'p', model: 'm', via: 'janitor' }, ms: 10,
+  }))
+  writeFileSync(join(dir, 'janitor-inflight', 's1.json'), JSON.stringify({ at: Date.now(), trigger: 'manual', facts: 10, stage: 'llm' }))
+  const s = (await get('/api/memory/status?sessionId=session-s1')).body
+  check('⑬ status 回传上次巡检与在飞', s.janitor.last?.ops?.refresh === 2 && s.janitor.inflight?.stage === 'llm',
+    JSON.stringify({ l: s.janitor.last, i: s.janitor.inflight }))
+  check('⑬ 无会话时不串其它会话的巡检结果', (await get('/api/memory/status')).body.janitor.last === null)
+  writeFileSync(join(dir, 'janitor-inflight', 's1.json'), JSON.stringify({ at: Date.now() - 11 * 60000, trigger: 'auto', facts: 1, stage: 'llm' }))
+  check('⑬ 陈旧在飞标记忽略', (await get('/api/memory/status?sessionId=session-s1')).body.janitor.inflight === null)
+}
+{
+  // Phase 4 轨迹详情：前缀路由必须以路径段结尾（宿主匹配是 pathname===prefix 或 prefix+'/'）。
+  // 旧值 '/api/memory/traces/' 要求双斜杠 ⇒ 详情请求落到宿主纯文本 404，面板报 JSON 解析错。
+  const tracePrefix = routes.find((r) => r.kind === 'prefix' && r.path === '/api/memory/traces')
+  const matchPrefix = (p, x) => x === p || x.startsWith(p + '/')
+  check('⑬ 轨迹详情前缀路由可被宿主匹配', !!tracePrefix
+    && matchPrefix(tracePrefix.path, '/api/memory/traces/123')
+    && !matchPrefix(tracePrefix.path, '/api/memory/tracesx'), tracePrefix && tracePrefix.path)
+  const callTrace = (url) => new Promise((resolve) => {
+    const req = Readable.from([])
+    req.method = 'GET'; req.url = url; req.headers = { host: '127.0.0.1:8080' }
+    const res = {
+      code: 0,
+      writeHead(c) { this.code = c },
+      end(buf) { resolve({ code: this.code, body: JSON.parse(String(buf || '{}')) }) },
+    }
+    tracePrefix.handler(req, res)
+  })
+  const missing = await callTrace('/api/memory/traces/999999')
+  check('⑬ 轨迹详情缺行返回 JSON（不是宿主纯文本）',
+    (missing.code === 404 && missing.body?.error === 'not-found')
+    || (missing.code === 200 && missing.body?.available === false && missing.body?.trace === null),
+    JSON.stringify(missing))
+  const badId = await callTrace('/api/memory/traces/not-a-number')
+  check('⑬ 轨迹详情非法 id 返回 JSON 404', badId.code === 404 && badId.body?.error === 'not-found',
+    JSON.stringify(badId))
+}
+{
+  const dir = join(state, '.memory')
+  const mdb = new DatabaseSync(join(root, 'memory.sqlite'))
+  mdb.prepare("INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)").run('lastSid:c:/work/alpha', 's2nd')
+  mdb.close()
+  writeFileSync(join(dir, 'janitor-last', 's2nd.json'), JSON.stringify({
+    ok: true, skipped: false, at: Date.now(), trigger: 'auto', workspace: 'c:/work/alpha', facts: 3,
+    ops: { refresh: 1, forget: 0, rejected: 0, failed: 0 }, model: { provider: 'p', model: 'm', via: 'janitor' }, ms: 5,
+  }))
+  unlinkSync(join(dir, 'janitor-last', 's1.json'))
+  const fb = (await get('/api/memory/status?sessionId=session-s1')).body
+  check('⑬ 无本会话记录时回退工作区最近一次', fb.janitor.last?.ops?.refresh === 1 && fb.janitor.last?.fromSid === 's2nd',
+    JSON.stringify(fb.janitor.last))
+  writeFileSync(join(dir, 'janitor-last', 's1.json'), JSON.stringify({
+    ok: true, skipped: false, at: Date.now(), trigger: 'manual', workspace: 'c:/work/alpha', facts: 1,
+    ops: { refresh: 9, forget: 0, rejected: 0, failed: 0 }, ms: 1,
+  }))
+  const own = (await get('/api/memory/status?sessionId=session-s1')).body
+  check('⑬ 本会话记录优先于工作区回退', own.janitor.last?.ops?.refresh === 9 && own.janitor.last?.fromSid === undefined,
+    JSON.stringify(own.janitor.last))
+}
+{
+  const r = await post(janitorRoute, '/api/memory/janitor', { sessionId: 'session-s1' })
+  const f = join(state, '.memory', 'janitor-request', 's1.json')
+  check('⑬ 立即巡检写入请求文件', r.code === 202 && r.body.ok === true && existsSync(f)
+    && JSON.parse(readFileSync(f, 'utf8')).sessionId === 's1', JSON.stringify(r))
+  const bad = await post(janitorRoute, '/api/memory/janitor', {})
+  check('⑬ 缺 sessionId 返回 400', bad.code === 400 && bad.body.error === 'missing-sessionId')
+  const remote = await post(janitorRoute, '/api/memory/janitor', { sessionId: 's1' }, 'evil.example:80')
+  check('⑬ 非本机来源拒绝触发', remote.code === 403)
+}
+{
+  const before = JSON.parse(readFileSync(join(state, 'control.json'), 'utf8'))
+  const r = await post(configRoute, '/api/memory/config', {
+    memoryJanitorEnabled: true, memoryJanitorIntervalMs: 900000,
+    memoryJanitorProvider: 'p', memoryJanitorModel: 'm',
+  })
+  const c = JSON.parse(readFileSync(join(state, 'control.json'), 'utf8'))
+  check('⑬ 配置写入巡检开关/间隔/成对路由', r.code === 200 && r.body.ok === true && c.memoryJanitorEnabled === true
+    && c.memoryJanitorIntervalMs === 900000 && c.memoryJanitorProvider === 'p' && c.memoryJanitorModel === 'm'
+    && r.body.flags.janitorEnabled === true && r.body.janitorRoute?.model === 'm',
+    JSON.stringify({ c, flags: r.body.flags, route: r.body.janitorRoute }))
+  await post(configRoute, '/api/memory/config', { memoryJanitorProvider: '', memoryJanitorModel: '' })
+  const c2 = JSON.parse(readFileSync(join(state, 'control.json'), 'utf8'))
+  check('⑬ 空值清除巡检路由', !('memoryJanitorProvider' in c2) && !('memoryJanitorModel' in c2), JSON.stringify(c2))
+  writeFileSync(join(state, 'control.json'), JSON.stringify(before), 'utf8')
 }
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)

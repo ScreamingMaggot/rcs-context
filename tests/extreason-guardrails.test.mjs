@@ -21,7 +21,8 @@ mkdirSync(join(root, 'state-c'), { recursive: true })
 // 内部常量/函数未导出 ⇒ 复制一份并在末尾追加导出（不改动仓库源文件）
 const EXPORTS = '\nexport const __t = { READONLY, subagentStartKind, PERSONA, groundBriefRows, TURN_TIMEOUT_MS, TOOL_TIMEOUT_MS, STEER_AT,'
   + ' MAX_BRIEF_CHARS, MAX_BRIEF_ROWS, MAX_BRIEF_ROW, CHILD_LABEL, DIGEST_ON, DIGEST_CLAMP,'
-  + ' parseBriefRows, extractTargets, buildDigest, maxSeqOf, toolResultInfo, pickChildBrief, trivialContinuation, IDLE_SKIP }\n'
+  + ' parseBriefRows, extractTargets, buildDigest, maxSeqOf, toolResultInfo, pickChildBrief, trivialContinuation, IDLE_SKIP,'
+  + ' isSubagentSession, guardExtraTools, pickRecoverableChild }\n'
 const src = readFileSync(join(SRC, 'web', 'extreason.mjs'), 'utf8')
 writeFileSync(join(root, 'ext-a.mjs'), src + EXPORTS, 'utf8')
 writeFileSync(join(root, 'ext-b.mjs'), src + EXPORTS, 'utf8')
@@ -65,6 +66,52 @@ check('① 无子代理 API ⇒ none（干净跳过）', A.subagentStartKind({})
 check('① 记忆取证提示：默认 project scope、不误限 kind、空结果不许猜',
   /default project scope/.test(A.PERSONA) && /omit kind/.test(A.PERSONA)
   && /count 0/.test(A.PERSONA) && /Never guess/.test(A.PERSONA))
+
+/* ── ①b 防递归：子会话首条 pre-step 早于进程内登记 ─────────────────────── */
+check('①b 0.2.1 的 header.parentSession 直接认作子会话',
+  A.isSubagentSession({ sid: 'c1', header: { parentSession: 'p1' } }) === true)
+check('①b 父会话自己（parentSession === sid）不误判',
+  A.isSubagentSession({ sid: 'p1', header: { parentSession: 'p1' } }) === false)
+check('①b startingFor 兜住“子会话已开跑、childId 还没返回”的窗口',
+  A.isSubagentSession({ sid: 'c1', header: { parentSession: 'p1' } }, new Set(), new Set(['p1'])) === true)
+check('①b 老宿主的 meta.delegationDepth / origin 仍生效',
+  A.isSubagentSession({ sid: 'c1', meta: { delegationDepth: 1 } }) === true
+  && A.isSubagentSession({ sid: 'c2', meta: { origin: 'subagent' } }) === true)
+check('①b 普通主会话不误判', A.isSubagentSession({ sid: 'm1', meta: {}, header: {}, options: {} }) === false)
+check('①b descriptor 一到就先登记子会话（不等 startChild 返回）',
+  /event\?\.type === 'subagent\/descriptor'[\s\S]{0,240}childSessions\.add\(sid\)/.test(src))
+
+/* ── ①c scoped 工具无法隐藏时：装 guard 拒绝执行 ───────────────────────── */
+{
+  const fns = []
+  const fakeTools = { guard(fn) { fns.push(fn); return () => { fns.splice(fns.indexOf(fn), 1) } } }
+  const guarded = A.guardExtraTools(fakeTools, ['subagent'], 'read-only sub-session')
+  check('①c scoped 额外工具被 guard 拦截', guarded.join(',') === 'subagent' && fns.length === 1
+    && fns[0]({ name: 'subagent' }) === 'read-only sub-session'
+    && fns[0]({ name: 'read' }) === undefined)
+  check('①c 没有额外工具时不装 guard', A.guardExtraTools(fakeTools, []).length === 0 && fns.length === 1)
+  check('①c 宿主没有 guard 能力时显式失败，不静默放行', (() => {
+    try { A.guardExtraTools({}, ['subagent']); return false } catch (e) { return /guard unavailable/.test(String(e?.message)) }
+  })())
+
+/* ── ①d 持久子会话恢复：0.2.1 目录形状没有 id/kind ─────────────────────── */
+check('①d 0.2.1 的 {childId,mode,label} 可恢复（取最后一个）',
+  A.pickRecoverableChild([
+    { childId: 'c1', mode: 'continuable', label: '外部思考中' },
+    { childId: 'c2', mode: 'continuable', label: '外部思考中' },
+  ]) === 'c2')
+check('①d 旧宿主 {id,kind,mode,label} 仍可恢复',
+  A.pickRecoverableChild([{ id: 'old1', kind: 'child', mode: 'continuable', label: '外部思考中' }]) === 'old1')
+check('①d 一次性/别名/空列表不误选',
+  A.pickRecoverableChild([{ childId: 'once', mode: 'one-shot', label: '外部思考中' }]) === null
+  && A.pickRecoverableChild([{ childId: 'other', mode: 'continuable', label: '别的' }]) === null
+  && A.pickRecoverableChild([]) === null)
+check('①d 恢复走 pickRecoverableChild（不再按 kind 过滤）',
+  /pickRecoverableChild\(rows, CHILD_LABEL\)/.test(src))
+check('①d 恢复的子会话在首条 pre-step 重新收紧（进程重启后 guard 会丢）',
+  /childSessions\.has\(sid\) && !hardenedChildren\.has\(sid\)/.test(src)
+  && /await hardenChildAgent\(agent, sid\)/.test(src))
+}
 
 /* ── ② 预算常量（deck 第 5 页写死的三个数） ────────────────────────────── */
 check('② 整轮硬掐断 45s', A.TURN_TIMEOUT_MS === 45000, A.TURN_TIMEOUT_MS)

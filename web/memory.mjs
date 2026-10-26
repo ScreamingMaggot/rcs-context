@@ -23,6 +23,15 @@ import {
   fuseRRF, vecQueryEligible, vecSrcHash, embedBatch, probeEmbedder,
 } from './memory-vec.mjs'
 import { recordTrace, closeTraceRecorder } from './memory-trace.mjs'
+import {
+  runFileStatJanitor, janitorBusyNow, janitorSkipResult, writeJanitorLast,
+  janitorDir,
+} from './memory-janitor.mjs'
+
+export {
+  runFileStatJanitor, buildJanitorPrompt, applyJanitorOps, selectJanitorCandidates,
+  verifyPath, parseJanitorOps, JANITOR_DEFAULTS, janitorSkipResult,
+} from './memory-janitor.mjs'
 
 let DatabaseSync = null
 try { ({ DatabaseSync } = await import('node:sqlite')) } catch { /* Node < 22.5: layer stays off */ }
@@ -1727,6 +1736,66 @@ export class MemoryStore {
       }
     }
     return { resets, invalidated, stale, checked }
+  }
+
+  // 巡检候选：只读、不 stat。verifiedAt 缺失视为最旧；按 verifiedAt 升序截断。
+  selectJanitorCandidates(workspace, { limit = 10, minAgeMs = 24 * 3600_000, now = Date.now(), scan = 500 } = {}) {
+    const ws = this._normWs(workspace)
+    if (!ws) return []
+    const lim = Math.max(1, Math.min(50, Number(limit) || 10))
+    const scanN = Math.max(lim, Math.min(2000, Number(scan) || 500))
+    const cutoff = Number(now) - Math.max(0, Number(minAgeMs) || 0)
+    let rows = []
+    try {
+      rows = this.db.prepare(`SELECT rowid, scope, key, value FROM records
+        WHERE kind='file_state' AND scope=? AND status='active'
+        ORDER BY updated_ts ASC LIMIT ?`).all('ws:' + ws, scanN)
+    } catch { return [] }
+    const out = []
+    for (const r of rows) {
+      let v = {}
+      try { v = JSON.parse(r.value) ?? {} } catch { v = {} }
+      const has = Number.isFinite(Number(v?.verifiedAt)) && Number(v.verifiedAt) > 0
+      const verifiedAt = has ? Number(v.verifiedAt) : 0
+      if (has && verifiedAt >= cutoff) continue
+      out.push({
+        rowid: r.rowid, uri: rcsUriOf({ scope: r.scope, kind: 'file_state', key: r.key }),
+        scope: r.scope, key: r.key, value: v, verifiedAt,
+      })
+    }
+    return out.sort((a, b) => a.verifiedAt - b.verifiedAt).slice(0, lim)
+  }
+
+  // 只刷新核实时间，保留 value 里的其他字段；记录已不是 active file_state 时不动。
+  refreshFileStat(rowid, now = Date.now()) {
+    const id = Number(rowid)
+    if (!Number.isFinite(id)) return null
+    const r = this.db.prepare('SELECT rowid, kind, status, value FROM records WHERE rowid=?').get(id)
+    if (!r || r.kind !== 'file_state' || r.status !== 'active') return null
+    let v = {}
+    try { v = JSON.parse(r.value) ?? {} } catch { v = {} }
+    v.verifiedAt = Number(now)
+    this.db.prepare('UPDATE records SET value=?, updated_ts=?, status=? WHERE rowid=?')
+      .run(JSON.stringify(v), Number(now), 'active', id)
+    this._dirBump()
+    return { rowid: id, verifiedAt: Number(now) }
+  }
+
+  // 逻辑失效：写 staleAt/staleReason 并置 stale，不物理删除、不碰其他事实。
+  markFileStatStale(rowid, now = Date.now(), reason = 'file-missing') {
+    const id = Number(rowid)
+    if (!Number.isFinite(id)) return null
+    const r = this.db.prepare('SELECT rowid, kind, status, value FROM records WHERE rowid=?').get(id)
+    if (!r || r.kind !== 'file_state' || r.status !== 'active') return null
+    let v = {}
+    try { v = JSON.parse(r.value) ?? {} } catch { v = {} }
+    const why = String(reason ?? 'file-missing').slice(0, 120) || 'file-missing'
+    v.staleAt = Number(now)
+    v.staleReason = why
+    this.db.prepare('UPDATE records SET value=?, updated_ts=?, status=? WHERE rowid=?')
+      .run(JSON.stringify(v), Number(now), 'stale', id)
+    this._dirBump()
+    return { rowid: id, staleAt: Number(now), reason: why }
   }
 
   factTypeCounts(workspace) {
@@ -3647,6 +3716,13 @@ export function routeForConsolidate({ trigger = 'auto', lastRoute = null, ctrl =
   return routePair(ctrl?.memoryLlmProvider, ctrl?.memoryLlmModel, 'control')
 }
 
+// 巡检路由：成对 memoryJanitorProvider/Model 优先；否则沿自动整理路由。手动也不用强模型。
+export function routeForJanitor(ctrl = null, lastRoute = null) {
+  const own = routePair(ctrl?.memoryJanitorProvider, ctrl?.memoryJanitorModel, 'janitor')
+  if (own) return own
+  return routeForConsolidate({ trigger: 'auto', lastRoute, ctrl })
+}
+
 export function routeForCompile(session, ctrl) {
   const p = ctrl?.memoryLlmProvider
   const m = ctrl?.memoryLlmModel
@@ -4186,7 +4262,7 @@ const OUTPUT_OK = {
     path: { type: 'string' },
     truncated: { type: 'boolean' },
     hasMore: { type: 'boolean' },
-    nextCursor: { type: ['string', 'null'] },
+    nextCursor: { type: 'string', description: 'Cursor for the next page; omitted when hasMore=false.' },
     bytes: { type: 'integer' },
     nodes: { type: 'integer' },
     contentTrust: { type: 'string' },
@@ -4768,6 +4844,131 @@ function consolidateAutoOn(ctrl = controlNow()) {
   return ctrl?.memoryConsolidateAuto !== false
 }
 
+// ===== 文件巡检管家（Phase A）=====
+// 只处理“超过 24h 未核实”的 file_state；默认 30 分钟检查一次、每次最多 10 条。
+const JANITOR_DEFAULT_INTERVAL_MS = 30 * 60 * 1000
+export const JANITOR_FAIL_COOLDOWN_MS = 10 * 60 * 1000
+
+export function janitorEnabled(ctrl = controlNow()) {
+  if (process.env.DSH_MEMORY_JANITOR === '0') return false
+  if (process.env.DSH_MEMORY_JANITOR === '1') return true
+  return ctrl?.memoryJanitorEnabled === true
+}
+
+export function janitorIntervalMs(ctrl = controlNow()) {
+  const env = Number(process.env.DSH_MEMORY_JANITOR_INTERVAL_MS)
+  const raw = Number.isFinite(env) && env > 0 ? env : Number(ctrl?.memoryJanitorIntervalMs)
+  const n = Number.isFinite(raw) && raw > 0 ? raw : JANITOR_DEFAULT_INTERVAL_MS
+  return Math.max(60_000, Math.min(86_400_000, n))
+}
+
+export function janitorShouldRun({ ctrl = controlNow(), now = Date.now(), lastAt = 0, failAt = 0 } = {}) {
+  const intervalMs = janitorIntervalMs(ctrl)
+  if (!janitorEnabled(ctrl)) return { run: false, reason: 'disabled', intervalMs }
+  if (failAt > 0 && now - failAt < JANITOR_FAIL_COOLDOWN_MS) return { run: false, reason: 'cooldown', intervalMs }
+  if (lastAt > 0 && now - lastAt < intervalMs) return { run: false, reason: 'interval', intervalMs }
+  return { run: true, reason: 'ok', intervalMs }
+}
+
+export function janitorDueWorkspaces(store, { ctrl = controlNow(), now = Date.now(), limit = 50 } = {}) {
+  if (!janitorEnabled(ctrl)) return []
+  const cap = Math.max(1, Math.min(200, Number(limit) || 50))
+  const byWs = new Map()
+  try {
+    const rows = store.db.prepare("SELECT key, value FROM meta WHERE key LIKE 'lastEventAt:%' LIMIT ?").all(cap)
+    for (const row of rows) {
+      const ws = String(row.key).slice('lastEventAt:'.length)
+      if (ws) byWs.set(ws, Number(row.value) || 0)
+    }
+  } catch { /* 没有 meta 表时退回记录发现 */ }
+  // 历史库可能没有 lastEventAt，但仍有活跃 file_state；这类工作区同样需要巡检。
+  try {
+    const rows = store.db.prepare(
+      "SELECT scope, MAX(updated_ts) AS ts FROM records WHERE kind='file_state' AND status='active' AND scope LIKE 'ws:%' GROUP BY scope LIMIT ?",
+    ).all(cap)
+    for (const row of rows) {
+      const ws = String(row.scope ?? '').slice('ws:'.length)
+      if (ws && !byWs.has(ws)) byWs.set(ws, Number(row.ts) || 0)
+    }
+  } catch { /* 记录发现失败不影响 meta 发现 */ }
+  const out = []
+  for (const [ws, lastEventAt] of byWs) {
+    try {
+      const lastAt = Number(store.getMetaRaw('lastJanitorAt:' + ws) ?? 0)
+      const failAt = Number(store.getMetaRaw('janitorFailAt:' + ws) ?? 0)
+      const gate = janitorShouldRun({ ctrl, now, lastAt, failAt })
+      if (gate.run) out.push({ workspace: ws, lastAt, lastEventAt, intervalMs: gate.intervalMs })
+    } catch { /* 单个工作区失败不影响其它 */ }
+  }
+  return out.sort((a, b) => a.lastAt - b.lastAt).slice(0, cap)
+}
+
+function readLastRoute(store, ws) {
+  try {
+    const r = JSON.parse(store.getMetaRaw('lastRoute:' + ws) || 'null')
+    if (r?.provider && r?.model) return { provider: r.provider, model: r.model }
+  } catch { /* fall through */ }
+  return null
+}
+
+function workspaceForSid(store, sid) {
+  const s = normSid(sid)
+  try {
+    const rows = store.db.prepare("SELECT key, value FROM meta WHERE key LIKE 'lastSid:%'").all()
+    for (const r of rows) if (String(r.value) === s) return String(r.key).slice('lastSid:'.length)
+  } catch { /* fall through */ }
+  try {
+    const row = store.db.prepare("SELECT scope FROM records WHERE sid=? AND scope LIKE 'ws:%' LIMIT 1").get(s)
+    if (row?.scope) return String(row.scope).slice(3)
+  } catch { /* ignore */ }
+  return null
+}
+
+// 手动巡检：2s 轮询 janitor-request/。请求文件无论成败都删除，避免死循环。
+export async function processJanitorRequests({ store, llm = null, ctrl = controlNow(), trigger = 'manual', max = 5 } = {}) {
+  const dir = janitorDir(store, 'janitor-request')
+  let files = []
+  try { files = readdirSync(dir) } catch { return 0 }
+  let done = 0
+  for (const f of files.filter((x) => x.endsWith('.json')).slice(0, max)) {
+    const p = join(dir, f)
+    let j = {}
+    try { j = JSON.parse(readFileSync(p, 'utf8')) ?? {} } catch { j = {} }
+    const sid = normSid(j.sessionId || f.replace(/\.json$/, ''))
+    const reqWs = normPath(String(j.workspace ?? '')).toLowerCase().replace(/\/$/, '')
+    try {
+      if (!enabledNow(ctrl) || !llmEnabledNow(ctrl) || !janitorEnabled(ctrl)) {
+        writeJanitorLast(store, sid, janitorSkipResult('disabled', { trigger, workspace: reqWs }))
+        continue
+      }
+      const ws = reqWs || workspaceForSid(store, sid)
+      if (!ws) {
+        writeJanitorLast(store, sid, janitorSkipResult('no-workspace', { trigger }))
+        continue
+      }
+      if (janitorBusyNow()) {
+        writeJanitorLast(store, sid, janitorSkipResult('busy', { trigger, workspace: ws }))
+        continue
+      }
+      const route = routeForJanitor(ctrl, readLastRoute(store, ws))
+      if (!route) {
+        writeJanitorLast(store, sid, janitorSkipResult('no-route', { trigger, workspace: ws }))
+        continue
+      }
+      const r = await runFileStatJanitor({ store, llm, route, sid, workspace: ws, trigger })
+      try {
+        store.setMetaRaw('lastJanitorAt:' + ws, String(Date.now()))
+        if (r?.ok === false) store.setMetaRaw('janitorFailAt:' + ws, String(Date.now()))
+        else if (r?.ok && !r?.skipped) store.setMetaRaw('janitorFailAt:' + ws, '0')
+      } catch { /* best-effort */ }
+      done++
+    } finally {
+      try { rmSync(p, { force: true }) } catch { /* ignore */ }
+    }
+  }
+  return done
+}
+
 export default {
   name: 'MEMORY',
   inject: ['tools'],
@@ -5080,25 +5281,9 @@ export default {
     }
     // ===== 整理调度（0.1.39）=====
     // 自动：最后事件后空闲 idleMs（默认 15 分钟）且确有新事件/新重置；手动：请求文件，2s 内响应。
-    const routeForWs = (ws, trigger = 'auto') => {
-      let lastRoute = null
-      try {
-        const r = JSON.parse(store.getMetaRaw('lastRoute:' + ws) || 'null')
-        if (r?.provider && r?.model) lastRoute = { provider: r.provider, model: r.model }
-      } catch { /* fall through */ }
-      return routeForConsolidate({ trigger, lastRoute, ctrl: controlNow() })
-    }
-    const resolveWsForSid = (sid) => {
-      try {
-        const rows = store.db.prepare("SELECT key, value FROM meta WHERE key LIKE 'lastSid:%'").all()
-        for (const r of rows) if (String(r.value) === sid) return String(r.key).slice('lastSid:'.length)
-      } catch { /* fall through */ }
-      try {
-        const row = store.db.prepare("SELECT scope FROM records WHERE sid=? AND scope LIKE 'ws:%' LIMIT 1").get(sid)
-        if (row?.scope) return String(row.scope).slice(3)
-      } catch { /* ignore */ }
-      return null
-    }
+    const routeForWs = (ws, trigger = 'auto') =>
+      routeForConsolidate({ trigger, lastRoute: readLastRoute(store, ws), ctrl: controlNow() })
+    const resolveWsForSid = (sid) => workspaceForSid(store, sid)
     const runConsolidate = async ({ sid, ws, trigger }) => {
       const route = routeForWs(ws, trigger)
       if (!route) {
@@ -5117,12 +5302,9 @@ export default {
       return r
     }
     let autoBusy = false
-    const tickAuto = async () => {
-      if (autoBusy) return
-      autoBusy = true
+    const tickConsolidateAuto = async (c) => {
       try {
-        const c = controlNow()
-        if (!enabledNow(c) || !llmEnabledNow(c) || !consolidateAutoOn(c)) return
+        if (!llmEnabledNow(c) || !consolidateAutoOn(c)) return
         if (consolidator.busy.size) return
         const idleMs = consolidateIdleMs(c)
         const now = Date.now()
@@ -5152,6 +5334,45 @@ export default {
         }
       } catch (err) {
         console.error('[MEMORY] consolidate tick failed:', err?.message ?? err)
+      }
+    }
+    // 巡检独立调度：不受整理开关影响；每次 tick 最多跑 3 个工作区、一次只跑一个巡检。
+    const tickJanitorAuto = async (c) => {
+      try {
+        if (!llmEnabledNow(c) || !janitorEnabled(c) || janitorBusyNow()) return
+        const due = janitorDueWorkspaces(store, { ctrl: c })
+        for (const item of due.slice(0, 3)) {
+          const ws = item.workspace
+          const sid = normSid(store.getMetaRaw('lastSid:' + ws) || 'auto')
+          // 先推进检查时间：失败也不形成风暴；失败另记 10 分钟冷却。
+          try { store.setMetaRaw('lastJanitorAt:' + ws, String(Date.now())) } catch { /* ignore */ }
+          const route = routeForJanitor(c, readLastRoute(store, ws))
+          if (!route) {
+            writeJanitorLast(store, sid, janitorSkipResult('no-route', { trigger: 'auto', workspace: ws }))
+            continue
+          }
+          const r = await runFileStatJanitor({ store, llm: llmServiceOf(ctx), route, sid, workspace: ws, trigger: 'auto' })
+          try {
+            store.setMetaRaw('lastJanitorAt:' + ws, String(Date.now()))
+            if (r?.ok === false) store.setMetaRaw('janitorFailAt:' + ws, String(Date.now()))
+            else if (r?.ok && !r?.skipped) store.setMetaRaw('janitorFailAt:' + ws, '0')
+          } catch { /* best-effort */ }
+          if (r?.ok && !r?.skipped) break
+        }
+      } catch (err) {
+        console.error('[MEMORY] janitor tick failed:', err?.message ?? err)
+      }
+    }
+    const tickAuto = async () => {
+      if (autoBusy) return
+      autoBusy = true
+      try {
+        const c = controlNow()
+        if (!enabledNow(c)) return
+        await tickConsolidateAuto(c)
+        await tickJanitorAuto(c)
+      } catch (err) {
+        console.error('[MEMORY] auto tick failed:', err?.message ?? err)
       } finally { autoBusy = false }
     }
     let reqBusy = false
@@ -5182,10 +5403,21 @@ export default {
         console.error('[MEMORY] consolidate request failed:', err?.message ?? err)
       } finally { reqBusy = false }
     }
+    let janitorReqBusy = false
+    const tickJanitorRequests = async () => {
+      if (janitorReqBusy) return
+      janitorReqBusy = true
+      try {
+        await processJanitorRequests({ store, llm: llmServiceOf(ctx), ctrl: controlNow(), trigger: 'manual' })
+      } catch (err) {
+        console.error('[MEMORY] janitor request failed:', err?.message ?? err)
+      } finally { janitorReqBusy = false }
+    }
     const timers = []
     try {
       timers.push(setInterval(tickAuto, 30_000))
       timers.push(setInterval(tickRequests, 2_000))
+      timers.push(setInterval(tickJanitorRequests, 2_000))
       const kick = setTimeout(() => { tickAuto().catch(() => {}) }, 5_000)
       for (const t of timers) t.unref?.()
       kick.unref?.()

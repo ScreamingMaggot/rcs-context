@@ -1,0 +1,150 @@
+{
+  "version": "attribution-1",
+  "description": "Realistic Chinese user messages. One-off task instructions and questions expect no durable proposal; explicit durable rules expect one proposal.",
+  "cases": [
+    {
+      "id": "T1",
+      "class": "task",
+      "text": "你负责 commerce-core 的 pricing 子任务。先读取 README、src/money.js、src/pricing.js、tests/pricing.test.js。实现分级批量折扣：quantity >= 10 时 5%，quantity >= 20 时 10%。完成后运行测试并输出 [[DONE]]。",
+      "expected": []
+    },
+    {
+      "id": "T2",
+      "class": "task",
+      "text": "你负责 commerce-core 的 tax 子任务。实现区域税额：CN 1300 bps、US 825 bps、DE 1900 bps。未知区域必须拒绝。补足并运行 tax 测试。",
+      "expected": []
+    },
+    {
+      "id": "T3",
+      "class": "task",
+      "text": "请先读取 README 和最近 20 行日志，定位测试失败原因。不要修改 integration.test.js，完成后汇报。",
+      "expected": []
+    },
+    {
+      "id": "T4",
+      "class": "task",
+      "text": "请把结果写入 report.json，然后运行 node --test，并把失败列表贴出来。",
+      "expected": []
+    },
+    {
+      "id": "T5",
+      "class": "task",
+      "text": "先跑一遍测试，修复当前失败，再重新运行确认。不要调用 web 搜索。",
+      "expected": []
+    },
+    {
+      "id": "T6",
+      "class": "task",
+      "text": "这次先用 18888 端口启动服务，测试完就关掉。",
+      "expected": []
+    },
+    {
+      "id": "T7",
+      "class": "task",
+      "text": "临时把日志级别调成 debug，抓一次完整请求后恢复原设置。",
+      "expected": []
+    },
+    {
+      "id": "T8",
+      "class": "task",
+      "text": "请检查 pricing.js 和 tax.js 是否使用同一个 money 工具，并告诉我差异。",
+      "expected": []
+    },
+    {
+      "id": "C1",
+      "class": "constraint",
+      "text": "业务规则：金额一律使用整数分。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "金额一律使用整数分" }]
+    },
+    {
+      "id": "C2",
+      "class": "constraint",
+      "text": "项目约定：折扣统一用基点，10000 表示 100%。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "折扣统一用基点" }]
+    },
+    {
+      "id": "C3",
+      "class": "constraint",
+      "text": "业务规则：折扣金额四舍五入到分。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "折扣金额四舍五入到分" }]
+    },
+    {
+      "id": "C4",
+      "class": "constraint",
+      "text": "结算顺序约定：先应用折扣再扣固定优惠券。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "先应用折扣再扣固定优惠券" }]
+    },
+    {
+      "id": "C5",
+      "class": "constraint",
+      "text": "优惠券规则：优惠券最多抵扣折扣后金额的 50%。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "优惠券最多抵扣折扣后金额" }]
+    },
+    {
+      "id": "C6",
+      "class": "constraint",
+      "text": "项目约定：不在生产代码引入第三方依赖。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "不在生产代码引入第三方依赖" }]
+    },
+    {
+      "id": "C7",
+      "class": "constraint",
+      "text": "测试约定：所有测试统一使用 node:test。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "所有测试统一使用 node:test" }]
+    },
+    {
+      "id": "C8",
+      "class": "constraint",
+      "text": "以后所有金额字段都以 cents 结尾。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "金额字段都以 cents 结尾" }]
+    },
+    {
+      "id": "C9",
+      "class": "constraint",
+      "text": "接口约定：错误响应统一使用 JSON。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "错误响应统一使用 JSON" }]
+    },
+    {
+      "id": "C10",
+      "class": "constraint",
+      "text": "部署约定：生产环境不允许写入本地磁盘。",
+      "expected": [{ "predicate": "project.constraint", "phrase": "生产环境不允许写入本地磁盘" }]
+    },
+    {
+      "id": "P1",
+      "class": "preference",
+      "text": "以后回答先给结论，再给细节。",
+      "expected": [{ "predicate": "project.preference", "phrase": "先给结论" }]
+    },
+    {
+      "id": "P2",
+      "class": "preference",
+      "text": "我们决定数据库使用 SQLite，不引入 PostgreSQL。",
+      "expected": [{ "predicate": "project.decision", "phrase": "数据库使用 SQLite" }]
+    },
+    {
+      "id": "P3",
+      "class": "preference",
+      "text": "文件命名统一用 kebab-case。",
+      "expected": [{ "predicate": "project.preference", "phrase": "kebab-case" }]
+    },
+    {
+      "id": "P4",
+      "class": "preference",
+      "text": "遇到不确定时先提问，不要猜。",
+      "expected": [{ "predicate": "project.preference", "phrase": "先提问" }]
+    },
+    {
+      "id": "Q1",
+      "class": "question",
+      "text": "当前记录到哪些文件？",
+      "expected": []
+    },
+    {
+      "id": "Q2",
+      "class": "question",
+      "text": "金额和折扣规则是什么？",
+      "expected": []
+    }
+  ]
+}

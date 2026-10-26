@@ -35,6 +35,7 @@ function sqliteModule() {
 const truthy = (v) => v === true || v === '1'
 function memoryFlags(control, env = process.env) {
   const idleRaw = Number(env.DSH_MEMORY_CONSOLIDATE_IDLE_MS) || Number(control.memoryConsolidateIdleMs) || 15 * 60 * 1000
+  const janitorRaw = Number(env.DSH_MEMORY_JANITOR_INTERVAL_MS) || Number(control.memoryJanitorIntervalMs) || 30 * 60 * 1000
   return {
     enabled: env.DSH_MEMORY === '0' ? false : (truthy(env.DSH_MEMORY) || control.memoryEnabled === true),
     llmEnabled: env.DSH_MEMORY_LLM === '0' ? false : (truthy(env.DSH_MEMORY_LLM) || control.memoryLlmEnabled === true),
@@ -43,7 +44,15 @@ function memoryFlags(control, env = process.env) {
     consolidateAuto: env.DSH_MEMORY_CONSOLIDATE === '0' ? false
       : (env.DSH_MEMORY_CONSOLIDATE === '1' || control.memoryConsolidateAuto !== false),
     consolidateIdleMs: Math.max(60_000, Math.min(24 * 3600_000, idleRaw)),
+    janitorEnabled: env.DSH_MEMORY_JANITOR === '0' ? false
+      : (env.DSH_MEMORY_JANITOR === '1' || control.memoryJanitorEnabled === true),
+    janitorIntervalMs: Math.max(60_000, Math.min(24 * 3600_000, janitorRaw)),
+    janitorRoute: routePairOf(control.memoryJanitorProvider, control.memoryJanitorModel),
   }
+}
+// 路由覆盖必须成对；半配置视为未配置（与 memory.mjs 的 routePair 同口径）。
+function routePairOf(p, m) {
+  return typeof p === 'string' && p && typeof m === 'string' && m ? { provider: p, model: m } : null
 }
 // 环境变量是否真的把某一项钉死（与 web/memory.mjs 的解析同口径）：
 //   DSH_MEMORY / DSH_MEMORY_LLM 只认 '0'|'1'；DSH_MEMORY_INJECT 只认 '0'（'1' 不构成强制，默认本就为开）。
@@ -55,6 +64,7 @@ function envLockOf(env = process.env) {
     injectCatalog: env.DSH_MEMORY_INJECT === '0',
     handoff: env.DSH_MEMORY_HANDOFF === '0',
     consolidateAuto: env.DSH_MEMORY_CONSOLIDATE === '0' || env.DSH_MEMORY_CONSOLIDATE === '1',
+    janitorEnabled: env.DSH_MEMORY_JANITOR === '0' || env.DSH_MEMORY_JANITOR === '1',
   }
 }
 // 只读快照：任何一步失败都返回已有结构 + error，面板不空白。
@@ -86,8 +96,9 @@ async function memorySnapshot(sessionId = null, opts = {}) {
   const cursorRaw = String(opts.cursor ?? '')
   const cursorMatch = /^(\d{1,16}):(\d{1,16})$/.exec(cursorRaw)
   const cursor = cursorMatch ? { ts: Number(cursorMatch[1]), rowid: Number(cursorMatch[2]) } : null
+  const flags = memoryFlags(control)
   const out = {
-    flags: memoryFlags(control),
+    flags,
     db: { path: MEM_DB, exists: existsSync(MEM_DB), bytes: 0 },
     totals: { active: 0, resolved: 0, insights: 0, errors: 0, workspaces: 0 },
     range: reqRange,
@@ -103,7 +114,6 @@ async function memorySnapshot(sessionId = null, opts = {}) {
     inflight: sessionId ? readMemoryInflight(sessionId) : null,
     // 记忆整理：下次自动时间、进行中阶段、上次结果（均按会话存档；无会话时只有开关与间隔）。
     consolidate: (() => {
-      const flags = memoryFlags(control)
       const manualRoute = {
         provider: typeof control?.memoryConsolidateManualProvider === 'string' && control.memoryConsolidateManualProvider ? control.memoryConsolidateManualProvider : null,
         model: typeof control?.memoryConsolidateManualModel === 'string' && control.memoryConsolidateManualModel ? control.memoryConsolidateManualModel : null,
@@ -118,6 +128,18 @@ async function memorySnapshot(sessionId = null, opts = {}) {
         last: readJson(memSessionFile('consolidate-last', id)),
       }
     })(),
+    // 文件巡检管家：自动间隔、路由、最近一次结果与在飞标记（均按会话存档）。
+    janitor: (() => {
+      const base = { enabled: flags.janitorEnabled, intervalMs: flags.janitorIntervalMs, route: flags.janitorRoute, last: null, inflight: null }
+      if (!sessionId) return base
+      const id = normSid(sessionId)
+      return {
+        ...base,
+        last: readJson(memSessionFile('janitor-last', id)),
+        inflight: readJanitorInflight(id),
+      }
+    })(),
+    vector: null,
     session: null,
     // armed=记忆插件在本进程里真正 apply 过（meta.armedPid 与当前 pid 同号）；仅控制层启用还不够。
     armed: false,
@@ -134,6 +156,7 @@ async function memorySnapshot(sessionId = null, opts = {}) {
   try {
     db = tuneReadOnly(new sq.DatabaseSync(MEM_DB, { readOnly: true }))
     out.sqlite = true
+    out.vector = readVectorHealth(db)
     const one = (sql, ...args) => { try { return db.prepare(sql).get(...args) } catch { return null } }
     const all = (sql, ...args) => { try { return db.prepare(sql).all(...args) } catch { return [] } }
     // 作用域是否真实存在：未知会话不能因为构造出 sess:<sid> 就声称"当前上下文"。
@@ -280,6 +303,18 @@ async function memorySnapshot(sessionId = null, opts = {}) {
         records: wsCount.records + sessCount.records,
         insights: wsCount.insights + sessCount.insights,
       }
+    }
+    // 自动巡检结果按「工作区最近会话」落盘（lastSid:<ws>），新开的同工作区会话不是那个 sid。
+    // 当前会话没有自己的记录时回退到工作区最近一次，否则面板在新会话里永远显示“还没有巡检结果”。
+    if (knownSession && curWsScope && !out.janitor.last) {
+      try {
+        const sidRaw = one('SELECT value FROM meta WHERE key=?', 'lastSid:' + curWsScope.slice(3))?.value
+        const other = sidRaw ? normSid(sidRaw) : ''
+        if (other && other !== normSid(sessionId)) {
+          const rec = readJson(memSessionFile('janitor-last', other))
+          if (rec) out.janitor.last = { ...rec, fromSid: other }
+        }
+      } catch { /* best-effort：回退失败就维持空 */ }
     }
     out.graph = null
     out.compile.cursors = Number(one("SELECT COUNT(*) n FROM meta WHERE key LIKE 'compiledThrough:%'")?.n ?? 0)
@@ -675,6 +710,40 @@ function readConsolidateInflight(sid) {
   if (!sid) return null
   const m = readJson(memSessionFile('consolidate-inflight', sid))
   return m && !isFoldInflightStale(m) ? m : null
+}
+// 文件巡检在飞标记：同款陈旧闸，孤儿标记不会让面板永久显示「巡检中」。
+// 契约文件用 `at`（与 last 同口径），这里统一补出 startedAt 供 TTL 判定与 UI 计时。
+function readJanitorInflight(sid) {
+  if (!sid) return null
+  const m = readJson(memSessionFile('janitor-inflight', sid))
+  if (!m) return null
+  const startedAt = Number(m.startedAt ?? m.at)
+  if (!Number.isFinite(startedAt) || Date.now() - startedAt > FOLD_INFLIGHT_TTL_MS) return null
+  return { ...m, startedAt }
+}
+// 向量层只读诊断：与 MemoryStore._vecCfg()/vecHealth() 同口径，直接用只读连接查。
+function readVectorHealth(db) {
+  const meta = (k) => { try { return db.prepare('SELECT value FROM meta WHERE key=?').get(k)?.value ?? null } catch { return null } }
+  const raw = String(process.env.DSH_MEMORY_VEC ?? meta('vec:enabled') ?? 'off').trim().toLowerCase()
+  const enabled = raw === 'on' || raw === 'auto' || raw === '1' || raw === 'true'
+  let row = null
+  try {
+    row = db.prepare('SELECT model, dim, COUNT(*) n FROM record_vectors GROUP BY model, dim ORDER BY n DESC LIMIT 1').get()
+  } catch { /* pre-Phase-3 库 */ }
+  let pending = 0
+  try { pending = Number(db.prepare('SELECT COUNT(*) c FROM vec_queue').get()?.c ?? 0) } catch { /* ignore */ }
+  const model = String(process.env.DSH_MEMORY_EMBED_MODEL || meta('vec:model') || row?.model || '')
+  const dim = Number(process.env.DSH_MEMORY_EMBED_DIM || meta('vec:dim') || row?.dim || 0) || 0
+  return {
+    enabled,
+    mode: enabled ? (raw === 'auto' ? 'auto' : 'on') : 'off',
+    state: !enabled ? 'off' : (String(meta('vec:state') || 'ok') || 'ok'),
+    model, dim,
+    rows: Number(row?.n ?? 0) || 0,
+    pending,
+    lastError: String(meta('vec:lastError') || ''),
+    failAt: Number(meta('vec:failAt') || 0) || null,
+  }
 }
 function readMemoryLast(sid) {
   if (!sid) return null
@@ -1337,7 +1406,10 @@ export default {
     }))
     disposers.push(webServer.register({
       kind: 'prefix',
-      path: '/api/memory/traces/',
+      // 前缀必须以路径段结尾：宿主匹配规则是 pathname === prefix 或 startsWith(prefix + '/')，
+      // 旧值 '/api/memory/traces/' 会要求 '/api/memory/traces//…' ⇒ 详情路由永远落到宿主的
+      // 纯文本 404（面板显示 Unexpected token 'o', "not found"）。列表仍由上面的 exact 路由承接。
+      path: '/api/memory/traces',
       handler(req, res) {
         if (!isLocalOrigin(req)) { sendJson(res, 403, { ok: false, error: 'forbidden' }); return }
         let u = null
@@ -1405,6 +1477,24 @@ export default {
     }))
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/api/memory/janitor',
+      handler(req, res) {
+        if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
+        if (!isLocalOrigin(req)) { sendJson(res, 403, { ok: false, error: 'forbidden' }); return }
+        readBody(req).then((args) => {
+          const sid = normSid(args?.sessionId)
+          if (!sid) { sendJson(res, 400, { ok: false, error: 'missing-sessionId' }); return }
+          const workspace = typeof args?.workspace === 'string' ? args.workspace.trim().slice(0, 500) : ''
+          const dir = join(STATE_DIR, '.memory', 'janitor-request')
+          try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
+          const file = join(dir, sid.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) + '.json')
+          const ok = writeJson(file, { sessionId: sid, workspace: workspace || undefined, at: Date.now() })
+          sendJson(res, ok ? 202 : 500, { ok, queued: ok })
+        })
+      },
+    }))
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/api/memory/config',
       handler(req, res) {
         if (req.method !== 'POST') { sendJson(res, 405, { ok: false, error: 'method-not-allowed' }); return }
@@ -1412,13 +1502,26 @@ export default {
         readBody(req).then((args) => {
           const cur = readControl()
           const next = { ...cur }
-          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog', 'memoryHandoff', 'memoryConsolidateAuto', 'memoryTrace']) {
+          for (const k of ['memoryEnabled', 'memoryLlmEnabled', 'memoryInjectCatalog', 'memoryHandoff', 'memoryConsolidateAuto', 'memoryTrace', 'memoryJanitorEnabled']) {
             if (typeof args?.[k] === 'boolean') next[k] = args[k]
           }
           if ('memoryConsolidateIdleMs' in (args ?? {})) {
             const n = Number(args.memoryConsolidateIdleMs)
             if (Number.isFinite(n) && n > 0) next.memoryConsolidateIdleMs = Math.max(60_000, Math.min(24 * 3600_000, n))
             else delete next.memoryConsolidateIdleMs
+          }
+          if ('memoryJanitorIntervalMs' in (args ?? {})) {
+            const n = Number(args.memoryJanitorIntervalMs)
+            if (Number.isFinite(n) && n > 0) next.memoryJanitorIntervalMs = Math.max(60_000, Math.min(24 * 3600_000, n))
+            else delete next.memoryJanitorIntervalMs
+          }
+          // 巡检独立路由：成对写入；空 = 回退到自动整理/编译路由。
+          const touchedJanitorRoute = args != null && ('memoryJanitorProvider' in args || 'memoryJanitorModel' in args)
+          if (touchedJanitorRoute) {
+            const p = typeof args?.memoryJanitorProvider === 'string' ? args.memoryJanitorProvider.trim() : ''
+            const m = typeof args?.memoryJanitorModel === 'string' ? args.memoryJanitorModel.trim() : ''
+            if (p && m) { next.memoryJanitorProvider = p; next.memoryJanitorModel = m }
+            else { delete next.memoryJanitorProvider; delete next.memoryJanitorModel }
           }
           // 编译模型覆盖：两者必须成对；null/空串 = 清除覆盖（回退到会话当前模型）。
           const touchedRoute = args != null && ('memoryLlmProvider' in args || 'memoryLlmModel' in args)
@@ -1450,12 +1553,13 @@ export default {
               provider: typeof ctrlNow?.memoryConsolidateManualProvider === 'string' && ctrlNow.memoryConsolidateManualProvider ? ctrlNow.memoryConsolidateManualProvider : null,
               model: typeof ctrlNow?.memoryConsolidateManualModel === 'string' && ctrlNow.memoryConsolidateManualModel ? ctrlNow.memoryConsolidateManualModel : null,
             },
+            janitorRoute: routePairOf(ctrlNow?.memoryJanitorProvider, ctrlNow?.memoryJanitorModel),
             envLocked: envLockOf(),
           })
         })
       },
     }))
     ctx.effect(() => () => { for (const d of disposers) d() })
-    console.log(`[contextinjector-webui] /api/context-inject/{status,config,session} + /api/logcompiler/{config,export} + /api/memory/{status,config,consolidate} ready (stateDir=${STATE_DIR})`)
+    console.log(`[contextinjector-webui] /api/context-inject/{status,config,session} + /api/logcompiler/{config,export} + /api/memory/{status,config,consolidate,janitor,metrics,traces} ready (stateDir=${STATE_DIR})`)
   },
 }

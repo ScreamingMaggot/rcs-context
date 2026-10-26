@@ -1,0 +1,800 @@
+{
+  "input": "work/testspace2-online/semantic-attribution-result.json",
+  "updatedAt": "2026-10-26T04:02:14.475Z",
+  "models": {
+    "qwen3:4b": {
+      "model": "qwen3:4b",
+      "reps": 12,
+      "samples": 288,
+      "classes": {
+        "task": {
+          "samples": 96,
+          "success": 12,
+          "contentSuccessStrict": 12,
+          "contentRateStrict": 0.125,
+          "contentSuccessRelaxed": 12,
+          "contentRateRelaxed": 0.125,
+          "rate": 0.125,
+          "low": 0.07297128992395069,
+          "high": 0.2058864206896613,
+          "halfWidth": 0.0664575653828553,
+          "falsePositiveCases": 84
+        },
+        "constraint": {
+          "samples": 120,
+          "success": 60,
+          "contentSuccessStrict": 60,
+          "contentRateStrict": 0.5,
+          "contentSuccessRelaxed": 120,
+          "contentRateRelaxed": 1,
+          "rate": 0.5,
+          "low": 0.411937137430229,
+          "high": 0.588062862569771,
+          "halfWidth": 0.08806286256977103,
+          "falsePositiveCases": 0
+        },
+        "preference": {
+          "samples": 48,
+          "success": 48,
+          "contentSuccessStrict": 48,
+          "contentRateStrict": 1,
+          "contentSuccessRelaxed": 48,
+          "contentRateRelaxed": 1,
+          "rate": 1,
+          "low": 0.9258973488472576,
+          "high": 0.9999999999999999,
+          "halfWidth": 0.0370513255763711,
+          "falsePositiveCases": 0
+        },
+        "question": {
+          "samples": 24,
+          "success": 0,
+          "contentSuccessStrict": 0,
+          "contentRateStrict": 0,
+          "contentSuccessRelaxed": 0,
+          "contentRateRelaxed": 0,
+          "rate": 0,
+          "low": 0,
+          "high": 0.13798057582897535,
+          "halfWidth": 0.06899028791448768,
+          "falsePositiveCases": 24
+        }
+      },
+      "positive": {
+        "samples": 168,
+        "strictRecall": {
+          "rate": 0.6428571428571429,
+          "low": 0.5679499551135433,
+          "high": 0.7113770530148728,
+          "halfWidth": 0.0717135489506647
+        },
+        "relaxedRecall": {
+          "rate": 0.9285714285714286,
+          "low": 0.8793098515780879,
+          "high": 0.95867117280716,
+          "halfWidth": 0.039680660614536
+        },
+        "strictContentRecall": {
+          "rate": 0.6428571428571429,
+          "low": 0.5679499551135433,
+          "high": 0.7113770530148728,
+          "halfWidth": 0.0717135489506647
+        },
+        "relaxedContentRecall": {
+          "rate": 1,
+          "low": 0.9776445284494559,
+          "high": 1,
+          "halfWidth": 0.01117773577527211
+        },
+        "wrongPredicateSamplesStrict": 0,
+        "wrongPredicateSamplesRelaxed": 12
+      },
+      "negative": {
+        "samples": 120,
+        "strictFalsePositiveRate": {
+          "rate": 0.9,
+          "low": 0.8333168001483641,
+          "high": 0.9418669830068925,
+          "halfWidth": 0.05427509142926421
+        },
+        "relaxedFalsePositiveRate": {
+          "rate": 0.9,
+          "low": 0.8333168001483641,
+          "high": 0.9418669830068925,
+          "halfWidth": 0.05427509142926421
+        }
+      },
+      "overall": {
+        "strictAccuracy": {
+          "rate": 0.4166666666666667,
+          "low": 0.36118960679084344,
+          "high": 0.4743376107134467,
+          "halfWidth": 0.056574001961301655
+        },
+        "relaxedAccuracy": {
+          "rate": 0.5833333333333334,
+          "low": 0.5256623892865534,
+          "high": 0.6388103932091568,
+          "halfWidth": 0.056574001961301655
+        }
+      },
+      "precision": {
+        "strict": 0.5,
+        "relaxed": 0.5652173913043478
+      },
+      "boundaryRescueSamples": 48,
+      "parseFailures": 0,
+      "mixedCases": 0,
+      "perCase": {
+        "T1": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T2": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T3": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T4": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T5": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T6": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T7": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "T8": {
+          "class": "task",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "C1": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 12,
+          "strictContentHits": 0,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 12,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C2": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C3": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 12,
+          "strictContentHits": 0,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 12,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C4": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C5": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 12,
+          "strictContentHits": 0,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 12,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C6": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C7": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C8": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C9": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C10": {
+          "class": "constraint",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 12,
+          "strictContentHits": 0,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 12,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P1": {
+          "class": "preference",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P2": {
+          "class": "preference",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P3": {
+          "class": "preference",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P4": {
+          "class": "preference",
+          "reps": 12,
+          "strictHits": 12,
+          "relaxedHits": 12,
+          "strictContentHits": 12,
+          "relaxedContentHits": 12,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "Q1": {
+          "class": "question",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        },
+        "Q2": {
+          "class": "question",
+          "reps": 12,
+          "strictHits": 0,
+          "relaxedHits": 0,
+          "strictContentHits": 0,
+          "relaxedContentHits": 0,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 12,
+          "mixed": false
+        }
+      }
+    },
+    "spark-x2.6": {
+      "model": "spark-x2.6",
+      "reps": 24,
+      "samples": 576,
+      "classes": {
+        "task": {
+          "samples": 192,
+          "success": 179,
+          "contentSuccessStrict": 179,
+          "contentRateStrict": 0.9322916666666666,
+          "contentSuccessRelaxed": 179,
+          "contentRateRelaxed": 0.9322916666666666,
+          "rate": 0.9322916666666666,
+          "low": 0.8876160972270705,
+          "high": 0.9600076966961816,
+          "halfWidth": 0.036195799734555535,
+          "falsePositiveCases": 13
+        },
+        "constraint": {
+          "samples": 240,
+          "success": 206,
+          "contentSuccessStrict": 221,
+          "contentRateStrict": 0.9208333333333333,
+          "contentSuccessRelaxed": 240,
+          "contentRateRelaxed": 1,
+          "rate": 0.8583333333333333,
+          "low": 0.808556667305257,
+          "high": 0.8968192816714556,
+          "halfWidth": 0.044131307183099315,
+          "falsePositiveCases": 15
+        },
+        "preference": {
+          "samples": 96,
+          "success": 75,
+          "contentSuccessStrict": 92,
+          "contentRateStrict": 0.9583333333333334,
+          "contentSuccessRelaxed": 92,
+          "contentRateRelaxed": 0.9583333333333334,
+          "rate": 0.78125,
+          "low": 0.6886190795275433,
+          "high": 0.8522376375122478,
+          "halfWidth": 0.0818092789923522,
+          "falsePositiveCases": 17
+        },
+        "question": {
+          "samples": 48,
+          "success": 48,
+          "contentSuccessStrict": 48,
+          "contentRateStrict": 1,
+          "contentSuccessRelaxed": 48,
+          "contentRateRelaxed": 1,
+          "rate": 1,
+          "low": 0.9258973488472576,
+          "high": 0.9999999999999999,
+          "halfWidth": 0.0370513255763711,
+          "falsePositiveCases": 0
+        }
+      },
+      "positive": {
+        "samples": 336,
+        "strictRecall": {
+          "rate": 0.8363095238095238,
+          "low": 0.7929865105693835,
+          "high": 0.8720291908632839,
+          "halfWidth": 0.03952134014695021
+        },
+        "relaxedRecall": {
+          "rate": 0.8898809523809523,
+          "low": 0.8519007413957783,
+          "high": 0.9190466646898802,
+          "halfWidth": 0.03357296164705091
+        },
+        "strictContentRecall": {
+          "rate": 0.9315476190476191,
+          "low": 0.8993816154897064,
+          "high": 0.9539571164371677,
+          "halfWidth": 0.02728775047373068
+        },
+        "relaxedContentRecall": {
+          "rate": 0.9880952380952381,
+          "low": 0.9697944582604969,
+          "high": 0.9953610730223126,
+          "halfWidth": 0.012783307380907782
+        },
+        "wrongPredicateSamplesStrict": 32,
+        "wrongPredicateSamplesRelaxed": 33
+      },
+      "negative": {
+        "samples": 240,
+        "strictFalsePositiveRate": {
+          "rate": 0.05416666666666667,
+          "low": 0.031924882079320746,
+          "high": 0.09045620465895525,
+          "halfWidth": 0.029265661289817255
+        },
+        "relaxedFalsePositiveRate": {
+          "rate": 0.05416666666666667,
+          "low": 0.031924882079320746,
+          "high": 0.09045620465895525,
+          "halfWidth": 0.029265661289817255
+        }
+      },
+      "overall": {
+        "strictAccuracy": {
+          "rate": 0.8819444444444444,
+          "low": 0.8530280809012425,
+          "high": 0.9057998472777635,
+          "halfWidth": 0.026385883188260482
+        },
+        "relaxedAccuracy": {
+          "rate": 0.9131944444444444,
+          "low": 0.8873770522944875,
+          "high": 0.9335367972809827,
+          "halfWidth": 0.02307987249324763
+        }
+      },
+      "precision": {
+        "strict": 0.8619631901840491,
+        "relaxed": 0.8666666666666667
+      },
+      "boundaryRescueSamples": 18,
+      "parseFailures": 7,
+      "mixedCases": 11,
+      "perCase": {
+        "T1": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T2": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T3": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 21,
+          "relaxedHits": 21,
+          "strictContentHits": 21,
+          "relaxedContentHits": 21,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 3,
+          "mixed": true
+        },
+        "T4": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T5": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 14,
+          "relaxedHits": 14,
+          "strictContentHits": 14,
+          "relaxedContentHits": 14,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 10,
+          "mixed": true
+        },
+        "T6": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T7": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "T8": {
+          "class": "task",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C1": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 19,
+          "relaxedHits": 24,
+          "strictContentHits": 19,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 5,
+          "strictFalsePositiveSamples": 0,
+          "mixed": true
+        },
+        "C2": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C3": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C4": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 21,
+          "relaxedHits": 21,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 3,
+          "mixed": true
+        },
+        "C5": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 21,
+          "relaxedHits": 24,
+          "strictContentHits": 21,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 3,
+          "strictFalsePositiveSamples": 0,
+          "mixed": true
+        },
+        "C6": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 18,
+          "relaxedHits": 24,
+          "strictContentHits": 18,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 6,
+          "strictFalsePositiveSamples": 0,
+          "mixed": true
+        },
+        "C7": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 13,
+          "relaxedHits": 13,
+          "strictContentHits": 23,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 10,
+          "mixed": true
+        },
+        "C8": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 22,
+          "relaxedHits": 22,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 2,
+          "mixed": true
+        },
+        "C9": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "C10": {
+          "class": "constraint",
+          "reps": 24,
+          "strictHits": 20,
+          "relaxedHits": 24,
+          "strictContentHits": 20,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 4,
+          "strictFalsePositiveSamples": 0,
+          "mixed": true
+        },
+        "P1": {
+          "class": "preference",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P2": {
+          "class": "preference",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "P3": {
+          "class": "preference",
+          "reps": 24,
+          "strictHits": 8,
+          "relaxedHits": 8,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 16,
+          "mixed": true
+        },
+        "P4": {
+          "class": "preference",
+          "reps": 24,
+          "strictHits": 19,
+          "relaxedHits": 19,
+          "strictContentHits": 20,
+          "relaxedContentHits": 20,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 1,
+          "mixed": true
+        },
+        "Q1": {
+          "class": "question",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        },
+        "Q2": {
+          "class": "question",
+          "reps": 24,
+          "strictHits": 24,
+          "relaxedHits": 24,
+          "strictContentHits": 24,
+          "relaxedContentHits": 24,
+          "boundaryRescues": 0,
+          "strictFalsePositiveSamples": 0,
+          "mixed": false
+        }
+      }
+    }
+  },
+  "decisions": {
+    "qwen3:4b": {
+      "maxWilsonHalfWidth": 0.0717135489506647,
+      "mixedCaseCount": 0,
+      "moreRepsRecommended": false,
+      "reason": "All cases were outcome-stable across repetitions and the 95% Wilson intervals are within ±0.10."
+    },
+    "spark-x2.6": {
+      "maxWilsonHalfWidth": 0.03952134014695021,
+      "mixedCaseCount": 11,
+      "moreRepsRecommended": false,
+      "reason": "Intervals are narrow at 24 repetitions; remaining per-case variation is measured model stochasticity, not sampling uncertainty."
+    }
+  }
+}

@@ -133,8 +133,13 @@ store.setMetaRaw('recallKeys:s1', '[]')
     effect: () => () => {},
   })
   const exact = routes.find((r) => r.kind === 'exact' && r.path === '/api/memory/traces')
-  const prefix = routes.find((r) => r.kind === 'prefix' && r.path === '/api/memory/traces/')
+  const prefix = routes.find((r) => r.kind === 'prefix' && r.path === '/api/memory/traces')
   check('B6 路由已注册', !!exact && !!prefix)
+  // 宿主匹配：pathname === prefix 或 startsWith(prefix + '/')。带尾斜杠的前缀要求双斜杠 ⇒ 永不命中。
+  const matches = (p, x) => x === p || x.startsWith(p + '/')
+  check('B6 前缀路由能匹配详情（旧尾斜杠值永不匹配）',
+    !!prefix && matches(prefix.path, '/api/memory/traces/1')
+    && !matches('/api/memory/traces/', '/api/memory/traces/1'))
   const call = (route, { method = 'GET', url, body = null, host = '127.0.0.1:3000' } = {}) => new Promise((resolve) => {
     const chunks = []
     const res = {

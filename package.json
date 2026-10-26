@@ -1,7 +1,7 @@
 {
   "name": "rcs-context",
   "version": "0.1.39",
-  "description": "RCS — cut the repeated per-turn context cost of a long coding session, and give the model a read-only verifier. DeepSeek Harness plugin bundle (context compression + external reasoning + append-only transcript + web panel).",
+  "description": "RCS — fold repeated tool output without losing the original, give the model a read-only verifier, and externalize session facts into auditable memory. DeepSeek Harness plugin bundle: context folding, external reasoning, append-only transcript, and external memory with rcs:// addressing, L0/L1/L2 layers, directory-aware search, retrieval traces, and controlled writes. MIT.",
   "type": "module",
   "main": "./web/contextinjector.mjs",
   "exports": {
@@ -26,7 +26,15 @@
     "dsh-plugin",
     "deepseek-harness",
     "context-management",
-    "llm-agent"
+    "context-compression",
+    "context-engineering",
+    "llm-agent",
+    "external-memory",
+    "agent-memory",
+    "retrieval",
+    "provenance",
+    "sqlite",
+    "observability"
   ],
   "license": "MIT",
   "author": "ScreamingMaggot",

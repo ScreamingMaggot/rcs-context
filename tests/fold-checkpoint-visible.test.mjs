@@ -1,7 +1,7 @@
 // 折叠可见性回归：replace 副本必须走宿主 compaction 协议，否则 UI 只认 append 来源，
 // 用户眼前的助手正文会被模型专用的替换副本遮掉（真机 session-91ed1967）。
 // 运行：node tests/fold-checkpoint-visible.test.mjs
-import { appendFoldCheckpoint, openRoundClampEnd, stripSnapshotRows, isSelfCompactionId } from '../web/contextinjector.mjs'
+import { appendFoldCheckpoint, openRoundClampEnd, stripSnapshotRows, isSelfCompactionId, openTurnOf } from '../web/contextinjector.mjs'
 import { pluginIdOf, classifyMessageSource } from '../condense/chunk.mjs'
 
 let fails = 0
@@ -66,6 +66,43 @@ check('① 宿主原生检查点不归类为 self',
   classifyMessageSource({ kind: 'compact-checkpoint', compactionId: 'x' }).cls === 'opaque')
 check('② 自身生命周期 ID 提交后从让路集合移除',
   isSelfCompactionId(result.compactionId) === false)
+
+/* ── compaction turn 归属：异步 turn-end fold 落到下一轮时不得写 turn:null（真机 session-64963da1）── */
+check('②a openTurnOf: 最后 turn/start 未闭合 ⇒ 该 turn',
+  openTurnOf({ ownEvents: () => [{ seq: 0, type: 'turn/start', data: { turn: 10 } }, { seq: 1, type: 'step/start', data: { turn: 10, step: 1 } }] }) === 10)
+check('②a openTurnOf: turn/end 后 ⇒ null',
+  openTurnOf({ ownEvents: () => [{ seq: 0, type: 'turn/start', data: { turn: 10 } }, { seq: 1, type: 'turn/end', data: { turn: 10 } }] }) === null)
+check('②a openTurnOf: snapshotEvents 回退',
+  openTurnOf({ snapshotEvents: () => [{ seq: 0, type: 'turn/start', data: { turn: 7 } }] }) === 7)
+check('②a openTurnOf: 事件异常/缺失 ⇒ null',
+  openTurnOf({ ownEvents() { throw new Error('boom') } }) === null && openTurnOf(null) === null)
+
+const makeCommitSession = (ownEvents) => {
+  const events = []
+  return {
+    events,
+    ownEvents: () => ownEvents,
+    append(type, data, meta) {
+      const seq = events.length
+      events.push({ seq, type, data, meta })
+      return { seq, type, data }
+    },
+  }
+}
+const openCommit = makeCommitSession([{ seq: 0, type: 'turn/start', data: { turn: 10 } }])
+const openResult = appendFoldCheckpoint(openCommit, {
+  transcript: '[ROUND] 1\n[U] q\n[A] a', shadowedSeqs: [3, 4], turn: null, shadowedBytes: 100,
+})
+check('②a 异步 fold 落到打开中的 turn 10 ⇒ start/end owner=10',
+  openCommit.events[0].data.turn === 10 && openCommit.events[3].data.turn === 10 && openResult.turn === 10,
+  JSON.stringify({ start: openCommit.events[0].data.turn, end: openCommit.events[3].data.turn, result: openResult.turn }))
+
+const closedCommit = makeCommitSession([{ seq: 0, type: 'turn/start', data: { turn: 10 } }, { seq: 1, type: 'turn/end', data: { turn: 10 } }])
+const closedResult = appendFoldCheckpoint(closedCommit, {
+  transcript: '[ROUND] 1\n[U] q\n[A] a', shadowedSeqs: [3, 4], turn: null, shadowedBytes: 100,
+})
+check('②a 无打开 turn ⇒ start/end owner=null（手动 compaction 语义）',
+  closedCommit.events[0].data.turn === null && closedCommit.events[3].data.turn === null && closedResult.turn === null)
 
 /* ── 当前轮保护：仍在飞的那一轮不得折；已结束的轮必须可折（turn/end 是折叠主路径）── */
 const entries = [

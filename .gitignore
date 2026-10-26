@@ -16,6 +16,18 @@ state/
 *.log
 node_modules/
 AI-CACHE/
+# 本地实验状态、压缩会话、截图与密钥；测试所需的 JSON/MD 证据另行显式加入
+work/**/*.sqlite
+work/**/*.zstd
+work/**/*.jsonl
+work/**/logs/
+work/**/*-logs/
+work/**/*.png
+work/**/*.key
 
 # 本地打包产物（npm pack）
 *.tgz
+
+# 本地版本快照 / 工具生成的文档
+version.json.bak-*
+docs/superpowers/

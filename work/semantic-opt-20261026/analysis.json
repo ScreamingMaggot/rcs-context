@@ -1,0 +1,998 @@
+{
+  "models": {
+    "qwen3:4b": {
+      "rows": 288,
+      "avgRawProposals": 1,
+      "emptyRate": 0,
+      "parseErrorRate": 0,
+      "rejectReasons": {
+        "quote-not-found": 12
+      },
+      "accepted": 276,
+      "rejected": 12,
+      "cases": {
+        "T1": {
+          "id": "T1",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {
+            "quote-not-found": 12
+          },
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.decision | 你负责 commerce-core 的 pricing 子任务。先读取 README、src/money.js、src/pricing.js、tests/pricing.test.js。实现分级批量折扣：quantity >= 10 时 5%，quantity >= 20 时 等。完成后运行测试并输出 [[DONE]]。"
+            }
+          ]
+        },
+        "T2": {
+          "id": "T2",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 实现区域税额：CN 1300 bps、US 825 bps、DE 1900 bps。未知区域必须拒绝。补足并运行 tax 测试。"
+            }
+          ]
+        },
+        "T3": {
+          "id": "T3",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.decision | 请先读取 README 和最近 20 行日志，定位测试失败原因。不要修改 integration.test.js，完成后汇报。"
+            }
+          ]
+        },
+        "T4": {
+          "id": "T4",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 请把结果写入 report.json，然后运行 node --test，并把失败列表贴出来。"
+            }
+          ]
+        },
+        "T5": {
+          "id": "T5",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 先跑一遍测试，修复当前失败，再重新运行确认。不要调用 web 搜索。"
+            }
+          ]
+        },
+        "T6": {
+          "id": "T6",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 这次先用 18888 端口启动服务，测试完就关掉。"
+            }
+          ]
+        },
+        "T7": {
+          "id": "T7",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 临时把日志级别调成 debug，抓一次完整请求后恢复原设置。"
+            }
+          ]
+        },
+        "T8": {
+          "id": "T8",
+          "class": "task",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.decision | 请检查 pricing.js 和 tax.js 是否使用同一个 money 工具，并告诉我差异。"
+            }
+          ]
+        },
+        "C1": {
+          "id": "C1",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 金额一律使用整数分。"
+            }
+          ]
+        },
+        "C2": {
+          "id": "C2",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 项目约定：折扣统一用基点，10000 表示 100%。"
+            }
+          ]
+        },
+        "C3": {
+          "id": "C3",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 折扣金额四舍五入到分。"
+            }
+          ]
+        },
+        "C4": {
+          "id": "C4",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 结算顺序约定：先应用折扣再扣固定优惠券。"
+            }
+          ]
+        },
+        "C5": {
+          "id": "C5",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 优惠券最多抵扣折扣后金额的 50%。"
+            }
+          ]
+        },
+        "C6": {
+          "id": "C6",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 项目约定：不在生产代码引入第三方依赖。"
+            }
+          ]
+        },
+        "C7": {
+          "id": "C7",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 所有测试统一使用 node:test。"
+            }
+          ]
+        },
+        "C8": {
+          "id": "C8",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 以后所有金额字段都以 cents 结尾。"
+            }
+          ]
+        },
+        "C9": {
+          "id": "C9",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 接口约定：错误响应统一使用 JSON。"
+            }
+          ]
+        },
+        "C10": {
+          "id": "C10",
+          "class": "constraint",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 0,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.constraint | 生产环境不允许写入本地磁盘。"
+            }
+          ]
+        },
+        "P1": {
+          "id": "P1",
+          "class": "preference",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 以后回答先给结论，再给细节。"
+            }
+          ]
+        },
+        "P2": {
+          "id": "P2",
+          "class": "preference",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.decision | 我们决定数据库使用 SQLite，不引入 PostgreSQL。"
+            }
+          ]
+        },
+        "P3": {
+          "id": "P3",
+          "class": "preference",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 文件命名统一用 kebab-case。"
+            }
+          ]
+        },
+        "P4": {
+          "id": "P4",
+          "class": "preference",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 遇到不确定时先提问，不要猜。"
+            }
+          ]
+        },
+        "Q1": {
+          "id": "Q1",
+          "class": "question",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 当前记录到哪些文件？"
+            }
+          ]
+        },
+        "Q2": {
+          "id": "Q2",
+          "class": "question",
+          "samples": 12,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 12,
+          "relaxedAccepted": 12,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 12,
+              "quote": "project.preference | 金额和折扣规则是什么？"
+            }
+          ]
+        }
+      }
+    },
+    "spark-x2.6": {
+      "rows": 576,
+      "avgRawProposals": 0.667,
+      "emptyRate": 0.342,
+      "parseErrorRate": 0.012,
+      "rejectReasons": {
+        "quote-boundary": 39
+      },
+      "accepted": 345,
+      "rejected": 39,
+      "cases": {
+        "T1": {
+          "id": "T1",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0.58,
+          "emptyRate": 0.5,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {
+            "quote-boundary": 14
+          },
+          "topQuotes": [
+            {
+              "count": 8,
+              "quote": "project.decision | 实现分级批量折扣：quantity >= 10 时 5%，quantity >= 20 时 10%。"
+            },
+            {
+              "count": 4,
+              "quote": "project.constraint | 实现分级批量折扣：quantity >= 10 时 5%，quantity >= 20 时 10%。"
+            },
+            {
+              "count": 1,
+              "quote": "project.decision | 你负责 commerce-core 的 pricing 子任务。"
+            },
+            {
+              "count": 1,
+              "quote": "project.constraint | 先读取 README、src/money.js、src/pricing.js、tests/pricing.test.js。"
+            }
+          ]
+        },
+        "T2": {
+          "id": "T2",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 1.04,
+          "emptyRate": 0.08,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {
+            "quote-boundary": 25
+          },
+          "topQuotes": [
+            {
+              "count": 13,
+              "quote": "project.constraint | 未知区域必须拒绝。"
+            },
+            {
+              "count": 5,
+              "quote": "project.constraint | 实现区域税额：CN 1300 bps、US 825 bps、DE 1900 bps。"
+            },
+            {
+              "count": 4,
+              "quote": "project.decision | 实现区域税额：CN 1300 bps、US 825 bps、DE 1900 bps。"
+            },
+            {
+              "count": 2,
+              "quote": "project.constraint | 实现区域税额：CN 1300 bps、US 825 bps、DE 1900 bps。未知区域必须拒绝。"
+            }
+          ]
+        },
+        "T3": {
+          "id": "T3",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0.13,
+          "emptyRate": 0.88,
+          "strictAccepted": 3,
+          "relaxedAccepted": 3,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 3,
+              "quote": "project.constraint | 不要修改 integration.test.js"
+            }
+          ]
+        },
+        "T4": {
+          "id": "T4",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        },
+        "T5": {
+          "id": "T5",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0.42,
+          "emptyRate": 0.58,
+          "strictAccepted": 10,
+          "relaxedAccepted": 10,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 10,
+              "quote": "project.constraint | 不要调用 web 搜索。"
+            }
+          ]
+        },
+        "T6": {
+          "id": "T6",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        },
+        "T7": {
+          "id": "T7",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        },
+        "T8": {
+          "id": "T8",
+          "class": "task",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        },
+        "C1": {
+          "id": "C1",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 19,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 0.792,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 19,
+              "quote": "project.constraint | 业务规则：金额一律使用整数分。"
+            },
+            {
+              "count": 4,
+              "quote": "project.constraint | 金额一律使用整数分。"
+            },
+            {
+              "count": 1,
+              "quote": "project.constraint | 金额一律使用整数分"
+            }
+          ]
+        },
+        "C2": {
+          "id": "C2",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 24,
+              "quote": "project.constraint | 项目约定：折扣统一用基点，10000 表示 100%。"
+            }
+          ]
+        },
+        "C3": {
+          "id": "C3",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 24,
+              "quote": "project.constraint | 业务规则：折扣金额四舍五入到分。"
+            }
+          ]
+        },
+        "C4": {
+          "id": "C4",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 0.875,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 21,
+              "quote": "project.constraint | 结算顺序约定：先应用折扣再扣固定优惠券。"
+            },
+            {
+              "count": 3,
+              "quote": "project.decision | 结算顺序约定：先应用折扣再扣固定优惠券。"
+            }
+          ]
+        },
+        "C5": {
+          "id": "C5",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 21,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 0.875,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 21,
+              "quote": "project.constraint | 优惠券规则：优惠券最多抵扣折扣后金额的 50%。"
+            },
+            {
+              "count": 2,
+              "quote": "project.constraint | 优惠券最多抵扣折扣后金额的 50%。"
+            },
+            {
+              "count": 1,
+              "quote": "project.constraint | 优惠券最多抵扣折扣后金额的 50%"
+            }
+          ]
+        },
+        "C6": {
+          "id": "C6",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 18,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 0.75,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 18,
+              "quote": "project.constraint | 项目约定：不在生产代码引入第三方依赖。"
+            },
+            {
+              "count": 4,
+              "quote": "project.constraint | 不在生产代码引入第三方依赖。"
+            },
+            {
+              "count": 2,
+              "quote": "project.constraint | 不在生产代码引入第三方依赖"
+            }
+          ]
+        },
+        "C7": {
+          "id": "C7",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 23,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 0.958,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 0.542,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 13,
+              "quote": "project.constraint | 测试约定：所有测试统一使用 node:test。"
+            },
+            {
+              "count": 10,
+              "quote": "project.decision | 测试约定：所有测试统一使用 node:test。"
+            },
+            {
+              "count": 1,
+              "quote": "project.decision | 所有测试统一使用 node:test。"
+            }
+          ]
+        },
+        "C8": {
+          "id": "C8",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 0.917,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 22,
+              "quote": "project.constraint | 以后所有金额字段都以 cents 结尾。"
+            },
+            {
+              "count": 1,
+              "quote": "project.decision | 以后所有金额字段都以 cents 结尾。"
+            },
+            {
+              "count": 1,
+              "quote": "project.preference | 以后所有金额字段都以 cents 结尾。"
+            }
+          ]
+        },
+        "C9": {
+          "id": "C9",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 24,
+              "quote": "project.constraint | 接口约定：错误响应统一使用 JSON。"
+            }
+          ]
+        },
+        "C10": {
+          "id": "C10",
+          "class": "constraint",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 20,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 0.833,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 20,
+              "quote": "project.constraint | 部署约定：生产环境不允许写入本地磁盘。"
+            },
+            {
+              "count": 4,
+              "quote": "project.constraint | 生产环境不允许写入本地磁盘。"
+            }
+          ]
+        },
+        "P1": {
+          "id": "P1",
+          "class": "preference",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 24,
+              "quote": "project.preference | 以后回答先给结论，再给细节。"
+            }
+          ]
+        },
+        "P2": {
+          "id": "P2",
+          "class": "preference",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 1,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 24,
+              "quote": "project.decision | 我们决定数据库使用 SQLite，不引入 PostgreSQL。"
+            }
+          ]
+        },
+        "P3": {
+          "id": "P3",
+          "class": "preference",
+          "samples": 24,
+          "avgRaw": 1,
+          "emptyRate": 0,
+          "strictAccepted": 24,
+          "relaxedAccepted": 24,
+          "contentStrictRate": 1,
+          "contentRelaxedRate": 1,
+          "predicateHitRate": 0.333,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 16,
+              "quote": "project.constraint | 文件命名统一用 kebab-case。"
+            },
+            {
+              "count": 8,
+              "quote": "project.preference | 文件命名统一用 kebab-case。"
+            }
+          ]
+        },
+        "P4": {
+          "id": "P4",
+          "class": "preference",
+          "samples": 24,
+          "avgRaw": 0.83,
+          "emptyRate": 0.17,
+          "strictAccepted": 20,
+          "relaxedAccepted": 20,
+          "contentStrictRate": 0.833,
+          "contentRelaxedRate": 0.833,
+          "predicateHitRate": 0.792,
+          "relaxedRejects": {},
+          "topQuotes": [
+            {
+              "count": 19,
+              "quote": "project.preference | 遇到不确定时先提问，不要猜。"
+            },
+            {
+              "count": 1,
+              "quote": "project.constraint | 遇到不确定时先提问，不要猜。"
+            }
+          ]
+        },
+        "Q1": {
+          "id": "Q1",
+          "class": "question",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        },
+        "Q2": {
+          "id": "Q2",
+          "class": "question",
+          "samples": 24,
+          "avgRaw": 0,
+          "emptyRate": 1,
+          "strictAccepted": 0,
+          "relaxedAccepted": 0,
+          "contentStrictRate": 0,
+          "contentRelaxedRate": 0,
+          "predicateHitRate": 0,
+          "relaxedRejects": {},
+          "topQuotes": []
+        }
+      }
+    }
+  }
+}

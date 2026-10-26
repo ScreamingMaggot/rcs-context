@@ -121,6 +121,41 @@ function allEvents(session) {
   return session?.events ?? []
 }
 
+// 子会话识别（防递归）。除了 meta 上的 subagent 标记，还要认 0.2.1 的
+// `session.header.parentSession`：新子会话在 `childSessions` 登记之前就会跑首条
+// pre-step，只靠进程内 Set 会漏 ⇒ 子会话再拉起子会话（用户实测 5 级链）。
+export function isSubagentSession({ sid, meta, header, options } = {}, childSessions = new Set(), startingFor = new Set()) {
+  if (sid && childSessions.has(sid)) return true
+  if (meta?.origin === 'subagent') return true
+  if (typeof meta?.delegationDepth === 'number' && meta.delegationDepth > 0) return true
+  const parent = header?.parentSession ?? meta?.parentSession ?? null
+  if (parent != null && parent !== sid) return true
+  if (parent != null && startingFor.has(parent)) return true
+  if (typeof options?.subagentDepth === 'number' && options.subagentDepth > 0) return true
+  return false
+}
+
+// `tools.restrict({allow})` 只遮蔽全局工具；宿主给子会话挂的 scoped 工具（0.2.1 的
+// `subagent` 等）会留在可见集里。无法隐藏就逐个装 guard，保证**调用被拒**（只读边界不破）。
+export function guardExtraTools(tools, extras = [], note = 'This sub-session is read-only.') {
+  const list = (Array.isArray(extras) ? extras : []).filter(Boolean)
+  if (!list.length) return []
+  if (typeof tools?.guard !== 'function') throw new Error('child tools.guard unavailable')
+  for (const name of list) tools.guard((exec) => (exec?.name === name ? note : undefined))
+  return list
+}
+
+// 找回上一次的持久子会话：0.2.1 的 listChildren() 返回目录投影
+// `{childId, mode, label}`（没有 id/kind），旧宿主返回 `{id, kind:'child', …}`。
+// 只按 mode+label 过滤，id 取两者之一；旧代码要求 kind='child' 且 .id ⇒ 0.2.1 永不命中，
+// 每轮新建一个子会话（用户实测顶栏堆出 5 条「外部思考中」）。
+export function pickRecoverableChild(rows, label = CHILD_LABEL) {
+  const mine = (Array.isArray(rows) ? rows : []).filter((r) =>
+    r && r.mode === 'continuable' && r.label === label && (r.id || r.childId))
+  const last = mine[mine.length - 1]
+  return last ? String(last.id ?? last.childId) : null
+}
+
 function textOf(m) {
   return (Array.isArray(m?.content) ? m.content : [])
     .map((b) => {
@@ -322,7 +357,7 @@ export default {
   apply(ctx) {
     // 【修 1】关闭时**什么都不做**：不建目录、不打横幅、不注册任何钩子（旧版先打横幅再 return）
     if (!ENABLED) return
-    console.log(`[EXTREASON] armed (v0.3 M3 (startActivation compat + read-only memory/transcript tools); enabled=${ENABLED}; force=${FORCE}; stateDir=${STATE_DIR}; briefDir=${DEBUG_BRIEF ? BRIEF_DIR : '(debug off)'})`)
+    console.log(`[EXTREASON] armed (v0.3 M4 (子会话 descriptor 早登记防递归 + header.parentSession 兜底 + scoped 工具 guard；M3: startActivation compat + read-only memory/transcript tools); enabled=${ENABLED}; force=${FORCE}; stateDir=${STATE_DIR}; briefDir=${DEBUG_BRIEF ? BRIEF_DIR : '(debug off)'})`)
 
     // —— 关掉 DSH 原生 subagent 的 report 机制（仅针对本插件的推理器子会话）——
     //   dsh-tool-subagent-report 通过 continuable-setup 给**每个持久子会话**装：
@@ -405,6 +440,26 @@ export default {
 
     // 子代理 Agent（steer 用）：continuable 路径不返回 localAgent，从 agents 注册表按 id 取
     const agentOf = (cid) => { try { return ctx.get('agents')?.get(cid) ?? null } catch { return null } }
+    // 每个子会话每进程只需收紧一次（进程重启后 guard/restrict 会随 agent 重建而丢失，
+    // 恢复的持久子会话必须在它自己的首条 pre-step 里重新收紧，而不是只在创建时）。
+    const hardenedChildren = new Set()
+    const hardenChildAgent = async (ag, id) => {
+      if (!ag?.ctx?.tools || typeof ag.ctx.tools.restrict !== 'function') throw new Error('child tools.restrict unavailable')
+      let rows = null
+      try { rows = ag.ctx.tools.schemas?.(ag) } catch { rows = null }
+      const names = Array.isArray(rows) ? rows.map((r) => r?.name).filter(Boolean) : null
+      const allow = names ? READONLY.filter((n) => names.includes(n)) : [...READONLY]
+      if (names && allow.length === 0) throw new Error('child exposes no read-only tools; visible: ' + names.join(','))
+      await ag.ctx.tools.restrict({ allow })
+      let guarded = null
+      if (names) {
+        const extras = names.filter((n) => !allow.includes(n))
+        if (extras.length) guarded = guardExtraTools(ag.ctx.tools, extras,
+          'EXTREASON sub-session is read-only: "' + extras.join('", "') + '" is unavailable; use read/glob/grep/memory_search.')
+      }
+      hardenedChildren.add(id)
+      log({ tag: 'child-restrict', sid: id, childId: id, ok: true, tools: allow, verified: names, guarded, phase: 'harden' })
+    }
     // 等子会话"这一轮"结束。
     //   ⚠ 竞态（2026-09-09 用户指出"有时候灵有时候不灵"）：快子代理可能在 followup() 返回**之前**
     //   就已走完 turn/end；若那时才注册等待者，就会一直等到 45s 超时（随后 interrupt、简报缺失）。
@@ -430,14 +485,12 @@ export default {
     //   origin='subagent' / delegationDepth>0 / parentSession 指向父会话；再用 childSessions 兜底。
     const isSubagentAgent = (agent, sid) => {
       try {
-        if (sid && childSessions.has(sid)) return true
-        const meta = agent?.session?.meta ?? {}
-        if (meta.origin === 'subagent') return true
-        if (typeof meta.delegationDepth === 'number' && meta.delegationDepth > 0) return true
-        if (meta.parentSession != null && meta.parentSession !== sid) return true
-        const opt = agent?.options ?? {}
-        if (typeof opt.subagentDepth === 'number' && opt.subagentDepth > 0) return true
-        return false
+        return isSubagentSession({
+          sid,
+          meta: agent?.session?.meta,
+          header: agent?.session?.header,
+          options: agent?.options,
+        }, childSessions, startingFor)
       } catch { return false }
     }
     const isTargetPath = (rawArgs, targets) => {
@@ -455,6 +508,16 @@ export default {
       try {
         const sid = subject?.id ?? null
         const isChild = childSessions.has(sid)
+        // 子会话的第一条持久事件就是 descriptor；在这里立刻登记，早于它自己的
+        // 首条 pre-step（旧实现等 startChild() 返回才 add ⇒ 首个 pre-step 漏网，
+        // 子会话又拉起子会话，形成「外部思考中」5 级链）。
+        if (event?.type === 'subagent/descriptor' && sid && event.data?.label === CHILD_LABEL) {
+          if (!childSessions.has(sid)) {
+            childSessions.add(sid)
+            log({ tag: 'child-descriptor', sid })
+          }
+          return
+        }
         if (event?.type === 'assistant/message') {
           const m = event.data?.message
           const blocks = (m?.content ?? []).map((b) => (b.type === 'tool-call' ? `tc:${b.name}` : b.type)).join('+')
@@ -686,6 +749,16 @@ export default {
       //   子代理识别依据（dsh-subagent childSessionMeta）：session.meta.origin='subagent' /
       //     delegationDepth>0 / parentSession 指向父会话；另加 childSessions 兜底。
       if (isSubagentAgent(agent, sid)) {
+        // 恢复的持久子会话在进程重启后没有 restrict/guard（它们活在 child.ctx 上）。
+        // 在它自己的首条 pre-step 里重新收紧；失败就中止这一轮（只读边界优先于可用性）。
+        if (sid && childSessions.has(sid) && !hardenedChildren.has(sid)) {
+          try {
+            await hardenChildAgent(agent, sid)
+          } catch (e) {
+            log({ tag: 'child-harden-failed', sid, err: String(e?.message ?? e) })
+            throw new Error('cannot enforce read-only child tools: ' + String(e?.message ?? e))
+          }
+        }
         log({ tag: 'skip', reason: 'subagent', sid, turn })
         return dropSettled(await next())
       }
@@ -851,26 +924,7 @@ export default {
               if (!child) await new Promise((r) => setTimeout(r, 20))
             }
             try {
-              if (!child?.ctx?.tools || typeof child.ctx.tools.restrict !== 'function') {
-                throw new Error('child tools.restrict unavailable')
-              }
-              await child.ctx.tools.restrict({ allow: [...childTools] })
-              // 事后复核：restrict 不报错不等于真的收窄（旧宿主 toolFilter 就是静默失效，
-              //   实测曾出现子会话调用 write）。能拿到 schema 就必须断言可见集 ⊆ 白名单。
-              let verified = null
-              try {
-                const rows = child.ctx.tools.schemas?.(child)
-                if (Array.isArray(rows)) {
-                  const names = rows.map((r) => r?.name).filter(Boolean)
-                  const bad = names.filter((n) => !childTools.includes(n))
-                  if (bad.length) throw new Error('restricted child still exposes: ' + bad.join(','))
-                  verified = names
-                }
-              } catch (e) {
-                if (/still exposes/.test(String(e?.message ?? e))) throw e
-                // schemas 不可用：保留 restrict 成功，但明确记“未复核”，不假装已证明。
-              }
-              log({ tag: 'child-restrict', sid, childId: id, ok: true, tools: [...childTools], verified })
+              await hardenChildAgent(child, id)
             } catch (e) {
               log({ tag: 'child-restrict', sid, childId: id, ok: false, err: String(e?.message ?? e) })
               try { await act.dispose?.() } catch { /* ignore */ }
@@ -910,12 +964,12 @@ export default {
           if (!childId && sid) {
             try {
               const rows = await ctx.subagents.listChildren(sid)
-              const mine = (rows ?? []).filter((r) => r?.kind === 'child' && r?.mode === 'continuable' && r?.label === CHILD_LABEL)
-              if (mine.length) {
-                childId = mine[mine.length - 1].id
+              const found = pickRecoverableChild(rows, CHILD_LABEL)
+              if (found) {
+                childId = found
                 childByParent.set(sid, childId)
                 childSessions.add(childId)
-                log({ tag: 'child-recovered', sid, childId, found: mine.length })
+                log({ tag: 'child-recovered', sid, childId, found: (rows ?? []).length })
               }
             } catch (e) { log({ tag: 'child-recover-failed', sid, err: String(e?.message ?? e) }) }
           }

@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
+const PLUGIN_VERSION = 'v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -1699,6 +1699,27 @@ function sidFromExec(exec) {
 const SELF_COMPACTION_IDS = new Set()
 export function isSelfCompactionId(id) { return SELF_COMPACTION_IDS.has(String(id ?? '')) }
 
+// 宿主 v4 日志要求 compaction/start.turn 等于“当时仍打开的 turn”（无打开 turn 才可为 null）。
+// turn-end 触发的 fold 是异步的：压缩完成时下一轮可能已经 turn/start。调用方传 null 时
+// 必须以**提交时刻**的会话事件为准回溯，否则会写出 turn:null + 开轮，重载时
+// SessionFormatError: compaction/start does not match the open turn（真机 session-64963da1）。
+export function openTurnOf(session) {
+  try {
+    const evs = session?.ownEvents?.() ?? session?.snapshotEvents?.() ?? session?.events ?? []
+    if (!Array.isArray(evs)) return null
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const e = evs[i]
+      if (!e || typeof e.type !== 'string') continue
+      if (e.type === 'turn/end') return null
+      if (e.type === 'turn/start') {
+        const n = Number(e.data?.turn)
+        return Number.isFinite(n) ? n : null
+      }
+    }
+  } catch { /* 观测/兼容：拿不到事件时保守按无开轮回退 */ }
+  return null
+}
+
 // 折叠提交：走宿主的 compaction 协议，而不是裸 surfaceOp replace。
 // 宿主的对话 UI 只把 append 来源当人类转录、把 replace 副本当模型专用；裸替换会让
 // 用户眼前的助手正文消失。compaction 检查点被 UI 识别为“上下文已压缩”标记，
@@ -1717,7 +1738,8 @@ export function appendFoldCheckpoint(session, {
   const text = String(transcript ?? '')
   const start = seqs[0]
   const end = seqs[seqs.length - 1]
-  const lifecycle = { compactionId, turn: Number.isFinite(turn) ? turn : null }
+  const lifecycleTurn = Number.isFinite(turn) ? turn : openTurnOf(session)
+  const lifecycle = { compactionId, turn: lifecycleTurn }
   SELF_COMPACTION_IDS.add(compactionId)
   try {
     const startEvent = session.append('compaction/start', lifecycle)
@@ -1745,6 +1767,7 @@ export function appendFoldCheckpoint(session, {
     const endEvent = session.append('compaction/end', lifecycle)
     return {
       compactionId,
+      turn: lifecycleTurn,
       startSeq: startEvent.seq,
       summarySeq: summaryEvent.seq,
       replaceSeq: replacementEvent.seq,

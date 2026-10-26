@@ -26,6 +26,9 @@ $pluginLg  = Join-Path $src 'web\logcompiler.mjs'
 # EXTREASON 外置推理插件（发布包顶层 extreason.mjs → 落位 profiles/web/extreason.mjs）
 $pluginEx  = Join-Path $src 'web\extreason.mjs'
 $pluginMem = Join-Path $src 'web\memory.mjs'
+$pluginJan = Join-Path $src 'web\memory-janitor.mjs'
+$pluginVec = Join-Path $src 'web\memory-vec.mjs'
+$pluginTrace = Join-Path $src 'web\memory-trace.mjs'
 $pluginCond= Join-Path $src 'condense\chunk.mjs'
 $pluginIvr = Join-Path $src 'condense\ivr.mjs'
 $webuiDir  = Join-Path $src 'contextinjector-webui'
@@ -45,7 +48,7 @@ function U8($p){ return [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8) }
 function U8W($p,$s){ [IO.File]::WriteAllText($p, $s, (New-Object Text.UTF8Encoding($false))) }
 
 # ---- 源完整校验 -------------------------------------------------------------
-foreach ($f in @($pluginCtx,$pluginLg,$pluginEx,$pluginMem,$pluginCond,$pluginIvr)) {
+foreach ($f in @($pluginCtx,$pluginLg,$pluginEx,$pluginMem,$pluginJan,$pluginVec,$pluginTrace,$pluginCond,$pluginIvr)) {
   if (-not (Test-Path -LiteralPath $f)) { Col Red "缺少发布文件: $f"; exit 1 }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $webuiDir 'package.json'))) { Col Red "缺少 webui 包: $webuiDir"; exit 1 }
@@ -81,6 +84,9 @@ if (Test-Path -LiteralPath (Join-Path $profDir 'contextinjector.mjs')) { Copy-It
 if (Test-Path -LiteralPath (Join-Path $profDir 'logcompiler.mjs'))    { Copy-Item -LiteralPath (Join-Path $profDir 'logcompiler.mjs')    -Destination (Join-Path $bk 'logcompiler.mjs') -Force; $hadAny = $true }
 if (Test-Path -LiteralPath (Join-Path $profDir 'extreason.mjs'))      { Copy-Item -LiteralPath (Join-Path $profDir 'extreason.mjs')      -Destination (Join-Path $bk 'extreason.mjs') -Force; $hadAny = $true }
 if (Test-Path -LiteralPath (Join-Path $profDir 'memory.mjs'))         { Copy-Item -LiteralPath (Join-Path $profDir 'memory.mjs')         -Destination (Join-Path $bk 'memory.mjs') -Force; $hadAny = $true }
+if (Test-Path -LiteralPath (Join-Path $profDir 'memory-janitor.mjs')) { Copy-Item -LiteralPath (Join-Path $profDir 'memory-janitor.mjs') -Destination (Join-Path $bk 'memory-janitor.mjs') -Force; $hadAny = $true }
+if (Test-Path -LiteralPath (Join-Path $profDir 'memory-vec.mjs'))     { Copy-Item -LiteralPath (Join-Path $profDir 'memory-vec.mjs')     -Destination (Join-Path $bk 'memory-vec.mjs') -Force; $hadAny = $true }
+if (Test-Path -LiteralPath (Join-Path $profDir 'memory-trace.mjs'))   { Copy-Item -LiteralPath (Join-Path $profDir 'memory-trace.mjs')   -Destination (Join-Path $bk 'memory-trace.mjs') -Force; $hadAny = $true }
 if (Test-Path -LiteralPath $patch)                                     { Copy-Item -LiteralPath $patch -Destination (Join-Path $bk 'cordis.patch.yml') -Force; $hadAny = $true }
 $tfFile = Join-Path $DSH_HOME 'profiles\toolfold\toolfold.mjs'
 if (Test-Path -LiteralPath $tfFile) { Copy-Item -LiteralPath $tfFile -Destination (Join-Path $bk 'toolfold.mjs') -Force; $hadAny = $true }
@@ -103,6 +109,9 @@ Copy-Item -LiteralPath $pluginCtx -Destination (Join-Path $profDir 'contextinjec
 Copy-Item -LiteralPath $pluginLg  -Destination (Join-Path $profDir 'logcompiler.mjs') -Force
 Copy-Item -LiteralPath $pluginEx  -Destination (Join-Path $profDir 'extreason.mjs') -Force
 Copy-Item -LiteralPath $pluginMem -Destination (Join-Path $profDir 'memory.mjs') -Force
+Copy-Item -LiteralPath $pluginJan -Destination (Join-Path $profDir 'memory-janitor.mjs') -Force
+Copy-Item -LiteralPath $pluginVec -Destination (Join-Path $profDir 'memory-vec.mjs') -Force
+Copy-Item -LiteralPath $pluginTrace -Destination (Join-Path $profDir 'memory-trace.mjs') -Force
 $tfDir = Join-Path $DSH_HOME 'profiles\toolfold'
 if (-not (Test-Path -LiteralPath $tfDir)) { New-Item -ItemType Directory -Path $tfDir -Force | Out-Null }
 Copy-Item -LiteralPath (Join-Path $src 'toolfold\toolfold.mjs') -Destination (Join-Path $tfDir 'toolfold.mjs') -Force
@@ -188,7 +197,7 @@ if (-not (Test-Path -LiteralPath $patch)) {
 
 # ---- 自校验 ----------------------------------------------------------------
 $ok = $true
-foreach ($need in @((Join-Path $profDir 'contextinjector.mjs'), (Join-Path $profDir 'logcompiler.mjs'), (Join-Path $profDir 'extreason.mjs'), (Join-Path $profDir 'memory.mjs'), (Join-Path $DSH_HOME 'profiles\condense\chunk.mjs'), (Join-Path $DSH_HOME 'profiles\condense\ivr.mjs'), (Join-Path $nmPkg 'package.json'), (Join-Path $nmPkg 'lib\index.mjs'), (Join-Path $nmPkg 'lib\client.js'))) {
+foreach ($need in @((Join-Path $profDir 'contextinjector.mjs'), (Join-Path $profDir 'logcompiler.mjs'), (Join-Path $profDir 'extreason.mjs'), (Join-Path $profDir 'memory.mjs'), (Join-Path $profDir 'memory-janitor.mjs'), (Join-Path $profDir 'memory-vec.mjs'), (Join-Path $profDir 'memory-trace.mjs'), (Join-Path $DSH_HOME 'profiles\condense\chunk.mjs'), (Join-Path $DSH_HOME 'profiles\condense\ivr.mjs'), (Join-Path $nmPkg 'package.json'), (Join-Path $nmPkg 'lib\index.mjs'), (Join-Path $nmPkg 'lib\client.js'))) {
   if (-not (Test-Path -LiteralPath $need)) { Col Red "校验失败: $need"; $ok = $false }
 }
 $patchTxt = if (Test-Path -LiteralPath $patch) { U8 $patch } else { '' }
@@ -196,7 +205,7 @@ foreach ($id in $entryYaml.Keys) { if (-not (Has-InsertYaml $patchTxt $id)) { Co
 
 if ($ok) {
   Col Green "`n安装完成（web profile）。"
-  Col Green ("  插件: $profDir\contextinjector.mjs / logcompiler.mjs / extreason.mjs / memory.mjs")
+  Col Green ("  插件: $profDir\contextinjector.mjs / logcompiler.mjs / extreason.mjs / memory.mjs / memory-janitor.mjs / memory-vec.mjs / memory-trace.mjs")
   Col Green ("  WebUI: $nmPkg")
   Col Yellow '下一步（重要）：'
   Col Yellow '  1) 重启 dsh web（client 装载器按名缓存，重启才生效；F5 不够）。'
