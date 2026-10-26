@@ -1,7 +1,7 @@
 # live 审计：折叠配置与记忆约束（2026-10-26）
 
 本文件不含原始会话正文、密码或临时 key；原文只在本地 session/DB。
-测试工作区：`C:\Users\Administrator\Desktop\TESTspace3`。
+测试工作区：`<TESTspace3>`。
 
 ## 1. 折叠配置
 

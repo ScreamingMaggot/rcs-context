@@ -44,7 +44,7 @@ const cycle2 = [
   ['memory-ledger.mjs', 'web/memory-ledger.mjs'],
   ['memory-observations.mjs', 'web/memory-observations.mjs'],
   ['memory-online-bridge.mjs', 'web/memory-online-bridge.mjs'],
-  ['ledger-online.mjs', 'work/testspace2-online/ledger-online.mjs'],
+  ['ledger-online.mjs', 'web/ledger-online.mjs'],
 ]
 const cycle2Backup = (install.match(/\$cycle2Names = @\([^)]*\)/) ?? [''])[0]
 const selfCheckSection = install.split('# ---- 自校验')[1] ?? ''

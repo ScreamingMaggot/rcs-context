@@ -78,8 +78,8 @@ Qwen 的 9 次谓词归一说明确定性 taxonomy 不是空转；Spark 仅 1 �
 ## 7. Live 部署与归档（2026-10-26）
 
 - live web profile 已安装 `ledger-online.mjs` 与 7 个 Cycle 2 模块，`cordis.patch.yml` 新增 `ledger-online` 入口；备份在 `~/.dsh/.statecompiler-backup-20261026-before-ledger-live/`。
-- 启动脚本 `D:\DSH\deepseek-harness\start_dsh_web.cmd` 增加：`LEDGER_ONLINE=1`、`LEDGER_ONLINE_STATE_DIR=%USERPROFILE%\.dsh\state-compiler\ledger-online-live`、`LEDGER_ONLINE_WORKSPACE=C:/Users/Administrator/Desktop/TESTspace3`、`LEDGER_ONLINE_REQUIRE_CWD=1`。
-- live 已重启（PID 33936，8080），日志确认 `[LEDGER_ONLINE] armed ... workspaceRoot=C:/Users/Administrator/Desktop/TESTspace3 scope=ws:c:/users/administrator/desktop/testspace3 ... routes=closed (candidates only)`；新状态库表齐全。
+- 启动脚本 `D:\DSH\deepseek-harness\start_dsh_web.cmd` 增加：`LEDGER_ONLINE=1`、`LEDGER_ONLINE_STATE_DIR=%USERPROFILE%\.dsh\state-compiler\ledger-online-live`、`LEDGER_ONLINE_WORKSPACE=<TESTspace3>`、`LEDGER_ONLINE_REQUIRE_CWD=1`。
+- live 已重启（PID 33936，8080），日志确认 `[LEDGER_ONLINE] armed ... workspaceRoot=<TESTspace3> scope=ws:c:/users/administrator/desktop/testspace3 ... routes=closed (candidates only)`；新状态库表齐全。
 - cwd 闸门：会话报告的 cwd 与 `TESTspace3` 不一致时，事件不归档、不提案、不注入；cwd 未报告时保持兼容。
 - 人工测试请在 **cwd=C:\Users\Administrator\Desktop\TESTspace3 的主会话**中进行；旧消息不会补课，重启后只处理新消息。耐久规则（如“项目约定：所有测试统一使用 node:test。”）应产生候选，任务/问句应只增加 `qwen.skipped`。只读检查器：
   `node work/semantic-opt-20261026/live-status.mjs`（打印 status、最近 run、候选 quote/谓词/拒绝原因与最近观测）。状态目录 `~/.dsh/state-compiler/ledger-online-live/`。

@@ -20,6 +20,20 @@ AI-CACHE/
 work/**/*.sqlite
 work/**/*.zstd
 work/**/*.jsonl
+# 本地实验驱动、原始结果与运行状态：摘要和源码入库，原始结果不入库
+work/**/*.checkpoint.json
+work/semantic-opt-20261026/fresh-testspace3.json
+work/semantic-opt-20261026/testspace3-replay.json
+work/semantic-opt-20261026/replay-testspace3.mjs
+work/testspace2-online/online-harness.mjs
+work/testspace2-online/realistic-harness.mjs
+work/testspace2-online/concurrent-harness.mjs
+work/testspace2-online/probe-followup.mjs
+work/testspace2-online/online-result.json
+work/testspace2-online/realistic-result.json
+work/testspace2-online/concurrent-result.json
+work/testspace2-online/probe-result.json
+work/testspace2-online/attribution-smoke.json
 work/**/logs/
 work/**/*-logs/
 work/**/*.png
