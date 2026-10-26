@@ -79,12 +79,13 @@ Qwen 的 9 次谓词归一说明确定性 taxonomy 不是空转；Spark 仅 1 �
 
 ### 7.1 TESTspace3 日志对照
 
-- 同一工作区共 6 个会话、16 条真人消息；3 个主会话被 live 记录为 `cwd-mismatch`，3 个子会话按设计跳过。
+- 首轮同一工作区共 6 个会话、16 条真人消息；3 个主会话被 live 记录为 `cwd-mismatch`，3 个子会话按设计跳过。切换工作区后又新增 4 个会话、4 条真人消息。
 - 第一次 live 测试实际结果：**0 条归档、0 个 proposal run、0 次 Qwen 调用**；`cwdMismatches=370`、`injection.skipped=35`。根因是固定的 `D:/RCS/src` 与测试会话 `C:\Users\Administrator\Desktop\TESTspace3` 不一致，属于部署配置问题，不是语义策略失败。
 - 当前闸门对 16 条消息的判定：3 条可入库（均为显式 `node:test` 约定），其余问句/任务/计划/无信号消息跳过。
 - 日志暴露并修复了一个误报：“简单些好吗不要雷霆大思考”原本因“不要”被判为可入库；新增 `好吗/行吗/可以吗/行不行` 请求标记，归为 question。
 - 用日志中的 3 条可入库消息离线回放 Qwen：2 条唯一规则均得到 `project.constraint` 候选，quote 为 `项目约定：所有测试统一使用 node:test` / `项目约定所有测试统一使用 node:test`；模型原判 `project.decision`，被确定性 taxonomy 纠正（`explicit-rule-noun`）。
-- 旧会话消息不会自动回填；live 工作区已切到 TESTspace3 并重启，请在主会话重新发送新消息观察候选。
+- 旧会话消息不会自动回填。切换工作区后的实测：4 个新会话的 4 条真人消息已归档（`archived.userMessages=4`、`cwdMismatches=0`），内容为 `hi` / 工作区询问，全部 `no-durable-signal`，`qwenCalls=0`；切换后尚未发送耐久规则，因此还没有候选。
+- live 进程在测试后收到 `^C` 停止；Spark `off: none` 配置已保存，下次用快捷方式启动即生效，无需再改。
 - 残余：路由仍全关；子会话按设计不归档；live 主模型启动器仍提示 `.env` 无 `DEEPSEEK_API_KEY`，但 `deepseek-account` 模型列表加载正常；语义维护走本地 Ollama Qwen，不依赖该 key。
 
 ### 7.2 Spark off-mode CoT（2026-10-26）
@@ -92,10 +93,11 @@ Qwen 的 9 次谓词归一说明确定性 taxonomy 不是空转；Spark 仅 1 �
 - 用 Spark x2.6 直连探测同一提示的四种请求：`reasoning_effort:"none"` → `reasoning_content` 长度 0、12 completion tokens；**省略 reasoning 字段** → `reasoning_content` 461 字并被 `max_tokens` 截断（对照组，说明 Spark 默认思考）；`thinking:{type:"disabled"}` 与 `enable_thinking:false` 也都为 0。
 - 根因在 live provider 配置：DSH 的 `reasoningEfforts.off: null` 表示“省略该字段”，这只在“不思考=参数缺省”的 provider 上成立；Spark 缺省时会思考。已把 live Spark 的 `off` 改为 `none`（`cordis.patch.yml`），`dsh --profile web --dump-config` 显示 `'off': none`，并重启 live 生效。
 - 语义提案的 Spark 直连调用本来就显式发送 `reasoning_effort:"none"`，因此 `fresh-spark` 与 864 次重放不受影响；本次修的是 live UI 选择“off”时的 provider 映射。
+- live 进程在测试后已停止（日志末尾 `^C`）；provider 配置保留，下次启动生效。
 
 ## 8. 文件
 
 - 新增：`web/memory-durability.mjs`、`tests/memory-durability.test.mjs`
 - 修改：`web/memory-proposals.mjs`、`web/memory-online-bridge.mjs`、`tests/memory-proposals.test.mjs`、`tests/memory-proposal-eval.test.mjs`、`tests/memory-online-bridge.test.mjs`、`work/testspace2-online/README.md`
 - 证据：`work/semantic-opt-20261026/{analysis.json,replay-production.json,fresh-qwen.json,fresh-spark.json}`
-- 未提交 git。
+- 已提交并推送 `c7e801c`（61 files, 77509 insertions）到 `origin/master`；本次文档订正为后续提交。TESTspace3 的原始会话 zstd/重放 JSON 仅本地保留，未随仓库发布。
