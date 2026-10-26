@@ -542,6 +542,29 @@ try {
     check('a required matching cwd accepts a session in the fixed workspace',
       accepted === true && bridge.status().archived.userMessages === 1 &&
       bridge.status().cwdMismatches === 1 && model.calls.length === 1)
+    const unknown = bridge.handleEvent({ id: 's3' }, 's3',
+      userEvent(USER_TEXT, { seq: 3, t: T0 + 3 }))
+    await bridge.drain()
+    check('a required cwd rejects a session that reports no cwd',
+      unknown === false && bridge.status().cwdUnknown === 1 &&
+      bridge.status().lastCwdUnknown?.sid === 's3' &&
+      bridge.status().archived.userMessages === 1 && model.calls.length === 1)
+  }
+
+  // ---------------------------------------------------------------------------
+  // 12c. Without require-cwd a missing cwd is diagnostic only; the event still
+  // archives, so ordinary local use is not silently disabled.
+  // ---------------------------------------------------------------------------
+  {
+    const model = fakeModel(emptyOutput)
+    const bridge = makeBridge(model)
+    const accepted = bridge.handleEvent({ id: 's1' }, 's1',
+      userEvent(USER_TEXT, { seq: 1, t: T0 + 1 }))
+    await bridge.drain()
+    check('a missing cwd is recorded but archived when cwd is not required',
+      accepted === true && bridge.status().cwdUnknown === 1 &&
+      bridge.status().cwdMismatches === 0 &&
+      bridge.status().archived.userMessages === 1 && model.calls.length === 1)
   }
 
   // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import {
   analyzeDurableUtterance,
   quoteWithinSpans,
   resolveQuotePredicate,
+  sentenceSpans,
 } from './memory-durability.mjs'
 
 // Cycle 2 proposal schema. The model may choose only an operation, a predicate,
@@ -83,6 +84,15 @@ function isStartBoundary(text, index) {
   if (index < 0 || index >= text.length) return false
   const char = text[index]
   if (QUOTE_START_BOUNDARY_CHARS.has(char)) return true
+  // Whitespace is a start margin only after a sentence end: "rule. Next" is two
+  // clauses, while "rule next" is one and must not shed its first word.
+  if (WHITESPACE_CHAR.test(char)) {
+    let prev = index - 1
+    while (prev >= 0 && WHITESPACE_CHAR.test(text[prev])) prev--
+    if (prev < 0) return true
+    return TERMINAL_CHARS.has(text[prev]) || text[prev] === ';' || text[prev] === '.' ||
+      text[prev] === '\n'
+  }
   return CONDITIONAL_BOUNDARY_CHARS.has(char) && isConditionalBoundary(text, index)
 }
 
@@ -118,6 +128,27 @@ function proposalFailure(error, errors = [error]) {
   return { ok: false, error, errors }
 }
 
+// An exception/qualifier ("除支付接口外", "但折扣除外", "except ...") belongs to the
+// rule it limits. A quote that stops before it silently turns a conditional rule
+// into an unconditional one; a quote that starts at it is a dangling fragment.
+const EXCEPTION_MARKER =
+  /(?:除了?[^，。；！？\n]{0,24}?外|除外|例外|除非|但(?!不|凡)|\bexcept\b|\bunless\b|\bhowever\b)/i
+
+function dropsException(text, start, end) {
+  const sentence = sentenceSpans(text).find((span) => start >= span.start && end <= span.end)
+  if (!sentence) return false
+  const sentenceText = text.slice(sentence.start, sentence.end)
+  const marker = EXCEPTION_MARKER.exec(sentenceText)
+  if (!marker) return false
+  const trimmedStart = sentence.start + (sentenceText.length - sentenceText.trimStart().length)
+  const trimmedEnd = sentence.start + sentenceText.trimEnd().length
+  if (start <= trimmedStart && end >= trimmedEnd) return false
+  const markerStart = sentence.start + marker.index
+  const markerEnd = markerStart + marker[0].length
+  if (start >= markerStart) return true
+  return end < markerEnd
+}
+
 function hasClauseBoundary(text, start, end) {
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start ||
       end > text.length) return false
@@ -128,7 +159,10 @@ function hasClauseBoundary(text, start, end) {
   // A quote that carries its own sentence terminator is a complete sentence even
   // when the next sentence starts immediately. The start rule still blocks mining
   // a fragment out of a negated clause, because such a fragment starts mid-clause.
-  return end > start && TERMINAL_CHARS.has(text[end - 1])
+  // An English period counts only when it really separates clauses ("rule. Next"),
+  // not inside a decimal, version, path, or URL ("3.5", "a.txt").
+  return end > start && (TERMINAL_CHARS.has(text[end - 1]) ||
+    (text[end - 1] === '.' && isConditionalBoundary(text, end - 1)))
 }
 
 function proposalParseFailure(error) {
@@ -315,6 +349,7 @@ export function validateProposal(
   }
   const valueText = record.text.slice(start, end)
   if (valueText !== quote) return proposalFailure('quote-span-mismatch')
+  if (dropsException(record.text, start, end)) return proposalFailure('quote-drops-exception')
 
   // The model chooses a predicate, but the taxonomy is defined deterministically.
   // Resolve on the containing durable sentence, not only the quote: a decision's

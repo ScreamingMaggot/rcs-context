@@ -34,5 +34,31 @@ check('⑦ 卸载器三个清单都包含全部 memory 模块', lists.length ===
 const pkg = JSON.parse(read('package.json'))
 check('⑧ 发布包 files 覆盖 web 目录', Array.isArray(pkg.files) && pkg.files.includes('web'))
 
+// Cycle 2 is a separate module graph (blog entry ledger-online), so it has to be
+// listed explicitly: memory.mjs does not import any of these files.
+const cycle2 = [
+  ['memory-durability.mjs', 'web/memory-durability.mjs'],
+  ['memory-proposals.mjs', 'web/memory-proposals.mjs'],
+  ['memory-proposal-store.mjs', 'web/memory-proposal-store.mjs'],
+  ['memory-ledger-core.mjs', 'web/memory-ledger-core.mjs'],
+  ['memory-ledger.mjs', 'web/memory-ledger.mjs'],
+  ['memory-observations.mjs', 'web/memory-observations.mjs'],
+  ['memory-online-bridge.mjs', 'web/memory-online-bridge.mjs'],
+  ['ledger-online.mjs', 'work/testspace2-online/ledger-online.mjs'],
+]
+const cycle2Backup = (install.match(/\$cycle2Names = @\([^)]*\)/) ?? [''])[0]
+const selfCheckSection = install.split('# ---- 自校验')[1] ?? ''
+for (const [name, rel] of cycle2) {
+  const winRel = rel.replace(/\//g, '\\')
+  check(`⑨ ${name} 源文件存在`, existsSync(join(ROOT, rel)))
+  check(`⑩ ${name} 安装器声明`, install.includes(`Join-Path $src '${winRel}'`))
+  check(`⑪ ${name} 安装器落位`, install.includes(`Destination (Join-Path $profDir '${name}')`))
+  check(`⑫ ${name} 安装器备份`, cycle2Backup.includes(`'${name}'`))
+  check(`⑬ ${name} 安装器自校验`, selfCheckSection.includes(`'${name}'`))
+  check(`⑭ ${name} 卸载器清单`, lists.length === 3 && lists.every((l) => l.includes(name)))
+}
+check('⑮ ledger-online 补丁项已声明',
+  install.includes("'ledger-online'") && install.includes('id: ledger-online'))
+
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

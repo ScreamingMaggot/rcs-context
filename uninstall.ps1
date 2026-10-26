@@ -57,7 +57,7 @@ function Strip-StateCompiler($txt) {
         $block.Add($b); $j++
       }
       $joined = ($block -join "`n")
-      if ($joined -match 'id:\s*contextinjector' -or $joined -match 'id:\s*logcompiler' -or $joined -match 'id:\s*extreason' -or $joined -match 'id:\s*memory') {
+      if ($joined -match 'id:\s*contextinjector' -or $joined -match 'id:\s*logcompiler' -or $joined -match 'id:\s*extreason' -or $joined -match 'id:\s*memory' -or $joined -match 'id:\s*ledger-online') {
         # 命中目标 → 跳过整块（含开头的 '- insert:')
         $i = $j; continue
       }
@@ -74,7 +74,7 @@ function Strip-StateCompiler($txt) {
 # ---- 执行 -------------------------------------------------------------------
 if ($hasBk) {
   Col Yellow "使用备份还原: $BackupDir"
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs','cordis.patch.yml')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs','memory-durability.mjs','memory-proposals.mjs','memory-proposal-store.mjs','memory-ledger-core.mjs','memory-ledger.mjs','memory-observations.mjs','memory-online-bridge.mjs','ledger-online.mjs','cordis.patch.yml')) {
     $b = Join-Path $BackupDir $name
     $t = Join-Path $profDir $name
     if (Test-Path -LiteralPath $b) { Copy-Item -LiteralPath $b -Destination $t -Force; Col Green "还原 $name" }
@@ -89,7 +89,7 @@ if ($hasBk) {
     Col Green '删除新增 contextinjector-webui（原貌无此包）'
   }
   # 备份里没有而仍在的（本次安装新增、安装前不存在）→ 删除
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs','memory-durability.mjs','memory-proposals.mjs','memory-proposal-store.mjs','memory-ledger-core.mjs','memory-ledger.mjs','memory-observations.mjs','memory-online-bridge.mjs','ledger-online.mjs')) {
     $b = Join-Path $BackupDir $name
     $t = Join-Path $profDir $name
     if (-not (Test-Path -LiteralPath $b) -and (Test-Path -LiteralPath $t)) { Remove-Item -LiteralPath $t -Force; Col Green "删除新增 $name" }
@@ -99,7 +99,7 @@ if ($hasBk) {
   }
 } else {
   Col Yellow '未找到备份，直接按现状移除。'
-  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs')) {
+  foreach ($name in @('contextinjector.mjs','logcompiler.mjs','extreason.mjs','memory.mjs','memory-janitor.mjs','memory-vec.mjs','memory-trace.mjs','memory-durability.mjs','memory-proposals.mjs','memory-proposal-store.mjs','memory-ledger-core.mjs','memory-ledger.mjs','memory-observations.mjs','memory-online-bridge.mjs','ledger-online.mjs')) {
     $t = Join-Path $profDir $name
     if (Test-Path -LiteralPath $t) { Remove-Item -LiteralPath $t -Force; Col Green "删除 $name" }
   }

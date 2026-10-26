@@ -268,14 +268,15 @@ export async function observationFromProbe(input) {
     stat?.mtime instanceof Date ? stat.mtime.getTime() : undefined)
   const sha256 = createHash('sha256').update(bytes).digest('hex')
   const value = { exists: true, size: bytes.length, sha256 }
+  // Hash and size are the evidence; the bytes are not. Archiving the body made a
+  // probe of a secrets file copy its contents into the ledger, where every later
+  // reader and export could see them.
   const rawPayload = {
     path,
     resolvedPath,
     probeId,
     size: bytes.length,
     sha256,
-    contentEncoding: 'base64',
-    content: bytes.toString('base64'),
   }
   // mtime is only observed when the host actually reported a finite one; an absent
   // mtime must not become `undefined`, which canonical JSON and the archive reject.

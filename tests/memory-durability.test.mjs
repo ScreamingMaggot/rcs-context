@@ -11,6 +11,7 @@ import {
   analyzeDurableUtterance,
   quoteWithinSpans,
   resolveQuotePredicate,
+  sentenceSpans,
 } from '../web/memory-durability.mjs'
 import {
   PROPOSAL_PROMPT_VERSION,
@@ -84,6 +85,27 @@ check('a fragment mined from a decimal version is still refused',
 check('a fragment mined from a file name is still refused',
   errorOf(validate('不要改 /srv/rcs.config 文件。', 'config 文件', { enforceDurability: false })) === 'quote-boundary')
 
+// Sentence spans: adjacent sentences stay separate, and an unambiguous English
+// period ends a sentence without splitting a decimal/version/path.
+const adjacent = analyzeDurableUtterance('项目约定：所有测试统一使用 node:test。回答先给结论。')
+check('adjacent sentences keep separate durable spans', adjacent.spans.length === 2,
+  JSON.stringify(adjacent.spans))
+const second = validate('项目约定：所有测试统一使用 node:test。回答先给结论。', '回答先给结论')
+check('a quote in the second sentence resolves against its own sentence',
+  second.ok === true && second.proposal.predicate === 'project.preference',
+  second.ok ? second.proposal.predicate : second.error)
+check('an English sentence boundary splits two rules',
+  sentenceSpans('first sentence is a rule. Second sentence is also a rule.').length === 2,
+  JSON.stringify(sentenceSpans('first sentence is a rule. Second sentence is also a rule.')))
+const englishSecond = validate('first sentence is a rule. Second sentence is also a rule.',
+  'Second sentence is also a rule')
+check('a quote in the second English sentence is accepted',
+  englishSecond.ok === true, englishSecond.ok ? '' : englishSecond.error)
+check('a decimal is not an English sentence boundary',
+  sentenceSpans('version 3.5 stays one sentence').length === 1)
+check('a path is not an English sentence boundary',
+  sentenceSpans('open C:/proj/a.txt now').length === 1)
+
 // ---------------------------------------------------------------------------
 // 2. Intent gate: task/question/transient/injection cases are refused before
 //    the quote rule; the earlier false refusals stay eligible.
@@ -105,6 +127,38 @@ const gateCases = [
   ['偏好小步提交，而不是一次性大改。', true, null],
   ['项目约定：所有测试统一使用 node:test。', true, null],
   ['以后每次回答都先给结论，再给细节。', true, null],
+  ['shell不可用，你得用pwsh', true, null],
+  ['bash 不可用，试试 pwsh', false, 'no-durable-signal'],
+  ['README 里写着 shell 不可用，得用 pwsh。', false, 'file-observation'],
+  ['端口改成 8080，然后重新部署。', false, 'task-assignment'],
+  ['帮我加一个测试文件', false, 'task-assignment'],
+  ['数据库用 MySQL 还是 PostgreSQL', false, 'question'],
+  ['要不要加个缓存层', false, 'question'],
+  ['你对这个工作区有何认识？先不要调用工具', false, 'question'],
+  ['如果 bash 不可用，你试试 pwsh', false, null],
+  ['先给结论，再给细节', true, null],
+  ['把金额一律使用整数分。', true, null],
+  ['以后端口一律用 8080', true, null],
+  ['决定采用 SQLite，然后迁移数据。', true, null],
+  ['这条回复先给结论', false, 'transient'],
+  ['这次测试统一用 node:test', false, 'transient'],
+  ['所有回复先给结论', true, null],
+  ['我需要你清理这个工作区，去除里面的所有文件', false, 'task-assignment'],
+  ['我注意到 inject 栏完全不显示内容，先告诉你状况', false, 'status-report'],
+  ['🧠 Context Inject OBSERVE targets: 1 4 总触发 2', false, 'status-report'],
+  ['你是否还需要了解其它文件？', false, 'question'],
+  ['token 不是有精确返回值吗，重启就重启', false, 'question'],
+  ['接口端口改为 9000。', true, null],
+  ['我们决定数据库使用 SQLite，不引入 PostgreSQL。', true, null],
+  ['我们改用独立 worktree 执行 Cycle 2。', true, null],
+  ['提交前必须跑 node tests/run-all.mjs 并保持全绿。', true, null],
+  ['禁止把模型输出直接写入账本。', true, null],
+  ['JSON 输出必须是封闭 schema，出现未知字段即整体拒绝。', true, null],
+  ['已经重启，请运行测试', false, null],
+  ['已经决定以后统一用 node:test', true, null],
+  ['now add this into memory: any model working on this device is a member of mine', true, null],
+  ['L2 不能丢失任务树的语义信息，我们想一想还需要哪些信息？', true, null],
+  ['我认为双层 LLM 是必要的，L2 标定节点比较容易。', true, null],
 ]
 for (const [text, eligible, reason] of gateCases) {
   const result = analyzeDurableUtterance(text)
@@ -164,6 +218,8 @@ checkCorpus('24-case corpus', corpus24.cases)
 // Regression cases that the first rule draft got wrong.
 check('固定为 is a constraint, not a decision verb',
   resolveQuotePredicate('接口端口固定为 8848')?.predicate === 'project.constraint')
+check('an unavailable tool with a required substitute is a constraint',
+  resolveQuotePredicate('shell不可用，你得用pwsh')?.predicate === 'project.constraint')
 check('a decision that mentions a rule noun stays a decision',
   resolveQuotePredicate('决定把评分器放在 proposal 模块内，避免重复实现证据规则。')?.predicate === 'project.decision')
 check('naming is a preference even with a universal adverb',
@@ -177,6 +233,19 @@ check('validator refuses a task instruction before span checking',
   errorOf(validate(taskText, taskText)) === 'evidence-not-durable:task-assignment')
 check('validator refuses a question quoted in full',
   errorOf(validate('金额和折扣规则是什么？', '金额和折扣规则是什么？')) === 'evidence-not-durable:question')
+
+const exceptionText = '所有接口可以匿名访问，除支付接口外。'
+check('a quote that drops the exception is refused',
+  errorOf(validate(exceptionText, '所有接口可以匿名访问')) === 'quote-drops-exception')
+check('a quote that starts at the exception is refused',
+  errorOf(validate(exceptionText, '除支付接口外')) === 'quote-drops-exception')
+check('the full exception clause is accepted',
+  validate(exceptionText, '所有接口可以匿名访问，除支付接口外').ok === true)
+const butText = '业务规则：金额一律使用整数分，但折扣除外。'
+check('a quote that drops a 但 qualifier is refused',
+  errorOf(validate(butText, '金额一律使用整数分')) === 'quote-drops-exception')
+check('the full 但 clause is accepted',
+  validate(butText, '金额一律使用整数分，但折扣除外').ok === true)
 
 const mixedText = '请你实现分级折扣。业务规则：金额一律使用整数分。'
 check('a whole-message quote in a mixed task/rule message is outside durable spans',
@@ -383,8 +452,12 @@ check('85-case replay: no content-correct label is lost to a predicate mistake',
   `contentTP=${baselineStats.contentTP} tp=${baselineStats.tp}`)
 check('85-case replay: taxonomy corrections are applied',
   baselineStats.adjustments === 3, baselineStats.adjustments)
-check('85-case replay: residual errors are model operation/extraction failures, not gate losses',
-  baselineStats.tp >= 64 && baselineStats.fp <= 2 && baselineStats.fn <= 6,
+// dec-05's raw proposal quotes two independent decisions as one span; the clause
+// rule now refuses it (the model must emit one proposal per rule), so its two
+// content hits move from accepted to rejected. That is a granularity failure, not
+// a gate loss of a correctly extracted per-fact quote.
+check('85-case replay: residual errors are model operation/extraction/granularity failures, not gate losses',
+  baselineStats.tp >= 62 && baselineStats.fp <= 2 && baselineStats.fn <= 8,
   JSON.stringify(baselineStats))
 
 if (fails > 0) {

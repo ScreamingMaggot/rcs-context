@@ -24,6 +24,13 @@ work/**/logs/
 work/**/*-logs/
 work/**/*.png
 work/**/*.key
+# 留出集来自真实历史会话：原始消息/标签仅本地；评测脚本、规则与构造集规格随源码发布
+work/heldout-20261026/*
+!work/heldout-20261026/eval.mjs
+!work/heldout-20261026/RUBRIC-v2.md
+!work/heldout-20261026/CONSTRUCT-SPEC.md
+!work/heldout-20261026/GATE-FREEZE.md
+!work/heldout-20261026/LIVE-AUDIT-20261026.md
 
 # 本地打包产物（npm pack）
 *.tgz

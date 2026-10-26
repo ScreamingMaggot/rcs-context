@@ -520,6 +520,12 @@ test('tool and probe path variants resolve to one file entity with no alias fact
   assert.equal(probe.source.resolvedPath, 'c:\\proj\\a.txt')
   assert.equal(probe.rawPayload.path, 'c:/proj/a.txt')
   assert.equal(probe.rawPayload.resolvedPath, 'c:\\proj\\a.txt')
+  // A probe records hash/size evidence, never the file body: probing a secrets file
+  // must not copy it into the ledger and every later export.
+  assert.equal(Object.hasOwn(probe.rawPayload, 'content'), false)
+  assert.equal(Object.hasOwn(probe.rawPayload, 'contentEncoding'), false)
+  assert.equal(probe.rawPayload.size, 1)
+  assert.match(probe.rawPayload.sha256, /^[0-9a-f]{64}$/)
   assert.equal(projection.entities.length, 1)
   assert.equal(projection.currentFacts.filter((fact) => fact.predicate === 'file.exists').length, 1)
   assert.equal(current(projection, 'file.exists').value, true)

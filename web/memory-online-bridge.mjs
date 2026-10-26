@@ -218,6 +218,8 @@ export class LedgerOnlineBridge {
     this._cwdWarned = new Set()
     this._cwdMismatches = 0
     this._lastCwdMismatch = null
+    this._cwdUnknown = 0
+    this._lastCwdUnknown = null
 
     // Proposal serialization: one chain per scope+session keeps Qwen CPU work from
     // overlapping while leaving unrelated sessions independent.
@@ -253,8 +255,8 @@ export class LedgerOnlineBridge {
     if (!event || typeof event.type !== 'string') return false
     const sidValue = identifier(sid, session?.id, session?.sessionId)
     if (!sidValue) return false
-    const mismatch = this._checkCwd(session, sidValue)
-    if (this.requireWorkspaceCwd && mismatch) return false
+    const cwd = this._checkCwd(session, sidValue)
+    if (this.requireWorkspaceCwd && (!cwd.known || cwd.mismatch)) return false
     const type = event.type === 'tool-call' ? 'tool/call' : event.type
     if (type === 'user/message') return this._handleUserMessage(sidValue, event)
     if (type === 'tool/call') return this._handleToolCall(sidValue, event)
@@ -262,28 +264,50 @@ export class LedgerOnlineBridge {
     return false
   }
 
-  // Pure cwd comparison. Null means "no known mismatch": an absent cwd is allowed,
-  // and a path that cannot be normalized is not evidence of a foreign workspace.
-  _cwdMismatchOf(session) {
+  // Tri-state cwd comparison. `known: false` means the host did not report a cwd
+  // (or it could not be normalized); in require-cwd mode that is a rejection, not
+  // a wildcard. Outside require-cwd it is recorded but does not drop the event.
+  _cwdStateOf(session) {
     const sessionCwd = identifier(
       session?.cwd, session?.meta?.cwd, session?.header?.cwd,
       session?.workspace, session?.workspaceRoot,
     )
-    if (!sessionCwd) return null
+    if (!sessionCwd) return { known: false, sessionCwd: null }
     let normalized
-    try { normalized = normalizeWorkspacePath(sessionCwd) } catch { return null }
+    try { normalized = normalizeWorkspacePath(sessionCwd) } catch {
+      return { known: false, sessionCwd }
+    }
     let expected
-    try { expected = normalizeWorkspacePath(this.workspaceRoot) } catch { return null }
-    if (normalized === expected) return null
-    return { sessionCwd, normalized, expected }
+    try { expected = normalizeWorkspacePath(this.workspaceRoot) } catch {
+      return { known: false, sessionCwd }
+    }
+    if (normalized === expected) return { known: true, mismatch: null }
+    return { known: true, mismatch: { sessionCwd, normalized, expected } }
   }
 
   // The session cwd is evidence about the host's intent, not an instruction. It is
   // compared with the fixed workspace and recorded once per offending value.
-  // Returns true when a known cwd differs from the fixed workspace.
   _checkCwd(session, sid) {
-    const mismatch = this._cwdMismatchOf(session)
-    if (!mismatch) return false
+    const state = this._cwdStateOf(session)
+    if (!state.known) {
+      this._cwdUnknown += 1
+      this._lastCwdUnknown = {
+        sid,
+        sessionCwd: state.sessionCwd,
+        workspaceRoot: this.workspaceRoot,
+        at: this.now(),
+      }
+      if (!this._cwdWarned.has(`${sid}\u0000unknown`)) {
+        this._cwdWarned.add(`${sid}\u0000unknown`)
+        console.warn(
+          `[LEDGER_ONLINE] cwd-unknown sid=${sid} session=${state.sessionCwd ?? 'none'} ` +
+          `fixed=${this.workspaceRoot}; require-cwd=${this.requireWorkspaceCwd}`,
+        )
+      }
+      return { known: false, mismatch: false }
+    }
+    const mismatch = state.mismatch
+    if (!mismatch) return { known: true, mismatch: false }
     this._cwdMismatches += 1
     this._lastCwdMismatch = {
       sid,
@@ -299,7 +323,7 @@ export class LedgerOnlineBridge {
         `fixed=${this.workspaceRoot}; session cwd ignored`,
       )
     }
-    return true
+    return { known: true, mismatch: true }
   }
 
   _seqOf(event, sid) {
@@ -623,6 +647,8 @@ export class LedgerOnlineBridge {
       },
       cwdMismatches: this._cwdMismatches,
       lastCwdMismatch: this._lastCwdMismatch,
+      cwdUnknown: this._cwdUnknown,
+      lastCwdUnknown: this._lastCwdUnknown,
       errors: {
         count: this._errors.count,
         last: this._errors.last,

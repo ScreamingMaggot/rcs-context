@@ -29,6 +29,16 @@ $pluginMem = Join-Path $src 'web\memory.mjs'
 $pluginJan = Join-Path $src 'web\memory-janitor.mjs'
 $pluginVec = Join-Path $src 'web\memory-vec.mjs'
 $pluginTrace = Join-Path $src 'web\memory-trace.mjs'
+# Cycle 2 semantic layer. ledger-online.mjs is the host entry; it imports the bridge
+# from the same profile directory after installation.
+$pluginDurability   = Join-Path $src 'web\memory-durability.mjs'
+$pluginProposals    = Join-Path $src 'web\memory-proposals.mjs'
+$pluginProposalStore= Join-Path $src 'web\memory-proposal-store.mjs'
+$pluginLedgerCore   = Join-Path $src 'web\memory-ledger-core.mjs'
+$pluginLedger       = Join-Path $src 'web\memory-ledger.mjs'
+$pluginObservations = Join-Path $src 'web\memory-observations.mjs'
+$pluginBridge       = Join-Path $src 'web\memory-online-bridge.mjs'
+$pluginLedgerOnline = Join-Path $src 'work\testspace2-online\ledger-online.mjs'
 $pluginCond= Join-Path $src 'condense\chunk.mjs'
 $pluginIvr = Join-Path $src 'condense\ivr.mjs'
 $webuiDir  = Join-Path $src 'contextinjector-webui'
@@ -48,7 +58,7 @@ function U8($p){ return [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8) }
 function U8W($p,$s){ [IO.File]::WriteAllText($p, $s, (New-Object Text.UTF8Encoding($false))) }
 
 # ---- 源完整校验 -------------------------------------------------------------
-foreach ($f in @($pluginCtx,$pluginLg,$pluginEx,$pluginMem,$pluginJan,$pluginVec,$pluginTrace,$pluginCond,$pluginIvr)) {
+foreach ($f in @($pluginCtx,$pluginLg,$pluginEx,$pluginMem,$pluginJan,$pluginVec,$pluginTrace,$pluginDurability,$pluginProposals,$pluginProposalStore,$pluginLedgerCore,$pluginLedger,$pluginObservations,$pluginBridge,$pluginLedgerOnline,$pluginCond,$pluginIvr)) {
   if (-not (Test-Path -LiteralPath $f)) { Col Red "缺少发布文件: $f"; exit 1 }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $webuiDir 'package.json'))) { Col Red "缺少 webui 包: $webuiDir"; exit 1 }
@@ -87,6 +97,11 @@ if (Test-Path -LiteralPath (Join-Path $profDir 'memory.mjs'))         { Copy-Ite
 if (Test-Path -LiteralPath (Join-Path $profDir 'memory-janitor.mjs')) { Copy-Item -LiteralPath (Join-Path $profDir 'memory-janitor.mjs') -Destination (Join-Path $bk 'memory-janitor.mjs') -Force; $hadAny = $true }
 if (Test-Path -LiteralPath (Join-Path $profDir 'memory-vec.mjs'))     { Copy-Item -LiteralPath (Join-Path $profDir 'memory-vec.mjs')     -Destination (Join-Path $bk 'memory-vec.mjs') -Force; $hadAny = $true }
 if (Test-Path -LiteralPath (Join-Path $profDir 'memory-trace.mjs'))   { Copy-Item -LiteralPath (Join-Path $profDir 'memory-trace.mjs')   -Destination (Join-Path $bk 'memory-trace.mjs') -Force; $hadAny = $true }
+$cycle2Names = @('memory-durability.mjs','memory-proposals.mjs','memory-proposal-store.mjs','memory-ledger-core.mjs','memory-ledger.mjs','memory-observations.mjs','memory-online-bridge.mjs','ledger-online.mjs')
+foreach ($name in $cycle2Names) {
+  $p = Join-Path $profDir $name
+  if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination (Join-Path $bk $name) -Force; $hadAny = $true }
+}
 if (Test-Path -LiteralPath $patch)                                     { Copy-Item -LiteralPath $patch -Destination (Join-Path $bk 'cordis.patch.yml') -Force; $hadAny = $true }
 $tfFile = Join-Path $DSH_HOME 'profiles\toolfold\toolfold.mjs'
 if (Test-Path -LiteralPath $tfFile) { Copy-Item -LiteralPath $tfFile -Destination (Join-Path $bk 'toolfold.mjs') -Force; $hadAny = $true }
@@ -112,6 +127,14 @@ Copy-Item -LiteralPath $pluginMem -Destination (Join-Path $profDir 'memory.mjs')
 Copy-Item -LiteralPath $pluginJan -Destination (Join-Path $profDir 'memory-janitor.mjs') -Force
 Copy-Item -LiteralPath $pluginVec -Destination (Join-Path $profDir 'memory-vec.mjs') -Force
 Copy-Item -LiteralPath $pluginTrace -Destination (Join-Path $profDir 'memory-trace.mjs') -Force
+Copy-Item -LiteralPath $pluginDurability    -Destination (Join-Path $profDir 'memory-durability.mjs') -Force
+Copy-Item -LiteralPath $pluginProposals     -Destination (Join-Path $profDir 'memory-proposals.mjs') -Force
+Copy-Item -LiteralPath $pluginProposalStore -Destination (Join-Path $profDir 'memory-proposal-store.mjs') -Force
+Copy-Item -LiteralPath $pluginLedgerCore    -Destination (Join-Path $profDir 'memory-ledger-core.mjs') -Force
+Copy-Item -LiteralPath $pluginLedger        -Destination (Join-Path $profDir 'memory-ledger.mjs') -Force
+Copy-Item -LiteralPath $pluginObservations  -Destination (Join-Path $profDir 'memory-observations.mjs') -Force
+Copy-Item -LiteralPath $pluginBridge        -Destination (Join-Path $profDir 'memory-online-bridge.mjs') -Force
+Copy-Item -LiteralPath $pluginLedgerOnline  -Destination (Join-Path $profDir 'ledger-online.mjs') -Force
 $tfDir = Join-Path $DSH_HOME 'profiles\toolfold'
 if (-not (Test-Path -LiteralPath $tfDir)) { New-Item -ItemType Directory -Path $tfDir -Force | Out-Null }
 Copy-Item -LiteralPath (Join-Path $src 'toolfold\toolfold.mjs') -Destination (Join-Path $tfDir 'toolfold.mjs') -Force
@@ -139,6 +162,7 @@ $entryYaml = [ordered]@{
   'contextinjector-webui' = "- insert:`n    - id: contextinjector-webui`n      name: 'contextinjector-webui'`n"
   'extreason'             = "- insert:`n    - id: extreason`n      name: './extreason.mjs'`n"
   'memory'                = "- insert:`n    - id: memory`n      name: './memory.mjs'`n"
+  'ledger-online'         = "- insert:`n    - id: ledger-online`n      name: './ledger-online.mjs'`n"
   # 0.1.7+ 新增的 dsh_plugin_packages 请求扩展与折叠（改写历史）互斥：折叠档位下会让请求秒败。
   # rc.2 无此特性 ⇒ 对 web profile 关闭该遥测扩展，恢复与历史批次同构的宿主语义。
   'plugin-package-inventory-deepseek' = "- id: plugin-package-inventory-deepseek`n  config:`n    enabled: false`n"
@@ -197,7 +221,7 @@ if (-not (Test-Path -LiteralPath $patch)) {
 
 # ---- 自校验 ----------------------------------------------------------------
 $ok = $true
-foreach ($need in @((Join-Path $profDir 'contextinjector.mjs'), (Join-Path $profDir 'logcompiler.mjs'), (Join-Path $profDir 'extreason.mjs'), (Join-Path $profDir 'memory.mjs'), (Join-Path $profDir 'memory-janitor.mjs'), (Join-Path $profDir 'memory-vec.mjs'), (Join-Path $profDir 'memory-trace.mjs'), (Join-Path $DSH_HOME 'profiles\condense\chunk.mjs'), (Join-Path $DSH_HOME 'profiles\condense\ivr.mjs'), (Join-Path $nmPkg 'package.json'), (Join-Path $nmPkg 'lib\index.mjs'), (Join-Path $nmPkg 'lib\client.js'))) {
+foreach ($need in @((Join-Path $profDir 'contextinjector.mjs'), (Join-Path $profDir 'logcompiler.mjs'), (Join-Path $profDir 'extreason.mjs'), (Join-Path $profDir 'memory.mjs'), (Join-Path $profDir 'memory-janitor.mjs'), (Join-Path $profDir 'memory-vec.mjs'), (Join-Path $profDir 'memory-trace.mjs'), (Join-Path $profDir 'memory-durability.mjs'), (Join-Path $profDir 'memory-proposals.mjs'), (Join-Path $profDir 'memory-proposal-store.mjs'), (Join-Path $profDir 'memory-ledger-core.mjs'), (Join-Path $profDir 'memory-ledger.mjs'), (Join-Path $profDir 'memory-observations.mjs'), (Join-Path $profDir 'memory-online-bridge.mjs'), (Join-Path $profDir 'ledger-online.mjs'), (Join-Path $DSH_HOME 'profiles\condense\chunk.mjs'), (Join-Path $DSH_HOME 'profiles\condense\ivr.mjs'), (Join-Path $nmPkg 'package.json'), (Join-Path $nmPkg 'lib\index.mjs'), (Join-Path $nmPkg 'lib\client.js'))) {
   if (-not (Test-Path -LiteralPath $need)) { Col Red "校验失败: $need"; $ok = $false }
 }
 $patchTxt = if (Test-Path -LiteralPath $patch) { U8 $patch } else { '' }
@@ -205,7 +229,7 @@ foreach ($id in $entryYaml.Keys) { if (-not (Has-InsertYaml $patchTxt $id)) { Co
 
 if ($ok) {
   Col Green "`n安装完成（web profile）。"
-  Col Green ("  插件: $profDir\contextinjector.mjs / logcompiler.mjs / extreason.mjs / memory.mjs / memory-janitor.mjs / memory-vec.mjs / memory-trace.mjs")
+  Col Green ("  插件: $profDir\contextinjector.mjs / logcompiler.mjs / extreason.mjs / memory.mjs / memory-janitor.mjs / memory-vec.mjs / memory-trace.mjs / ledger-online.mjs (+ Cycle2 语义模块)")
   Col Green ("  WebUI: $nmPkg")
   Col Yellow '下一步（重要）：'
   Col Yellow '  1) 重启 dsh web（client 装载器按名缓存，重启才生效；F5 不够）。'
