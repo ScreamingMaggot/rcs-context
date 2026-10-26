@@ -23,10 +23,10 @@ const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 const hex64 = (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)
 
 if (![CORPUS, BASELINE, SMOKE].every((file) => existsSync(file))) {
-  // The artifacts are workspace evidence, not a shipped fixture. Without them
-  // there is nothing to verify; say so instead of printing a vacuous PASS.
-  console.log('SKIP  baseline artifacts are not present in this workspace')
-  process.exit(0)
+  // These artifacts are committed evidence and every check below is meaningless
+  // without them. A skip would make run-all green while verifying nothing.
+  console.log('FAIL  baseline artifacts are required for this regression')
+  process.exit(1)
 }
 
 const corpusBytes = readFileSync(CORPUS)
@@ -144,8 +144,8 @@ check('route evidence mirrors the evaluator counters exactly',
 
 // ---- Isolated audit evidence ---------------------------------------------
 if (!existsSync(AUDIT)) {
-  console.log('SKIP  audit.json is not present in this workspace')
-  process.exit(fails ? 1 : 0)
+  console.log('FAIL  audit.json is required for this regression')
+  process.exit(1)
 }
 const audit = readJson(AUDIT)
 check('audit passes its 4 preconditions and 13 measured checks',

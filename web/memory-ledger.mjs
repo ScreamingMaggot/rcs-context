@@ -11,7 +11,7 @@ import {
   validateAssertionInput,
 } from './memory-ledger-core.mjs'
 
-const REDUCER_VERSION = 'r1'
+const REDUCER_VERSION = 'r2'
 const DEFAULT_MAX_PROJECTION_EVENTS = 5000
 const DEFAULT_MAX_PROJECTION_MS = 30000
 

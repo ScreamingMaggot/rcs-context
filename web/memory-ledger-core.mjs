@@ -88,7 +88,15 @@ const projectContract = {
   // verification, so a hand-written unverified llm assertion stays queryable but
   // never enters injected context.
   allowedSources: ['user', 'llm'],
-  cardinality: 'single',
+  // Project rules are independent facts, not alternative values of one setting:
+  // "金额用整数分" and "测试用 node:test" must coexist. Each rule gets a stable
+  // valueKey (the exact rule value for an assert, the target's key for a
+  // correction/retraction), so equal-authority conflicts are scoped to the same
+  // rule rather than to the whole predicate. The slot is the exact rule value, not
+  // a semantic topic: changing a setting's value must use correct/retract; two
+  // plain asserts of the same topic remain separate rules until a semantic slot
+  // extractor is added.
+  cardinality: 'multi',
   mutable: true,
   entityBound: false,
   invalidationRule: 'explicit-correction-or-retraction',
@@ -405,7 +413,13 @@ export function factKey(fact) {
 
   const qualifiers = fact.qualifiers === undefined ? null : fact.qualifiers
   const parts = [fact.scope, fact.subjectEntityId, fact.generation, fact.predicate, canonicalJson(qualifiers)]
-  if (predicate.cardinality === 'multi') parts.push(canonicalJson(fact.valueKey))
+  if (predicate.cardinality === 'multi') {
+    // A multi fact must carry its rule slot. The reducer derives it from the value
+    // for asserts and inherits it from the target for corrections/retractions; the
+    // value fallback keeps direct factKey() callers (tests, audits) well-defined.
+    const valueKey = fact.valueKey === undefined ? fact.value : fact.valueKey
+    parts.push(canonicalJson(valueKey))
+  }
   return parts.join('/')
 }
 
@@ -809,6 +823,38 @@ export function projectLedger({ observations, assertions, reducerVersion }) {
     placeObservation(observation, 'subject', observation.subjectEntityId, null, 'unsupported-operation')
   }
 
+  // Resolve the rule slot for every multi assertion before any fact is built. An
+  // assert owns its value; a correction/retraction inherits the target's slot so it
+  // closes exactly that rule rather than opening a new one. The fixed-point loop
+  // also handles a correction whose target is itself a correction.
+  function multiValueKeysFor(assertions) {
+    const keys = new Map()
+    for (const assertion of assertions) {
+      const contract = registryEntry(assertion.predicate)
+      if (!contract || contract.cardinality !== 'multi') continue
+      if (assertion.valueKey !== undefined) {
+        keys.set(assertion.assertionId, assertion.valueKey)
+      } else if (assertion.op === 'assert' && assertion.value !== undefined && assertion.value !== null) {
+        keys.set(assertion.assertionId, assertion.value)
+      }
+    }
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const assertion of assertions) {
+        if (keys.has(assertion.assertionId) ||
+            (assertion.op !== 'correct' && assertion.op !== 'retract')) continue
+        const targetKey = keys.get(assertion.targetAssertionId)
+        if (targetKey !== undefined) {
+          keys.set(assertion.assertionId, targetKey)
+          changed = true
+        }
+      }
+    }
+    return keys
+  }
+  const multiValueKeyById = multiValueKeysFor(validAssertions)
+
   function processAssertion(assertion) {
     let generation = null
     let reason = null
@@ -834,6 +880,11 @@ export function projectLedger({ observations, assertions, reducerVersion }) {
     assertionPlacementById.set(assertion.assertionId, placement)
     if (!duplicateTerminalIds.has(assertion.assertionId) &&
         (generation || assertion.op === 'correct' || assertion.op === 'retract')) {
+      const contract = registryEntry(assertion.predicate)
+      const multiValueKey = contract?.cardinality === 'multi'
+        ? multiValueKeyById.get(assertion.assertionId) ??
+          (assertion.op === 'assert' ? assertion.value : { unresolved: assertion.assertionId })
+        : undefined
       const fact = {
         scope: assertion.scope,
         subjectEntityId: assertion.subjectEntityId,
@@ -841,6 +892,7 @@ export function projectLedger({ observations, assertions, reducerVersion }) {
         generation: generation?.number ?? null,
         predicate: assertion.predicate,
         qualifiers: assertion.qualifiers ?? null,
+        ...(multiValueKey !== undefined ? { valueKey: multiValueKey } : {}),
         value: assertion.op === 'retract' || assertion.op === 'invalidate' ? null : assertion.value,
         assertionId: assertion.assertionId,
         evidence: assertion.evidence ?? null,

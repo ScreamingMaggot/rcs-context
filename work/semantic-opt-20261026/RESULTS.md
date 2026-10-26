@@ -54,7 +54,15 @@ Qwen 的 9 次谓词归一说明确定性 taxonomy 不是空转；Spark 仅 1 �
 
 ## 5. 回归
 
-- 全套 **60/60 套、1971/1971 断言**通过（26.9 s）；其中 2 条为 live 的 require-cwd 闸门（异工作区事件不归档、同工作区正常处理）。
+- 全套 **60/60 套、1974/1974 断言**通过（24.6 s）；其中 2 条为 live 的 require-cwd 闸门（异工作区事件不归档、同工作区正常处理）。
+
+### 5.1 多规则 project.* 修复（reducer r2）
+
+- 根因：`projectContract.cardinality:'single'` + `factKey` 不含 value，同级 `project.constraint` 在 reducer 层必然冲突；现有测试明确断言两条全部 conflicted、不渲染。
+- 修复：`project.*` 改 `multi`；assert 的 `valueKey` 取规则值，`correct/retract` 继承 target 的 `valueKey`；factKey 加入 `valueKey`。不同规则各占一个槽位并存；只有显式同 `valueKey` 的同级值才冲突，冲突仍不注入。
+- 测试：`memory-ledger.test.mjs` 的旧“alpha/beta 双杀”改为“两条独立约束并存并都渲染”，另补“显式同 valueKey 才冲突且不渲染”；store/proposals 的旧冲突用例改为不同规则并存，补正 injection 断言。
+- 语义边界：槽位是**精确规则值**，不是语义主题。修改同一设置的值必须用 `correct/retract`；两条同主题的裸 `assert` 仍会被视为两条规则，语义 rule-slot/矛盾检测是后续工作。
+- reducer 版本升 `r2`；live 库有 0 条断言，下次启动重建投影即可。证据 JSON 增加 `.gitattributes eol=lf`，缺证据的 baseline 测试改为 fail（不再 SKIP 假绿）。
 - 提案契约升 **p2**：提示词、闸门与 taxonomy 都属于契约；证据集重放按 schema 查询，旧 p1 候选不会在新策略下被直接回放。p1 语料与基线工件保持冻结（原文件按冻结 diff 逐字节恢复，sha256 仍为 `d3fa86…`），新增 case 完全相同的 `proposal-corpus-p2.json` 供当前 evaluator 使用。
 - 新增 `tests/memory-durability.test.mjs`：句界方向性、意图闸门、两套语料正负类、谓词规则、生产校验器接入、提示词/哈希版本、864 次零调用重放、85 例零调用重放。
 - 更新 `memory-proposal-eval.test.mjs`：全角冒号后的完整子句现在是 noncanonical span，不再是伪造值；原“从句中间截断”安全用例改用真正的从句中间片段。

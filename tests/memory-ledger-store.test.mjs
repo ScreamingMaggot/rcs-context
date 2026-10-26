@@ -149,10 +149,12 @@ try {
     store.currentFacts(SCOPE).some((fact) => fact.assertionId === 'd2' && fact.validTo === null && fact.retiredAt === null))
 
   store.appendAssertion(assertion('c1', {
-    predicate: 'project.constraint', value: { text: 'alpha' }, validAt: 1000, recordedAt: 1000,
+    predicate: 'project.constraint', value: { text: 'alpha' }, valueKey: { rule: 'same' },
+    validAt: 1000, recordedAt: 1000,
   }))
   store.appendAssertion(assertion('c2', {
-    predicate: 'project.constraint', value: { text: 'beta' }, validAt: 1000, recordedAt: 1500,
+    predicate: 'project.constraint', value: { text: 'beta' }, valueKey: { rule: 'same' },
+    validAt: 1000, recordedAt: 1500,
   }))
   store.appendAssertion(assertion('lines-1', {
     predicate: 'file.lines', value: 12, validAt: 1200, recordedAt: 1200,

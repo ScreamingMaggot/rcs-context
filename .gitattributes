@@ -1,0 +1,3 @@
+# Baseline evidence is hashed byte-for-byte. Force LF on every checkout so a
+# Windows clone with core.autocrlf=true produces the same bytes as the artifact.
+work/**/*.json text eol=lf

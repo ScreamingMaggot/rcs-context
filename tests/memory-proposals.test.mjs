@@ -1039,15 +1039,15 @@ if (!engineReady) {
       promotedAgain.promotedAt === 9000 &&
       journal.listProposals(scopeD, { verdict: 'candidate' })[0].promotedAt === 9000)
 
-    // --- Route enabled: equal-authority conflict is never injected --------
+    // --- Route enabled: independent project rules coexist -----------------
     const scopeE = 'ws:d:/engine/e'
     enableRoute(scopeE, 'project.constraint')
     const e1 = message(scopeE, 's5', 1, 5000, 5000, '接口端口固定为 8848。')
-    const e2 = message(scopeE, 's5', 2, 6000, 6000, '接口端口固定为 9000。')
+    const e2 = message(scopeE, 's5', 2, 6000, 6000, '所有测试统一使用 node:test。')
     store.appendObservations([e1, e2])
     const runE = fakeModel(
       outputOfItems([assertItem('project.constraint', e1.eventKey, ENGINE_CONSTRAINT)]),
-      outputOfItems([assertItem('project.constraint', e2.eventKey, '接口端口固定为 9000')]),
+      outputOfItems([assertItem('project.constraint', e2.eventKey, '所有测试统一使用 node:test')]),
     )
     const engineE = engine(runE)
     const resultE1 = await engineE.run({
@@ -1056,17 +1056,16 @@ if (!engineReady) {
     const resultE2 = await engineE.run({
       scope: scopeE, evidenceEventKeys: [e2.eventKey], model: MODEL, modelDigest: MODEL_DIGEST,
     })
-    const conflictsE = assertionsFor(scopeE)
-    check('accepted values with equal authority become conflicted',
+    const coexistingE = assertionsFor(scopeE)
+    check('different project rules coexist with equal authority',
       resultE1.accepted === 1 && resultE2.accepted === 1 &&
-      conflictsE.length === 2 &&
-      conflictsE.every((fact) =>
-        fact.status === 'conflicted' &&
-        fact.conflict?.reason === 'equal-authority-overlap'))
-    check('conflicted accepted facts are never injected',
+      coexistingE.length === 2 &&
+      coexistingE.every((fact) => fact.status === 'active' && fact.conflict === null))
+    check('different project rules are both injected',
       store.currentFacts(scopeE, { injectableOnly: true })
-        .every((fact) => fact.predicate !== 'project.constraint') &&
-      store.renderCurrent(scopeE, 10000).text === '')
+        .filter((fact) => fact.predicate === 'project.constraint').length === 2 &&
+      store.renderCurrent(scopeE, 10000).text.includes('接口端口固定为 8848') &&
+      store.renderCurrent(scopeE, 10000).text.includes('所有测试统一使用 node:test'))
 
     // --- Correction: newer evidence closes only the targeted assertion ----
     const scopeF = 'ws:d:/engine/f'

@@ -84,7 +84,7 @@ check('source and cardinality contracts distinguish files, projects, and sets',
   // Cycle 2 opens `llm` only for the three project predicates; the proposal engine
   // still derives every admitted llm fact from an archived user quote.
   enabledPredicates.slice(4).every((name) =>
-    PREDICATES[name].cardinality === 'single' && PREDICATES[name].entityBound === false &&
+    PREDICATES[name].cardinality === 'multi' && PREDICATES[name].entityBound === false &&
     canonicalJson(PREDICATES[name].allowedSources) === canonicalJson(['user', 'llm'])) &&
   PREDICATES['synthetic.set'].cardinality === 'multi' &&
   !PREDICATES['synthetic.set'].allowedSources.includes('llm'))
@@ -100,6 +100,13 @@ check('factKey appends canonical value keys for multi-value predicates',
   factKey({ scope: 'workspace', subjectEntityId: 'project', generation: 1,
     predicate: 'synthetic.set', qualifiers: {}, valueKey: { z: 2, a: 1 } }) ===
   'workspace/project/1/synthetic.set/{}/{"a":1,"z":2}')
+check('project rules get distinct fact keys for distinct values',
+  factKey({ scope: 'workspace', subjectEntityId: 'project', generation: 1,
+    predicate: 'project.constraint', qualifiers: null,
+    valueKey: { text: '金额用整数分' }, value: { text: '金额用整数分' } }) !==
+  factKey({ scope: 'workspace', subjectEntityId: 'project', generation: 1,
+    predicate: 'project.constraint', qualifiers: null,
+    valueKey: { text: '测试用 node:test' }, value: { text: '测试用 node:test' } }))
 
 const facts = [
   { predicate: 'file.exists', subjectDisplay: 'C:/p/a.txt', value: true },
@@ -410,20 +417,26 @@ const conflictFirst = decisionAssertion('c1', 'assert', { text: 'alpha' }, 1000,
 const conflictSecond = decisionAssertion('c2', 'assert', { text: 'beta' }, 1000, 2000, {
   predicate: 'project.constraint', seq: 11,
 })
-const conflicted = project([decisionCreate], [conflictFirst, conflictSecond])
-const conflictRows = conflicted.currentFacts.filter((fact) => fact.predicate === 'project.constraint')
-check('overlapping equal-authority values are all conflicted and omitted from rendering',
-  conflictRows.length === 2 && conflictRows.every((fact) => fact.status === 'conflicted') &&
-  conflictRows.every((fact) => canonicalJson(fact.conflict.assertionIds) === '["c1","c2"]') &&
-  renderFacts(conflicted.currentFacts, 2000).selected.every((fact) => fact.predicate !== 'project.constraint'))
+const coexisting = project([decisionCreate], [conflictFirst, conflictSecond])
+const conflictRows = coexisting.currentFacts.filter((fact) => fact.predicate === 'project.constraint')
+check('different project.constraints coexist and both render',
+  conflictRows.length === 2 && conflictRows.every((fact) =>
+    fact.status === 'active' && fact.conflict === null) &&
+  canonicalJson(conflictRows.map((fact) => fact.value.text).sort()) ===
+    canonicalJson(['alpha', 'beta']) &&
+  renderFacts(coexisting.currentFacts, 2000).selected.filter((fact) =>
+    fact.predicate === 'project.constraint').length === 2)
 const conflictThird = decisionAssertion('c3', 'assert', { text: 'alpha' }, 1500, 2500, {
   predicate: 'project.constraint', seq: 12,
 })
 const expandedConflict = project([decisionCreate], [conflictFirst, conflictSecond, conflictThird])
-check('a plain same-authority assert expands rather than resolves a conflict',
-  expandedConflict.currentFacts.filter((fact) => fact.predicate === 'project.constraint')
-    .every((fact) => fact.status === 'conflicted') &&
-  expandedConflict.currentFacts.filter((fact) => fact.predicate === 'project.constraint').length === 2)
+const expandedRows = expandedConflict.currentFacts.filter((fact) =>
+  fact.predicate === 'project.constraint')
+check('re-asserting the same rule keeps one slot while the other rule survives',
+  expandedRows.length === 2 && expandedRows.every((fact) =>
+    fact.status === 'active' && fact.conflict === null) &&
+  canonicalJson(expandedRows.map((fact) => fact.value.text).sort()) ===
+    canonicalJson(['alpha', 'beta']))
 const differentAuthorityAssert = decisionAssertion('different-authority', 'assert', { text: 'gamma' }, 1500, 2500, {
   predicate: 'project.constraint', seq: 12, sourceAuthority: 'host-verified',
 })
@@ -431,20 +444,39 @@ const differentAuthorityConflict = project([decisionCreate],
   [conflictFirst, conflictSecond, differentAuthorityAssert])
 const differentAuthorityRows = differentAuthorityConflict.currentFacts.filter((fact) =>
   fact.predicate === 'project.constraint')
-check('a plain different-authority assert cannot resolve an existing semantic conflict',
-  differentAuthorityRows.length === 3 &&
-  differentAuthorityRows.every((fact) => fact.status === 'conflicted') &&
-  differentAuthorityRows.every((fact) =>
-    canonicalJson(fact.conflict.assertionIds) === '["c1","c2","different-authority"]'))
+check('different rule values coexist regardless of sourceAuthority',
+  differentAuthorityRows.length === 3 && differentAuthorityRows.every((fact) =>
+    fact.status === 'active' && fact.conflict === null) &&
+  canonicalJson(differentAuthorityRows.map((fact) => fact.value.text).sort()) ===
+    canonicalJson(['alpha', 'beta', 'gamma']))
 const retractSecond = decisionAssertion('r2', 'retract', null, 2000, 3000, {
   predicate: 'project.constraint', targetAssertionId: 'c2', seq: 13,
 })
 const retractedConflict = project([decisionCreate], [conflictFirst, conflictSecond, retractSecond])
 const remainingDecision = currentFact(retractedConflict, 'project.constraint', DECISION_ENTITY)
-check('retracting one conflict member recomputes the sole survivor as active',
+check('retracting one rule leaves the other rule active',
   retractedConflict.currentFacts.filter((fact) => fact.predicate === 'project.constraint').length === 1 &&
   remainingDecision?.assertionId === 'c1' && remainingDecision.status === 'active' &&
   remainingDecision.conflict === null && remainingDecision.validTo === null)
+
+// Multi cardinality scopes conflicts to one rule slot. Two equal-authority
+// assertions that explicitly name the same slot are still a safety conflict;
+// distinct slots coexist above. This preserves the "conflicted facts are never
+// rendered" contract without making every independent rule collide.
+const sameSlotFirst = decisionAssertion('same-slot-1', 'assert', { text: 'alpha' }, 1000, 1000, {
+  predicate: 'project.constraint', valueKey: { rule: 'same' }, seq: 10,
+})
+const sameSlotSecond = decisionAssertion('same-slot-2', 'assert', { text: 'beta' }, 1000, 2000, {
+  predicate: 'project.constraint', valueKey: { rule: 'same' }, seq: 11,
+})
+const sameSlot = project([decisionCreate], [sameSlotFirst, sameSlotSecond])
+const sameSlotRows = sameSlot.currentFacts.filter((fact) => fact.predicate === 'project.constraint')
+check('same rule slot with equal-authority values is conflicted and not rendered',
+  sameSlotRows.length === 2 && sameSlotRows.every((fact) => fact.status === 'conflicted') &&
+  sameSlotRows.every((fact) =>
+    canonicalJson(fact.conflict.assertionIds) === '["same-slot-1","same-slot-2"]') &&
+  renderFacts(sameSlot.currentFacts, 2000).selected.every((fact) =>
+    fact.predicate !== 'project.constraint'))
 
 const changedQualifiers = decisionAssertion('bad-qualifiers', 'correct', { text: 'wrong' }, 2000, 3000, {
   targetAssertionId: 'd1', qualifiers: { changed: true },
@@ -537,12 +569,12 @@ check('mixed Observation and Assertion replay hash is independent of archive ord
   currentFact(mixedForward, 'project.preference', DECISION_ENTITY) === undefined &&
   mixedForward.currentFacts.filter((fact) => fact.predicate === 'project.constraint').length === 2)
 const mixedExpectedHashFacts = expectedHashFacts(mixedForward)
-check('mixed exact hash DTO includes non-null conflict_json',
+check('mixed exact hash DTO exposes both independent project rules as active',
   projectionHash(mixedForward) === sha256Canonical({
     reducer_version: 'r1', facts: mixedExpectedHashFacts,
-  }) && mixedExpectedHashFacts.some((fact) =>
-    fact.assertion_id === 'c1' && fact.status === 'conflicted' &&
-    fact.conflict_json !== null && canonicalJson(fact.conflict_json.assertionIds) === '["c1","c2"]'))
+  }) && ['c1', 'c2'].every((assertionId) => mixedExpectedHashFacts.some((fact) =>
+    fact.assertion_id === assertionId && fact.status === 'active' &&
+    fact.conflict_json === null)))
 
 const rebuildOne = project(lifecycleFixture)
 const rebuildTwo = project(lifecycleFixture)
