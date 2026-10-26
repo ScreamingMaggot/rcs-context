@@ -1,7 +1,7 @@
 {
   "name": "rcs-context",
   "version": "0.1.39",
-  "description": "RCS — fold repeated tool output without losing the original, give the model a read-only verifier, and externalize session facts into auditable memory. DeepSeek Harness plugin bundle: context folding, external reasoning, append-only transcript, and external memory with rcs:// addressing, L0/L1/L2 layers, directory-aware search, retrieval traces, and controlled writes. MIT.",
+  "description": "RCS — fold repeated tool output without losing the original, give the model a read-only verifier, and externalize session facts into auditable memory. DeepSeek Harness plugin bundle: context folding, external reasoning, append-only transcript, and external memory with rcs:// addressing, L0/L1/L2 layers, directory-aware search, retrieval traces, a deterministic durability gate, host-verified semantic proposals, and a file-state janitor. Compatible with DSH 0.1.5-rc.2 through 0.2.1-rc.3. MIT.",
   "type": "module",
   "main": "./web/contextinjector.mjs",
   "exports": {
@@ -31,8 +31,11 @@
     "llm-agent",
     "external-memory",
     "agent-memory",
+    "semantic-memory",
+    "ledger",
     "retrieval",
     "provenance",
+    "auditability",
     "sqlite",
     "observability"
   ],

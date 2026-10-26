@@ -4,7 +4,7 @@
 
 **上下文折叠 + 外置推理 + 转录日志 + 外部记忆**，为 DeepSeek Harness (DSH) 的 web profile 设计。
 
-RCS 面向长会话：折叠重复的工具输出（原文可随时展开，不丢证据）；每轮可先交给只读子代理核实，主模型再动手；会话事实沉淀为带证据链的外部记忆，支持 `rcs://` 寻址、L0/L1/L2 分级加载、目录感知检索与检索轨迹。四个插件可独立启停。
+RCS 面向长会话：折叠重复的工具输出（原文可随时展开，不丢证据）；每轮可先交给只读子代理核实，主模型再动手；会话事实沉淀为带证据链的外部记忆，支持 `rcs://` 寻址、L0/L1/L2 分级加载、目录感知检索与检索轨迹。记忆写入另有确定性耐久闸门与“模型只提案、宿主复核”的语义层，文件事实可由后台巡检维护。四个插件可独立启停，兼容 DSH 0.1.5-rc.2 至当前最新 0.2.1-rc.3。
 
 装好后在会话侧边栏找到「注入」和「记忆」tab 使用。
 
@@ -15,7 +15,7 @@ RCS 面向长会话：折叠重复的工具输出（原文可随时展开，不�
 | **CONTEXTinjector** | 工具结果折叠、语义压缩、值保真提取 | 关（按会话启用） |
 | **EXTREASON** | 外置推理：只读子代理先核实（可查记忆/转录/文件/网页），主模型后动手 | 开 |
 | **LOGcompiler** | 转录日志，完整记录会话事件流 | 开 |
-| **memory.mjs** | 外部记忆：SQLite + trigram/2-gram 中文检索 + 索引头/交接卡/查询条件化召回 + 轻 LLM 编译与整理 + 事实生命周期 + `rcs://` 寻址与 L0/L1/L2 分层 + 目录感知检索 + 可选向量 + 检索轨迹 + 受控写入 | 关 |
+| **memory.mjs** | 外部记忆：SQLite + trigram/2-gram 中文检索 + 索引头/交接卡/查询条件化召回 + 轻 LLM 编译与整理 + 事实生命周期 + `rcs://` 寻址与 L0/L1/L2 分层 + 目录感知检索 + 可选向量 + 检索轨迹 + 文件巡检 + 实体账本/语义提案层（默认关） + 受控写入 | 关 |
 
 ## 安装
 
@@ -153,6 +153,10 @@ Phase 0 完成寻址与目录浏览；Phase 2 完成目录内检索。Phase 3–
 
 模型不可信，写入前由宿主逐条复核：候选外 URI（`not-candidate`）、重复操作（`duplicate`）、非 `file-missing` 的 forget（`bad-reason`）、空路径（`no-path`）一律拒绝；每个 refresh/forget 都重新 `statSync`——文件仍存在才能 refresh，已不存在才能 forget，否则记 `verified-exists / verified-missing`。失败开放：模型、工具或超时失败只落状态，不改任何事实；自动运行失败后冷却 10 分钟。手动「立即巡检」写 `janitor-request/<sid>.json`（2 秒轮询，处理后即删），不受间隔与冷却限制，但受总开关约束；面板设置页可开关、调间隔、立即巡检并查看上次结果（刷新/失效/拒绝数、耗时、模型）。状态与审计都在 `$STATE_DIR/.memory/`：`janitor-inflight/<sid>.json`、`janitor-last/<sid>.json`、`janitor-audit.jsonl`（每次运行一行，最多 20 条 op，只记 uri/result/reason，不写 value 正文；超过 2MB 轮转到 `janitor-audit.1.jsonl`，只保留一份旧文件）。没有候选时不调用模型、也不写 audit，避免空转；巡检与 `sweep()` 一样只做逻辑失效（`stale`），不物理删除。
 
+**实体账本与语义提案层（实验，默认关）**：确定性观测（文件是否存在、工具操作、工作区重置）直接写入独立的 `ledger.sqlite`：事件与观测追加保存，事实是带实体、谓词、代际与双时间的断言；新旧值不互相覆盖，失效/取代保留证据，可按证据集重放。语义事实走提案层：模型只输出操作（`assert/correct/retract`）、谓词（`decision/constraint/preference`）和一段逐字 `quote`；`value`、来源、置信度、有效期与验证状态全部由宿主从归档原文切片派生，模型不能自造事实。调用模型前还有确定性耐久闸门：任务、问句、临时操作、计划、文件转述、注入与助手转述不进入提案；混合消息只允许显式耐久从句；全角冒号只作左边界，`quote` 必须是完整子句。
+
+该层尚未进入默认 bundle，需单独挂载 `ledger-online` 入口并以 `LEDGER_ONLINE=1` 启用（`LEDGER_ONLINE_REQUIRE_CWD=1` 时会话 cwd 与配置工作区不一致则不归档、不提案、不注入）。默认 `routes=closed`：只归档与生成候选，不注入语义候选；文件存在等确定性事实可跨会话注入。路由开启需同时满足样本 ≥20、精确率 ≥0.95、召回 ≥0.5、零安全失败。864 次真实输出零调用重放中，Qwen 负类误报 90%→0%、正类内容/谓词 168/168，Spark 误报 5.4%→0%、332/336；85 例基线仍有 2 个误报与 6 个漏报，未达门槛，因此保持关闭。
+
 **冲突默认不露面**：`historical / stale / superseded` 不进入自动注入，也不进 2-gram 候选；模型默认只看到仍然成立的事实。显式调用 `memory_search` 时历史记录可见，并带状态标签；需要原文时用 `memory_get(includeRaw=true)`。不物理删除任何事实。
 
 **注入前复验路径**：目录、查询召回、同会话增量与交接卡在注入前会抽取 state 事实里的具体路径并 `stat`（30 秒缓存）；文件/目录已不存在的事实本次不注入（不删库、不改状态）。通配符、`...` 省略路径、未加引号且后面仍跟非标点 token 的空格路径和无法解析的相对路径不做误判（避免把 `C:\Program Files` 截成 `C:\Program` 后误藏事实）。
@@ -185,22 +189,33 @@ Phase 0 完成寻址与目录浏览；Phase 2 完成目录内检索。Phase 3–
 
 | DSH 版本 | 状态 |
 |---|---|
+| 0.2.1-rc.3 | 已验证（当前最新；五插件 + ledger-online 在隔离实例与 live 实测） |
 | 0.2.1-rc.2 | 已验证（五插件全装载，事件/工具/槽位/WebServer 正常） |
 | 0.2.0-rc.2 | 已验证（14 关键包中 10 个逐字节相同，16 条接缝 0 消失 0 改名） |
 | 0.1.7-rc.2 | 已验证（session-format v4 全链路） |
 | 0.1.5-rc.2 | 兼容 |
 
-插件含多代兼容层，同一份文件适配四代宿主接口。
+插件含多代兼容层，同一份文件适配四代宿主接口（0.2.1 / 0.2.0 / 0.1.7 / 0.1.5）。
 
 ## 目录结构
 
 ```
-├── web/                        插件本体
-│   ├── contextinjector.mjs     注入折叠
-│   ├── logcompiler.mjs         转录日志
-│   ├── extreason.mjs           外置推理
-│   └── memory.mjs              外部记忆
-├── condense/                   共享模块（分型/压缩器）
+├── web/                          插件本体
+│   ├── contextinjector.mjs       注入折叠
+│   ├── logcompiler.mjs           转录日志
+│   ├── extreason.mjs             外置推理
+│   ├── memory.mjs                外部记忆
+│   ├── memory-janitor.mjs        文件巡检管家
+│   ├── memory-vec.mjs            向量检索（默认关）
+│   ├── memory-trace.mjs          检索轨迹
+│   ├── memory-ledger-core.mjs    实体账本核心
+│   ├── memory-ledger.mjs         账本存储
+│   ├── memory-observations.mjs   观测抽取
+│   ├── memory-proposals.mjs      语义提案层
+│   ├── memory-proposal-store.mjs 提案日志
+│   ├── memory-durability.mjs     耐久闸门
+│   └── memory-online-bridge.mjs  在线账本桥（实验）
+├── condense/                     共享模块（分型/压缩器）
 ├── toolfold/                   工具结果折叠
 ├── contextinjector-webui/      WebUI 面板
 ├── tests/                      回归测试
@@ -221,6 +236,7 @@ Phase 0 完成寻址与目录浏览；Phase 2 完成目录内检索。Phase 3–
 ## 数据位置
 
 - 运行时：`$DSH_HOME/state-compiler/`（control、transcripts、raw、fold-index）
+- 记忆：`$DSH_HOME/state-compiler/memory/memory.sqlite`；实体账本在 `.../ledger-online-live/ledger.sqlite`（仅挂载 `ledger-online` 时）
 - 安装备份：`$DSH_HOME/.statecompiler-backup-<时间戳>/`
 
 ## 许可证
