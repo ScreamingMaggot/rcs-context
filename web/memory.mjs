@@ -365,6 +365,41 @@ export function normalizeFactType(v) {
   const t = String(v ?? '').trim().toLowerCase()
   return FACT_TYPES.has(t) ? t : ''
 }
+// 注入准入的唯一口径：可见性由这一处决定，所有渲染面（目录、handover、计数）都必须走它。
+// 历史上 handover 自带一套、注入 SQL 另有一套 ⇒ 最松的那个生效（实测 ft=task 的事实被注入）。
+export const INJECTABLE_FACT_TYPES = ['state', 'constraint']
+export function isInjectableFactType(type) {
+  return INJECTABLE_FACT_TYPES.includes(normalizeFactType(type) || '')
+}
+
+// 凭据形态：写入即拒。redactSecrets 只挡渲染，挡不住"把口令当成长期事实存进库"；
+// 而实测拦住过那条密码的其实是 quote-boundary（句子边界），配额与安全耦合在效率旋钮上。
+// 值必须像凭据（ASCII 随机段或含数字的长串），否则"密钥管理规则""密码忘了"这类正常约束会被误杀。
+const CREDENTIAL_ASSIGN_RE = /(?:密码|口令|密钥|秘钥|私钥|凭据|passphrase)\s*(?:改成|改为|设为|设置为|换成|是|为|[:=])\s*([^\s，。；,;]+)/i
+const CREDENTIAL_SHAPE_RE = /\bsk-[A-Za-z0-9_-]{8,}\b|\bBearer\s+[A-Za-z0-9._~+\/-]{8,}\b|\bak-[A-Za-z0-9]{6,}\b|\b(?:password|passwd|pwd|token|api[_-]?key|secret)\s*[:=]\s*[^\s,;]+/i
+export function looksLikeCredential(text) {
+  const s = String(text ?? '')
+  if (CREDENTIAL_SHAPE_RE.test(s)) return true
+  const m = s.match(CREDENTIAL_ASSIGN_RE)
+  if (!m) return false
+  const value = m[1]
+  return /^[A-Za-z0-9._~+\/-]{6,}$/.test(value) || (value.length >= 6 && /\d/.test(value) && /[A-Za-z]/.test(value))
+}
+
+// 类型判定改由出处决定，摘要措辞只作次级信号（inferFactType 就是纯措辞判据，实测把
+// "SCAN_ROOT 环境变量…"判成 constraint、把用户的设计立场判成 task ⇒ 噪声升格、立场被挡在注入面外）。
+// 规则：只被工具输出支撑的结论 = 当前工作区状态（可随目录重置失效），不得升格 constraint；
+// 站在用户自己的话上的结论 = 立场，除非明写待办，否则不当 task 处理。
+// 只影响新写入；库里已有类型不改写（那是追溯问题，交给整理层）。
+const TASK_HINT_RE = /(?:下一步|待办|计划|打算|准备|未完成|todo|next step|plan to)/i
+export function deriveFactType(summary, { userText = '', proposed = '' } = {}) {
+  const p = normalizeFactType(proposed)
+  const s = String(summary ?? '')
+  if (!proseSupported(s, userText)) return 'state'
+  if (p === 'task' && !TASK_HINT_RE.test(s)) return 'constraint'
+  return p || inferFactType(s)
+}
+
 export function inferFactType(summary, value = {}) {
   const explicit = normalizeFactType(value?.type)
   if (explicit) return explicit
@@ -1813,7 +1848,52 @@ export class MemoryStore {
       .all(s, from, Math.max(1, Math.min(200, Number(limit) || 40)))
   }
 
-  insights(scope, limit = 20, { types = ['state', 'constraint'] } = {}) {
+  // 游标之后第一句仍未编译的用户话。判"还有没有话要说"必须向后看全量积压，
+  // 不能只看头部窗口——高强度轮的窗口里全是工具事件，头部判据会把层永久锁死。
+  nextUserTurn(sid, seq) {
+    const s = normSid(sid)
+    const from = Number.isFinite(Number(seq)) ? Number(seq) : -1
+    return this.db.prepare(`SELECT id, seq, kind, key, value FROM events
+      WHERE sid=? AND seq>? AND kind='user_turn' ORDER BY seq ASC LIMIT 1`).get(s, from) ?? null
+  }
+
+  // (from, to] 内的末尾 limit 条，升序返回，且 to 那条必定在内。
+  eventsThrough(sid, from, to, limit = 40) {
+    const s = normSid(sid)
+    const lo = Number.isFinite(Number(from)) ? Number(from) : -1
+    const hi = Number(to)
+    if (!Number.isFinite(hi)) return []
+    const rows = this.db.prepare(`SELECT id, seq, kind, key, value FROM events
+      WHERE sid=? AND seq>? AND seq<=? ORDER BY seq DESC LIMIT ?`)
+      .all(s, lo, hi, Math.max(1, Math.min(200, Number(limit) || 40)))
+    return rows.reverse()
+  }
+
+  countEventsThrough(sid, from, to) {
+    const s = normSid(sid)
+    const lo = Number.isFinite(Number(from)) ? Number(from) : -1
+    const hi = Number(to)
+    if (!Number.isFinite(hi)) return 0
+    return Number(this.db.prepare('SELECT COUNT(*) c FROM events WHERE sid=? AND seq>? AND seq<=?')
+      .get(s, lo, hi)?.c ?? 0)
+  }
+
+  // evidence token（events.id，全局自增）→ 可 dereference 的 (sid, seq)。
+  // token 本身是全局 id，但渲染时若不换成"哪个会话的第几号事件"，读者只会把它当成
+  // 本会话的 seq，在跨会话共享的工作区事实里必然指错（实测 handover 就是这样）。
+  eventPointers(ids) {
+    const out = new Map()
+    const list = (Array.isArray(ids) ? ids : []).map((x) => Number(x)).filter(Number.isFinite)
+    if (!list.length) return out
+    const uniq = [...new Set(list)]
+    const marks = uniq.map(() => '?').join(',')
+    for (const r of this.db.prepare(`SELECT id, sid, seq FROM events WHERE id IN (${marks})`).all(...uniq)) {
+      out.set(Number(r.id), { sid: String(r.sid), seq: Number(r.seq) })
+    }
+    return out
+  }
+
+  insights(scope, limit = 20, { types = INJECTABLE_FACT_TYPES } = {}) {
     const n = Math.max(1, Math.min(100, Number(limit) || 20))
     const allow = Array.isArray(types) ? new Set(types.map(normalizeFactType).filter(Boolean)) : null
     const rows = this.db.prepare(`SELECT rowid, key, value, usage, last_used_ts, updated_ts, fact_type, abstract, overview, layer_src, layer_of, layer_ver
@@ -1865,9 +1945,11 @@ export class MemoryStore {
 
   insightsSince(scope, since = 0, limit = 3) {
     const n = Math.max(1, Math.min(50, Number(limit) || 3))
+    const marks = INJECTABLE_FACT_TYPES.map(() => '?').join(',')
     const rows = this.db.prepare(`SELECT rowid, key, value, updated_ts, abstract, overview, layer_src, layer_of, layer_ver
-      FROM records WHERE scope=? AND kind='insight' AND status='active' AND fact_type IN ('state','constraint') AND updated_ts>?
-      ORDER BY updated_ts DESC LIMIT ?`).all(String(scope), Number(since) || 0, n * 2)
+      FROM records WHERE scope=? AND kind='insight' AND status='active' AND fact_type IN (${marks}) AND updated_ts>?
+      ORDER BY updated_ts DESC LIMIT ?`)
+      .all(String(scope), ...INJECTABLE_FACT_TYPES, Number(since) || 0, n * 2)
     return rows.map((r) => {
       let v = {}
       try { v = JSON.parse(r.value) ?? {} } catch { /* keep key only */ }
@@ -1886,8 +1968,10 @@ export class MemoryStore {
       FROM records WHERE ${v.where} AND status='active'`).get(...v.args)
     const countKind = (kind) => Number(this.db.prepare(`SELECT COUNT(*) c FROM records
       WHERE ${v.where} AND status='active' AND kind=?`).get(...v.args, kind)?.c ?? 0)
+    const injectableMarks = INJECTABLE_FACT_TYPES.map(() => '?').join(',')
     const injectableInsights = Number(this.db.prepare(`SELECT COUNT(*) c FROM records
-      WHERE ${v.where} AND status='active' AND kind='insight' AND fact_type IN ('state','constraint')`).get(...v.args)?.c ?? 0)
+      WHERE ${v.where} AND status='active' AND kind='insight' AND fact_type IN (${injectableMarks})`)
+      .get(...v.args, ...INJECTABLE_FACT_TYPES)?.c ?? 0)
     return {
       total: Number(row?.total ?? 0),
       sessions: Number(row?.sessions ?? 0),
@@ -3326,9 +3410,21 @@ export class MemoryCompiler {
     if (!route?.provider || !route?.model) return { ok: false, reason: 'no-route' }
     if (this.busy.has(s)) return { ok: false, reason: 'busy' }
     const through = Number(this.store.getMetaRaw('llmThrough:' + s) ?? -1)
-    const rows = this.store.eventsSince(s, through, this.opts.maxEvents)
+    let rows = this.store.eventsSince(s, through, this.opts.maxEvents)
     if (rows.length < this.opts.minEvents) return { ok: false, reason: 'too-few', pending: rows.length }
-    if (!rows.some((r) => r.kind === 'user_turn')) return { ok: false, reason: 'no-user-turn' }
+    // 锚定窗口：头部窗口里没有用户话时，向后找第一句，用它和它前面的有限事件重造窗口。
+    // 旧实现把"窗口里没有"当成"后面没有"，谓词自指 ⇒ 游标永不推进（实测 14/15 个有积压
+    // 的会话锁死，理解层停在开场勘察阶段）。窗口起点之前的事件视为已消费，计数进 llmLast。
+    let anchorSeq = null
+    let skipped = 0
+    if (!rows.some((r) => r.kind === 'user_turn')) {
+      const anchor = this.store.nextUserTurn(s, through)
+      if (!anchor) return { ok: false, reason: 'no-user-turn' }
+      anchorSeq = Number(anchor.seq)
+      rows = this.store.eventsThrough(s, through, anchorSeq, this.opts.maxEvents)
+      skipped = Math.max(0, this.store.countEventsThrough(s, through, anchorSeq) - rows.length)
+    }
+    if (rows.length < this.opts.minEvents) return { ok: false, reason: 'too-few', pending: rows.length }
     const failAt = Number(this.store.getMetaRaw('llmFailAt:' + s) ?? 0)
     if (Date.now() - failAt < this.opts.cooldownMs) return { ok: false, reason: 'cooldown' }
 
@@ -3341,6 +3437,11 @@ export class MemoryCompiler {
         return { ok: false, reason: 'fold-inflight', waitMs: foldWait.waitMs }
       }
       const lastSeq = Math.max(...rows.map((r) => Number(r.seq)).filter(Number.isFinite))
+      // 本窗口里用户自己说过的话——判"这条结论有没有站在用户的话上"的唯一依据。
+      const userText = rows.filter((r) => r.kind === 'user_turn').map((r) => {
+        try { return String(JSON.parse(r.value)?.text ?? '') } catch { return '' }
+      }).join('\n')
+      let typeAdjusted = 0
       const scope = scopeOf('file_state', s, workspace)
       const existing = this.store.insights(scope, 20, { types: null })
       const digest = digestOf(rows, this.opts.maxChars)
@@ -3363,7 +3464,14 @@ export class MemoryCompiler {
         const hasChecked = rep.checked.length > 0 || bigNumbers(x.summary).length > 0 || identTokens(x.summary).length > 0
         if (rep.ok && (hasChecked || proseSupported(x.summary, haystack))) grounded.push(x)
       }
-      const items = [...explicitMemoryItems(rows), ...grounded]
+      const items = []
+      let secretRejected = 0
+      for (const it of [...explicitMemoryItems(rows), ...grounded]) {
+        // 写入侧的凭据闸门：模型提议与用户明示两条来源都过这一关（脱敏存档仍是无用事实）。
+        if (looksLikeCredential(it.summary)) { secretRejected += 1; continue }
+        items.push(it)
+      }
+      if (secretRejected) console.log(`[MEMORY] credential-rejected sid=${s} count=${secretRejected}`)
       const dropped = parsed.length - grounded.length
       const now = Date.now()
       const evidence = rows.slice(-20).map((r) => Number(r.id))
@@ -3388,6 +3496,8 @@ export class MemoryCompiler {
         }
       }
       for (const it of accepted) {
+        const factType = deriveFactType(it.summary, { userText, proposed: it.type })
+        if (factType !== normalizeFactType(it.type)) typeAdjusted += 1
         this.store.ingest({
           sid: s, seq: lastSeq, kind: 'insight', key: it.key, scope,
           value: {
@@ -3396,13 +3506,16 @@ export class MemoryCompiler {
             model: route.provider + '/' + route.model, compiledAt: now,
           },
           source: { sid: s, seq: lastSeq, extractor: 'llm', model: route.model },
-          extractor: 'llm', confidence: it.confidence, fact_type: it.type, ts: now,
+          extractor: 'llm', confidence: it.confidence, fact_type: factType, ts: now,
         })
       }
       this.store.setMetaRaw('llmThrough:' + s, lastSeq)
-      this.store.setMetaRaw('llmLast:' + s, JSON.stringify({ t: now, ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq }))
+      this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
+        t: now, ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
+        through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
+      }))
       recordCompile(true)
-      return { ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq, model: route.model }
+      return { ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted, model: route.model }
     } finally {
       this.busy.delete(s)
     }
@@ -3796,7 +3909,21 @@ export function redactSecrets(text) {
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{8,}\b/gi, 'Bearer [REDACTED]')
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]')
     .replace(/\b(password|passwd|pwd|token|api[_-]?key|secret)\s*[:=]\s*([^\s,;]+)/gi, '$1=[REDACTED]')
+    // 中文赋值式此前完全不被覆盖：实测"密码改成<明文>"原样入库并出现在事件流里。
+    .replace(/(密码|口令|密钥|秘钥|私钥|凭据|passphrase)\s*(改成|改为|设为|设置为|换成|是|为|[:=])\s*[^\s，。；,;]+/gi, '$1$2[REDACTED]')
 }
+
+// 事实携带的 evidence token（= events.id，全局自增）。整理层写的是 citations，编译层写 evidence。
+const evidenceTokensOf = (r) => {
+  const v = r?.value ?? {}
+  const list = Array.isArray(v.evidence) ? v.evidence : Array.isArray(v.citations) ? v.citations : []
+  return list.map((x) => Number(x)).filter(Number.isFinite)
+}
+
+// 升级前写下的 handover JSON 里 token 还是裸 id，渲染时一并兼容（下一次重写即变新形状）。
+const evidenceLabel = (e) => (e && typeof e === 'object'
+  ? `${String(e.sid ?? '-').slice(0, 8)}#${e.seq ?? '-'}`
+  : String(e))
 
 export function buildHandover(store, { sid, workspace = null, session = null, maxFiles = 8, maxCommands = 5, maxErrors = 5, maxInsights = 6 } = {}) {
   const s = normSid(sid)
@@ -3808,16 +3935,27 @@ export function buildHandover(store, { sid, workspace = null, session = null, ma
   const commands = recent('command', maxCommands)
   const errors = recent('error', maxErrors)
   const insightRows = recent('insight', 50)
+  // 与注入面同一把门：task/history 不是可注入的当前事实（实测 ft=task 的用户偏好曾绕过过滤进卡）。
   const insights = insightRows
     .filter((r) => String(r.value?.summary ?? '').trim() && !isQuarantinedSummary(r.value.summary))
+    .filter((r) => isInjectableFactType(r.factType ?? r.value?.type))
     .slice(0, maxInsights)
+  // token → (会话, seq)：渲染层给读者的必须是能被 memory_get 查到的坐标，而不是内部 id。
+  const pointers = typeof store.eventPointers === 'function'
+    ? store.eventPointers(insights.flatMap(evidenceTokensOf))
+    : new Map()
 
   const lastUser = users[0] ? {
     text: clip(redactSecrets(users[0].value?.text), 400),
     seq: users[0].source?.seq ?? null,
     key: users[0].key,
   } : null
-  const seqs = [...users, ...files, ...commands, ...errors, ...insightRows].map((r) => Number(r.source?.seq)).filter(Number.isFinite)
+  // throughSeq 必须是本会话的水位：files/commands/errors/insights 是按 workspace 取的，
+  // 对它们取 max 会把别的会话的水位当成本会话的报出去（实测 f5026a65 报 3176、自身只到 1843），
+  // 而这个水位正是 readLatestHandover 判过期/判 reset 的依据。
+  const own = [...users, ...files, ...commands, ...errors, ...insightRows]
+    .filter((r) => normSid(r.source?.sid) === s)
+  const seqs = own.map((r) => Number(r.source?.seq)).filter(Number.isFinite)
   const cursor = store.getCursor(s)
   if (Number.isFinite(cursor) && cursor >= 0) seqs.push(cursor)
   const throughSeq = seqs.length ? Math.max(...seqs) : null
@@ -3835,7 +3973,7 @@ export function buildHandover(store, { sid, workspace = null, session = null, ma
       key: r.key,
       summary: clip(redactSecrets(r.value?.summary), 240),
       confidence: r.value?.confidence ?? null,
-      evidence: Array.isArray(r.value?.evidence) ? r.value.evidence.slice(-3) : [],
+      evidence: evidenceTokensOf(r).slice(-3).map((t) => pointers.get(t)).filter(Boolean),
       seq: r.source?.seq ?? null,
     })),
     files: files.map((r) => ({
@@ -3904,7 +4042,7 @@ export function handoverMarkdown(h) {
   if (h.lastAssistant?.text) lines.push('## Last assistant', '', `${h.lastAssistant.text} [seq ${h.lastAssistant.seq ?? '-'}]`, '')
   if (h.insights?.length) {
     lines.push('## Known facts', '')
-    for (const x of h.insights) lines.push(`- ${x.summary}${x.evidence?.length ? ` [evidence ${x.evidence.join(',')}]` : ''}`)
+    for (const x of h.insights) lines.push(`- ${x.summary}${x.evidence?.length ? ` [evidence ${x.evidence.map(evidenceLabel).join(', ')}]` : ''}`)
     lines.push('')
   }
   if (h.errors?.length) {
@@ -4696,6 +4834,8 @@ export function makeMemoryTools(store) {
       const ns = normForIntent(statement)
       if (!nt || !(ns.includes(nt) || nt.includes(ns))) return { ok: false, error: 'not-in-user-statement' }
       if (isQuarantinedSummary(text)) return { ok: false, error: 'injection-pattern' }
+      // 凭据不进长期记忆：脱敏后存成"密码改成[REDACTED]"也是无用事实，直接拒写并说明原因。
+      if (looksLikeCredential(text)) return { ok: false, error: 'credential-not-storable' }
       const safe = redactSecrets(text)
       const h = sha1(safe.toLowerCase()).slice(0, 8)
       const slug = (safe.toLowerCase().match(/[a-z0-9]+/g) ?? []).slice(0, 4).join('-').slice(0, 40)
@@ -4780,6 +4920,8 @@ export function makeMemoryTools(store) {
       const text = String(args?.text ?? '').replace(/\s+/g, ' ').trim()
       if (text.length < 4 || text.length > 500) return { ok: false, error: 'text-length' }
       if (isQuarantinedSummary(text)) return { ok: false, error: 'injection-pattern' }
+      // 凭据不进长期记忆：脱敏后存成"密码改成[REDACTED]"也是无用事实，直接拒写并说明原因。
+      if (looksLikeCredential(text)) return { ok: false, error: 'credential-not-storable' }
       const scope = scopeForWrite(args, sid, workspace)
       let rec = null
       if (args?.rowid !== undefined) rec = store.get({ sid, scope, workspace, status: 'all', rowid: args.rowid })
