@@ -3188,30 +3188,58 @@ async function compileUserMessage(text) {
   return { id: 'mem-' + Date.now().toString(36), role: 'user', content, source }
 }
 
-async function callCompileLlm(llm, route, system, user, maxTokens) {
-  const messages = [await compileUserMessage(user)]
+// 推理档位是优化不是前提：实测宿主对不支持该档位的模型直接 finish=error
+// UNSUPPORTED_REASONING_EFFORT（opencode-go/deepseek-v4.1-flash 就没有 off 档），而旧实现把
+// 任何非 stop 都当作"静默 null"，整批编译零产出且**不留原因**（用户："没看到类似错误"）。
+const EFFORT_REJECTED_RE = /UNSUPPORTED_REASONING_EFFORT|reasoning\s*effort/i
+
+async function compileCallOnce(llm, route, system, messages, maxTokens, effort) {
   let text = ''
   let finish = null
+  const req = {
+    provider: route.provider,
+    model: route.model,
+    messages,
+    system,
+    temperature: 0,
+    maxTokens,
+    purpose: 'compaction', // 宿主只接受 compaction / session-title；记忆编译属于历史压缩
+  }
+  if (effort) req.reasoningEffort = effort
   try {
-    for await (const chunk of llm.stream({
-      provider: route.provider,
-      model: route.model,
-      messages,
-      system,
-      temperature: 0,
-      maxTokens,
-      purpose: 'compaction', // 宿主只接受 compaction / session-title；记忆编译属于历史压缩
-      reasoningEffort: 'off',
-    })) {
+    for await (const chunk of llm.stream(req)) {
       if (chunk?.type === 'text-delta') text += chunk.text ?? ''
       else if (chunk?.type === 'finish') finish = chunk.reason
     }
   } catch (err) {
-    console.error('[MEMORY] compile call failed:', err?.message ?? err)
+    const msg = 'stream error: ' + String(err?.message ?? err)
+    return { text: null, error: msg, effortRejected: EFFORT_REJECTED_RE.test(msg) }
+  }
+  const kind = String(finish?.kind ?? '')
+  if (kind !== 'stop') {
+    const f = finish?.failure ?? null
+    const detail = f ? (String(f.code ?? '') + ':' + String(f.message ?? '')).slice(0, 200) : ('finish=' + (kind || 'none'))
+    return { text: null, error: detail, effortRejected: EFFORT_REJECTED_RE.test(detail) }
+  }
+  if (!text.trim()) return { text: null, error: 'empty output', effortRejected: false }
+  return { text: text.trim(), error: null, effortRejected: false }
+}
+
+async function callCompileLlm(llm, route, system, user, maxTokens, meta = null) {
+  const messages = [await compileUserMessage(user)]
+  const first = await compileCallOnce(llm, route, system, messages, maxTokens, 'off')
+  if (first.text) return first.text
+  if (first.effortRejected) {
+    console.warn('[MEMORY] reasoningEffort=off unsupported by ' + route.provider + '/' + route.model + '; retrying without it')
+    const again = await compileCallOnce(llm, route, system, messages, maxTokens, '')
+    if (meta) meta.effortFallback = 'off'
+    if (again.text) return again.text
+    if (meta) meta.error = again.error
     return null
   }
-  if (String(finish?.kind ?? '') !== 'stop') return null
-  return text.trim() || null
+  if (meta) meta.error = first.error
+  if (first.error) console.error('[MEMORY] compile call failed: ' + first.error)
+  return null
 }
 
 export function compilePrompt(existing, digest) {
@@ -3446,12 +3474,16 @@ export class MemoryCompiler {
       const existing = this.store.insights(scope, 20, { types: null })
       const digest = digestOf(rows, this.opts.maxChars)
       const haystack = digest + '\n' + existing.map((x) => String(x.summary ?? '')).join('\n')
-      const text = await callCompileLlm(llm, route, COMPILE_SYSTEM, compilePrompt(existing, digest), this.opts.maxTokens)
+      const callMeta = {}
+      const text = await callCompileLlm(llm, route, COMPILE_SYSTEM, compilePrompt(existing, digest), this.opts.maxTokens, callMeta)
       if (text == null) {
         this.store.setMetaRaw('llmFailAt:' + s, Date.now())
-        this.store.setMetaRaw('llmLast:' + s, JSON.stringify({ t: Date.now(), ok: false, reason: 'llm-failed' }))
+        this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
+          t: Date.now(), ok: false, reason: 'llm-failed',
+          err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null,
+        }))
         recordCompile(false)
-        return { ok: false, reason: 'llm-failed' }
+        return { ok: false, reason: 'llm-failed', err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null }
       }
       const parsed = parseInsights(text, { max: this.opts.maxInsights })
       const grounded = []
@@ -3513,9 +3545,14 @@ export class MemoryCompiler {
       this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
         t: now, ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
         through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
+        effortFallback: callMeta.effortFallback ?? null,
       }))
       recordCompile(true)
-      return { ok: true, insights: accepted.length, dropped, merged, smallUnchecked, through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted, model: route.model }
+      return {
+        ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
+        through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
+        effortFallback: callMeta.effortFallback ?? null, model: route.model,
+      }
     } finally {
       this.busy.delete(s)
     }
@@ -3748,10 +3785,11 @@ export class MemoryConsolidator {
       }
       markConsolidateStage(safeSid, 'llm', { facts: g.facts.length, events: g.events.length })
       const basePrompt = this.prompt(g)
-      let text = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, basePrompt, this.opts.maxTokens)
+      const cMeta = {}
+      let text = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, basePrompt, this.opts.maxTokens, cMeta)
       if (text == null) {
         this.store.setMetaRaw('consolidateFailAt:' + ws, String(Date.now()))
-        result = { ok: false, reason: 'llm-failed', trigger, sweep, ms: Date.now() - t0 }
+        result = { ok: false, reason: 'llm-failed', trigger, sweep, err: cMeta.error ?? null, effortFallback: cMeta.effortFallback ?? null, ms: Date.now() - t0 }
         return result
       }
       let parsed = parseConsolidateOps(text, {
