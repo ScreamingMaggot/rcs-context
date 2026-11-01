@@ -1167,6 +1167,18 @@ async function userMessage(text) {
 //   失败载荷若与档位无关(额度、网络、空输出)则不重试,语义与旧版逐字一致。
 const EFFORT_REJECTED_RE = /UNSUPPORTED_REASONING_EFFORT|reasoning\s*effort/i
 
+// 辅助调用必须带会话身份：宿主自己的压缩/标题调用都传 sessionId
+//   （dsh-compaction-basic/lib/index.js:319 `sessionId: agent.session.id, purpose:"compaction"`；
+//    dsh-session-title-llm/lib/index.js:195 同形），适配器用它生成 provider 要求的会话头
+//   （@ebony-vinyl/dsh-our-free-model/src/adapter.js:389/396：缺失时回落 'global' 且只警告一次）。
+//   本插件此前只传 purpose:'compaction' ⇒ opencode-go 上游直接 400 MissingSessionID ——
+//   推理档位回退之后撞上的就是这一层。
+function auxSessionId(sid) {
+  const t = String(sid ?? '').trim()
+  if (!t) return undefined
+  return t.startsWith('session-') ? t : 'session-' + t
+}
+
 async function llmText(ctx, route, system, user, maxTokens, sink, llmFixed, opts) {
   const eff = opts && opts.effort !== undefined ? String(opts.effort).trim().toLowerCase() : LOSSY_EFFORT
   const meta = (opts && opts.meta) || null
@@ -1207,6 +1219,9 @@ async function llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, 
   }
   // 只在显式取值时下发 reasoningEffort；'' 表示"完全不传"（保留旧行为，便于对照实验/回滚）。
   if (LOSSY_EFFORTS.has(eff) && eff !== '') req.reasoningEffort = eff
+  // 会话身份与推理档位无关，任何 provider 都该带；缺了它，需要会话路由头的上游会整条拒收。
+  const auxSid = opts && opts.io ? auxSessionId(opts.io.sessionId) : undefined
+  if (auxSid) req.sessionId = auxSid
   // 只要发生了一次真实调用，钱就花了 —— 因此**无论成功/失败/被拒绝**都要计量（幂等：只记一次）。
   let usageRecorded = false
   const recordUsage = () => {
@@ -2078,7 +2093,7 @@ export default {
         const route = await resolveCondenseRoute(ctx, session, ctrl, llmFixed)
         condenseRoute = route ? { provider: route.provider, model: route.model, via: route.via } : null
         if (!condenseRoute) condenseErr = 'no condense route (llm service absent / no session model / empty registry)'
-        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 } } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量
+        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 }, sessionId: sid } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量 / v1.10.60 sessionId=辅助调用会话身份
         // #7 maxtokens：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)
         //   实际每次调用还会按输入长度自适应收敛（effectiveMaxTokens），此处是**上限**。
         // #7 maxtokens **上限**：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)。

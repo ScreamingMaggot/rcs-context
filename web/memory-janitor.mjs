@@ -327,7 +327,14 @@ const parseArgs = (s) => {
   try { return JSON.parse(String(s ?? '{}')) ?? {} } catch { return {} }
 }
 
-async function streamRound(llm, route, messages, signal, maxTokens) {
+// 与折叠/编译同规则：辅助调用要带会话身份，否则需要会话路由的 provider 会整条拒收。
+function auxSessionId(sid) {
+  const t = String(sid ?? '').trim()
+  if (!t) return undefined
+  return t.startsWith('session-') ? t : 'session-' + t
+}
+
+async function streamRound(llm, route, messages, signal, maxTokens, sid) {
   const acc = new Map()
   let text = ''
   let finish = null
@@ -341,6 +348,7 @@ async function streamRound(llm, route, messages, signal, maxTokens) {
     maxTokens,
     purpose: 'compaction',
     reasoningEffort: 'off',
+    sessionId: auxSessionId(sid),
     signal,
   })) {
     if (chunk?.type === 'text-delta') text += chunk.text ?? ''
@@ -460,7 +468,7 @@ export async function runFileStatJanitor({
       rounds++
       let r = null
       try {
-        r = await streamRound(llm, route, messages, ac.signal, maxTokens)
+        r = await streamRound(llm, route, messages, ac.signal, maxTokens, safeSid)
       } catch (err) {
         if (timedOut) return emit(mk({ ok: false, reason: 'timeout', facts, rounds }), [])
         console.error('[MEMORY] janitor llm failed:', err?.message ?? err)

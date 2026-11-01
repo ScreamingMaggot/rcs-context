@@ -3193,7 +3193,14 @@ async function compileUserMessage(text) {
 // 任何非 stop 都当作"静默 null"，整批编译零产出且**不留原因**（用户："没看到类似错误"）。
 const EFFORT_REJECTED_RE = /UNSUPPORTED_REASONING_EFFORT|reasoning\s*effort/i
 
-async function compileCallOnce(llm, route, system, messages, maxTokens, effort) {
+// 与折叠侧同规则：辅助调用带 sessionId，宿主/适配器据此生成 provider 要求的会话头。
+function auxSessionId(sid) {
+  const t = String(sid ?? '').trim()
+  if (!t) return undefined
+  return t.startsWith('session-') ? t : 'session-' + t
+}
+
+async function compileCallOnce(llm, route, system, messages, maxTokens, effort, sessionId) {
   let text = ''
   let finish = null
   const req = {
@@ -3206,6 +3213,7 @@ async function compileCallOnce(llm, route, system, messages, maxTokens, effort) 
     purpose: 'compaction', // 宿主只接受 compaction / session-title；记忆编译属于历史压缩
   }
   if (effort) req.reasoningEffort = effort
+  if (sessionId) req.sessionId = sessionId
   try {
     for await (const chunk of llm.stream(req)) {
       if (chunk?.type === 'text-delta') text += chunk.text ?? ''
@@ -3225,13 +3233,14 @@ async function compileCallOnce(llm, route, system, messages, maxTokens, effort) 
   return { text: text.trim(), error: null, effortRejected: false }
 }
 
-async function callCompileLlm(llm, route, system, user, maxTokens, meta = null) {
+async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, sid = null) {
   const messages = [await compileUserMessage(user)]
-  const first = await compileCallOnce(llm, route, system, messages, maxTokens, 'off')
+  const auxSid = auxSessionId(sid)
+  const first = await compileCallOnce(llm, route, system, messages, maxTokens, 'off', auxSid)
   if (first.text) return first.text
   if (first.effortRejected) {
     console.warn('[MEMORY] reasoningEffort=off unsupported by ' + route.provider + '/' + route.model + '; retrying without it')
-    const again = await compileCallOnce(llm, route, system, messages, maxTokens, '')
+    const again = await compileCallOnce(llm, route, system, messages, maxTokens, '', auxSid)
     if (meta) meta.effortFallback = 'off'
     if (again.text) return again.text
     if (meta) meta.error = again.error
@@ -3475,7 +3484,7 @@ export class MemoryCompiler {
       const digest = digestOf(rows, this.opts.maxChars)
       const haystack = digest + '\n' + existing.map((x) => String(x.summary ?? '')).join('\n')
       const callMeta = {}
-      const text = await callCompileLlm(llm, route, COMPILE_SYSTEM, compilePrompt(existing, digest), this.opts.maxTokens, callMeta)
+      const text = await callCompileLlm(llm, route, COMPILE_SYSTEM, compilePrompt(existing, digest), this.opts.maxTokens, callMeta, s)
       if (text == null) {
         this.store.setMetaRaw('llmFailAt:' + s, Date.now())
         this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
@@ -3786,7 +3795,7 @@ export class MemoryConsolidator {
       markConsolidateStage(safeSid, 'llm', { facts: g.facts.length, events: g.events.length })
       const basePrompt = this.prompt(g)
       const cMeta = {}
-      let text = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, basePrompt, this.opts.maxTokens, cMeta)
+      let text = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, basePrompt, this.opts.maxTokens, cMeta, safeSid)
       if (text == null) {
         this.store.setMetaRaw('consolidateFailAt:' + ws, String(Date.now()))
         result = { ok: false, reason: 'llm-failed', trigger, sweep, err: cMeta.error ?? null, effortFallback: cMeta.effortFallback ?? null, ms: Date.now() - t0 }
@@ -3813,7 +3822,7 @@ export class MemoryConsolidator {
         const repairUser = this.prompt(compact)
           + `\n\nYour previous reply was rejected (${why}). Previous reply:\n${clip(text, 900)}`
           + '\nReturn ONLY the JSON object. Every target must be one of the CURRENT FACTS keys; every evidence token must be copied exactly from the lists above.'
-        const text2 = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, repairUser, this.opts.maxTokens)
+        const text2 = await callCompileLlm(llm, route, CONSOLIDATE_SYSTEM, repairUser, this.opts.maxTokens, null, safeSid)
         if (text2 != null) {
           parsed = parseConsolidateOps(text2, {
             keys: compact.facts.map((f) => f.key), evidence: compactEvidence, max: this.opts.maxOps,

@@ -146,6 +146,55 @@ store.ingest({ sid, seq: 1, kind: 'user_turn', key: 'u1', value: { text: TEXT },
   check('⑤ 失败原因被记录', String(r.err ?? '').includes('UPSTREAM_TIMEOUT'), JSON.stringify(r))
 }
 
+/* ── ⑥ 会话身份：provider 要求 x-opencode-session 时，辅助调用必须带 sessionId ── */
+{
+  // 复刻今天的真机链路：off 被拒 → 回退不传档位 → 若请求没有会话身份，上游 400 MissingSessionID
+  const box = mkLlm((req) => {
+    if (req.reasoningEffort) return errChunks('UNSUPPORTED_REASONING_EFFORT', EFFORT_MSG)
+    if (!req.sessionId) return errChunks('INVALID_REQUEST', '400: {"type":"MissingSessionID","message":"Request is missing x-opencode-session"}')
+    return okChunks('结论：带会话身份才走通。')
+  })
+  const io = mkIo(box.llm)
+  io.sessionId = 'session-abc123'
+  const out = await applyCondense(rowsOf(`[A] ${A}`), 'single', io)
+  check('⑥ 折叠调用带 sessionId 后才成功', out.stat.folded === 1 && box.reqs.length === 2, JSON.stringify({ f: out.stat.folded, n: box.reqs.length }))
+  check('⑥ 第二次请求确实携带会话身份（session- 前缀原样保留）',
+    box.reqs[1].sessionId === 'session-abc123', JSON.stringify(box.reqs.map((r) => r.sessionId ?? '-')))
+  // 缺身份时不得假装成功
+  const box2 = mkLlm((req) => (req.sessionId ? okChunks('不该走到这里') : errChunks('INVALID_REQUEST', 'MissingSessionID')))
+  const io2 = mkIo(box2.llm)
+  const out2 = await applyCondense(rowsOf(`[A] ${A}`), 'single', io2)
+  check('⑥ 没有会话身份 ⇒ 仍按无损回退（不谎报压缩成功）',
+    out2.stat.folded === 0 && out2.stat.fallback === 1 && !out2.rows[2].includes('不该走到这里'), out2.rows[2])
+}
+
+/* ── ⑦ 记忆编译路径同样携带会话身份（裸 uuid 会被补成 session- 前缀） ── */
+{
+  const sid3 = 'eff7'
+  const TEXT7 = '渲染出片一律用 30fps'
+  store.ingest({ sid: sid3, seq: 1, kind: 'user_turn', key: 'u1', value: { text: TEXT7 }, source: { sid: sid3, seq: 1 } })
+  const reqs = []
+  const llm = {
+    stream: (req) => {
+      reqs.push(req)
+      return (async function* () {
+        if (!req.sessionId) {
+          yield { type: 'finish', reason: { kind: 'error', failure: { code: 'INVALID_REQUEST', message: '400 MissingSessionID' } } }
+          return
+        }
+        yield { type: 'text-delta', text: '{"insights":[{"key":"fps.rule","summary":"渲染出片一律用 30fps","confidence":0.9}]}' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      })()
+    },
+  }
+  const c = new MemoryCompiler(store, { foldGraceMs: 0, maxEvents: 40 })
+  const r = await c.compileSession({ sid: sid3, workspace: ws, llm, route: { provider: 'opencode-go', model: 'minimax-m3.1-flash-free' } })
+  check('⑦ 编译一次成功(身份始终在场,不需要第二枪)',
+    r.ok === true && r.insights === 1 && reqs.length === 1, JSON.stringify({ r: { ok: r.ok, i: r.insights }, n: reqs.length }))
+  check('⑦ 会话身份为 session-<uuid> 形态（与宿主 agent.session.id 同形）',
+    reqs.every((q) => q.sessionId === 'session-' + sid3), JSON.stringify(reqs.map((q) => q.sessionId)))
+}
+
 store.db.close()
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails === 0 ? 0 : 1)
