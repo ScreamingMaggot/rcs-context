@@ -3317,9 +3317,12 @@ async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, 
   }
   // 主路由彻底失败（瞬时故障重试仍不通，或模型已下线）：换路由而不是直接放弃。
   // 记忆编译在后台跑，本地模型慢一点也远好过这一轮什么也没学到。
+  // 每次尝试都记进 tried —— "到底调了谁"必须能从日志里直接读出来，不能只记最后一枪。
+  const tried = [route.provider + '/' + route.model]
   if (r.error && (isTransientAuxError(r) || isRouteDead(r))) {
     for (const alt of auxFallbackRoutes(controlNow())) {
       if (alt.provider === route.provider && alt.model === route.model) continue
+      tried.push(alt.provider + '/' + alt.model)
       let rr = await retryTransient(() => compileCallOnce(llm, alt, system, messages, maxTokens, 'off', auxSid), waits)
       if (!rr.text && rr.effortRejected) rr = await retryTransient(() => compileCallOnce(llm, alt, system, messages, maxTokens, '', auxSid), waits)
       if (rr.text) {
@@ -3328,6 +3331,7 @@ async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, 
           meta.fallbackRoute = alt.provider + '/' + alt.model
           meta.servedProvider = alt.provider
           meta.servedModel = alt.model
+          meta.tried = tried
           if (rr.attempts > 1) meta.attempts = rr.attempts
         }
         console.log('[MEMORY] compile served by fallback ' + alt.provider + '/' + alt.model + ' (primary: ' + r.error + ')')
@@ -3336,8 +3340,8 @@ async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, 
       r = rr // 错误指向最后一条真实尝试，便于核验
     }
   }
-  if (meta) { meta.error = r.error; if (r.attempts > 1) meta.attempts = r.attempts }
-  if (r.error) console.error('[MEMORY] compile call failed (' + (r.attempts || 1) + ' attempts): ' + r.error)
+  if (meta) { meta.error = r.error; meta.tried = tried; if (r.attempts > 1) meta.attempts = r.attempts }
+  if (r.error) console.error('[MEMORY] compile call failed [' + tried.join(' -> ') + '] (' + (r.attempts || 1) + ' attempts each): ' + r.error)
   return null
 }
 
@@ -3580,10 +3584,10 @@ export class MemoryCompiler {
         this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
           t: Date.now(), ok: false, reason: 'llm-failed',
           err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null,
-          attempts: callMeta.attempts ?? null, fallbackRoute: callMeta.fallbackRoute ?? null,
+          attempts: callMeta.attempts ?? null, fallbackRoute: callMeta.fallbackRoute ?? null, tried: callMeta.tried ?? null,
         }))
         recordCompile(false)
-        return { ok: false, reason: 'llm-failed', err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null }
+        return { ok: false, reason: 'llm-failed', err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null, tried: callMeta.tried ?? null }
       }
       const parsed = parseInsights(text, { max: this.opts.maxInsights })
       const grounded = []
@@ -3647,13 +3651,14 @@ export class MemoryCompiler {
         through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
         effortFallback: callMeta.effortFallback ?? null,
         attempts: callMeta.attempts ?? null, fallbackRoute: callMeta.fallbackRoute ?? null, model: callMeta.servedModel ?? route.model,
+        tried: callMeta.tried ?? null,
       }))
       recordCompile(true)
       return {
         ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
         through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
         effortFallback: callMeta.effortFallback ?? null, fallbackRoute: callMeta.fallbackRoute ?? null,
-        model: callMeta.servedModel ?? route.model,
+        model: callMeta.servedModel ?? route.model, tried: callMeta.tried ?? null,
       }
     } finally {
       this.busy.delete(s)

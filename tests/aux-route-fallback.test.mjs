@@ -101,6 +101,7 @@ check('② 空输出不算路由死亡', isRouteDead({ text: null, error: 'empty
   const r = await c.compileSession({ sid, workspace: { id: 'ws2', root }, llm, route: { provider: 'opencode-go', model: 'minimax-m3.1-flash-free' } })
   check('④ 主路由(minimax)死亡 ⇒ 改用压缩路由(deepseek)', r.ok === true && r.fallbackRoute === 'opencode-go/deepseek-v4.1-flash', JSON.stringify({ ok: r.ok, f: r.fallbackRoute, seen }))
   check('④ 没有去碰本机模型', seen.every((x) => !x.startsWith('ollama-local')), JSON.stringify(seen))
+  check('④ tried 依次记下主路由与回退路由', JSON.stringify(r.tried) === JSON.stringify(['opencode-go/minimax-m3.1-flash-free', 'opencode-go/deepseek-v4.1-flash']), JSON.stringify(r.tried))
 }
 
 if (fails === 0) console.log('ALL PASS')

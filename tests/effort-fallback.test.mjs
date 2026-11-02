@@ -165,6 +165,7 @@ store.ingest({ sid, seq: 1, kind: 'user_turn', key: 'u1', value: { text: TEXT },
   delete process.env.DSH_MEMORY_AUX_RETRY_MS
   // 主路由 3 枪 + 两个本地回退路由各 3 枪：全部不可用时如实失败，不谎报成功。
   check('⑤b 所有路由都不可用 ⇒ 逐条重试后如实失败', r.ok === false && calls === 9, JSON.stringify({ ok: r.ok, calls }))
+  check('⑤b 尝试过哪些模型可读', Array.isArray(r.tried) && r.tried.length === 3 && r.tried[0].includes('deepseek-v4.1-flash'), JSON.stringify(r.tried))
   check('⑤b 原因如实上报', String(r.err ?? '').includes('Model is unavailable'), JSON.stringify(r))
 }
 
