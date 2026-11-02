@@ -106,6 +106,10 @@ check('⑤ 天花板生效', effectiveMaxTokens(100000, 900) === 900)
 check('⑤ 天花板非法时回落默认且仍 ≥ 保底',
   Number.isFinite(effectiveMaxTokens(10, undefined)) && effectiveMaxTokens(10, undefined) >= 768)
 check('⑤ 负数输入按 0 处理（不产生负预算）', effectiveMaxTokens(-99, 4096) === 768)
+// v1.10.63：显式配置的天花板就是预算，不再按输入长度二次收敛——max_tokens 是上限不是计费，
+// 压低它只会让"思考 + 正文"共享的额度更快撞顶（真机 1/1 成功仍 salvage=max-tokens）。
+check('⑤ 显式预算不二次收敛', effectiveMaxTokens(1, 16864, { explicit: true }) === 16864)
+check('⑤ 显式预算同样不会超过自身天花板', effectiveMaxTokens(999999, 4096, { explicit: true }) === 4096)
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILED`)
 process.exit(fails ? 1 : 0)

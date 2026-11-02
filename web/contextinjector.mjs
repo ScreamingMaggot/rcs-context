@@ -1203,6 +1203,8 @@ async function llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, 
   //   condenseText 内部**提前返回**、一次请求都没发，但 last-fold 的 `calls` 已经 +1 —— 于是
   //   "本次折叠发起了几次付费调用"被虚高（实测：tooShort 行 calls=1 而 auxCalls=0）。
   if (opts && opts.io) opts.io.attempts = (opts.io.attempts ?? 0) + 1
+  // 记下**实际发出去的** max_tokens：truncation 到底是不是被我们自己压出来的，只能靠这个数说话。
+  if (opts && opts.io && Number.isFinite(maxTokens)) opts.io.mtSeen = Math.max(opts.io.mtSeen ?? 0, Math.floor(maxTokens))
   const meta = (opts && opts.meta) || null // 可选：回填 finish 详情，供调用方做截断抢救判定
   const messages = [await userMessage(user)]
   let text = ''
@@ -1289,8 +1291,12 @@ function pushErr(io, reason) {
 //   （模型会写满、延迟上去了、压缩率还变差）；给一条 8000 字的 [A] 只开 700 又会截断。
 //   经验式：≈ 输入的 1/2 token 足够让模型把"压缩后正文"写完并正常 stop（压到 1/4 字符 ≈ 1/6 token，
 //   这里留 3 倍余量）；下限 768（短输入也要写完一整段），上限取传入的天花板。
-export function effectiveMaxTokens(bodyChars, ceiling) {
+export function effectiveMaxTokens(bodyChars, ceiling, opts = null) {
   const cap = Number.isFinite(ceiling) && ceiling > 0 ? Math.floor(ceiling) : LOSSY_MAX_TOKENS
+  // 显式配置（control.condenseMaxTokens）就是预算，不再按输入长度二次收敛。
+  // max_tokens 是**上限**而不是计费：写大不会多花钱，写小只会让"思考 + 正文"共享的额度
+  // 更快撞顶（真机：一次 1/1 成功的折叠仍 salvage=max-tokens）。
+  if (opts && opts.explicit) return cap
   const n = Number.isFinite(bodyChars) ? Math.max(0, Math.floor(bodyChars)) : 0
   // 先保底（短输入也要够写完一段），再受天花板约束 —— 顺序反了会让 control 显式调小失效
   return Math.min(cap, Math.max(768, Math.ceil(n / 2)))
@@ -1394,7 +1400,7 @@ async function condenseText(text, io) {
     return null
   }
   const run = _condChain.then(async () => {
-    const mx = effectiveMaxTokens(body.length, io && io.maxTokens)
+    const mx = effectiveMaxTokens(body.length, io && io.maxTokens, { explicit: !!(io && io.maxTokensExplicit) })
     const condenseSys = (io && io.condenseSys) || CONDENSE_SYS // #10 可自定义提示词
     const meta = {}
     const a0 = io?.aux ? { ...io.aux } : null
@@ -1453,7 +1459,7 @@ async function extractKeys(text, io, opts) {
   const body = String(text).trim()
   if (body.length < minBytesOf(io)) return null
   const work = async () => {
-    const mx = effectiveMaxTokens(body.length, io && io.maxTokens)
+    const mx = effectiveMaxTokens(body.length, io && io.maxTokens, { explicit: !!(io && io.maxTokensExplicit) })
     const keysSys = (io && io.keysSys) || KEYS_SYS // #10 可自定义载荷提示词
     // 【v1.10.20 · P0】K 通道同样关掉思维链（它和浓缩是同一类"只删不改/逐字摘抄"任务，推理无收益）。
     //   【P2】但 K 通道**不开**截断抢救：截断会切在某个值中间，产出一个"半个值"，
@@ -2096,13 +2102,15 @@ export default {
         const route = await resolveCondenseRoute(ctx, session, ctrl, llmFixed)
         condenseRoute = route ? { provider: route.provider, model: route.model, via: route.via } : null
         if (!condenseRoute) condenseErr = 'no condense route (llm service absent / no session model / empty registry)'
-        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 }, sessionId: sid } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量 / v1.10.60 sessionId=辅助调用会话身份
+        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 }, mtSeen: 0, sessionId: sid } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量 / v1.10.60 sessionId=辅助调用会话身份
         // #7 maxtokens：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)
         //   实际每次调用还会按输入长度自适应收敛（effectiveMaxTokens），此处是**上限**。
         // #7 maxtokens **上限**：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)。
         //   每次调用再按输入长度自适应收敛（effectiveMaxTokens）；此处只定天花板。
         const ctlMT = ctrl && typeof ctrl.condenseMaxTokens === 'number' ? Math.max(64, Math.floor(ctrl.condenseMaxTokens)) : NaN
         ioc.maxTokens = Number.isFinite(ctlMT) ? ctlMT : LOSSY_MAX_TOKENS
+        // 显式设了天花板就按天花板发：max_tokens 是上限不是计费，压低只会让思考型和正文抢额度。
+        ioc.maxTokensExplicit = Number.isFinite(ctlMT)
         // 【v1.10.20 · 经济性 P0】浓缩调用的推理档位：control.condenseReasoningEffort（string，需为
         //   '' | off | low | high | max）或 env DSH_CONTEXTINJECTOR_LOSSY_EFFORT 覆盖；缺省 'off'。
         //   事故说明见 LOSSY_EFFORT 定义处：不关思维链时，推理 token 吃满整个输出额度 ⇒ 正文 0 字、
@@ -2139,7 +2147,7 @@ export default {
         // 抢救成功，folded=1/1、fallback=0）。这不是失败，面板不能再按错误展示；
         // 原始文本仍留在 condenseErr 里供核验。
         condenseErrResolved = !!(condenseErr && stat && stat.a > 0 && stat.fallback === 0)
-        if (stat.a > 0) console.log(`[contextinjector] condense[${mode}] trigger=${trigger} round=${roundState.n}: [A] ${stat.folded}/${stat.a} folded, ${stat.fallback} fallback${Object.keys(stat.fallbackReasons ?? {}).length ? '(' + Object.entries(stat.fallbackReasons).map(([k, v]) => k + '=' + v).join(',') + ')' : ''}, keys=${stat.keys}${stat.keysDiag ? '(' + stat.keysDiag.join('|') + ')' : ''}${stat.salvaged ? ', salvaged=' + stat.salvaged : ''}, calls=${stat.calls}/${ioc.maxCalls ?? '?'} ms=${stat.ms}${stat.budgetHit ? ' BUDGET-HIT' : ''}, ${stat.rawBytes}B->${stat.outBytes}B via=${route ? route.provider + '/' + route.model + '(' + route.via + ')' : 'none'}${condenseErr ? ' err=' + condenseErr : ''}${condenseErrKind ? ' kind=' + condenseErrKind : ''}${condenseErrResolved ? ' (recovered)' : ''}`)
+        if (stat.a > 0) console.log(`[contextinjector] condense[${mode}] trigger=${trigger} round=${roundState.n}: [A] ${stat.folded}/${stat.a} folded, ${stat.fallback} fallback${Object.keys(stat.fallbackReasons ?? {}).length ? '(' + Object.entries(stat.fallbackReasons).map(([k, v]) => k + '=' + v).join(',') + ')' : ''}, keys=${stat.keys}${stat.keysDiag ? '(' + stat.keysDiag.join('|') + ')' : ''}${stat.salvaged ? ', salvaged=' + stat.salvaged : ''}, calls=${stat.calls}/${ioc.maxCalls ?? '?'} ms=${stat.ms}${stat.budgetHit ? ' BUDGET-HIT' : ''}, ${stat.rawBytes}B->${stat.outBytes}B via=${route ? route.provider + '/' + route.model + '(' + route.via + ')' : 'none'}${condenseErr ? ' err=' + condenseErr : ''}${condenseErrKind ? ' kind=' + condenseErrKind : ''}${condenseErrResolved ? ' (recovered)' : ''}${ioc.mtSeen ? ' mt=' + ioc.mtSeen : ''}`)
       }
       // head 行只可能在 foldText === '' 时非空（补录只做一次），且其节点 seq 更早 ⇒ 必须排在增量行**之前**；
       // 之后每次折叠都只是向后追加 ⇒ monotonic 前缀纪律不变（transcript.startsWith(foldText) 仍成立）。
@@ -2388,7 +2396,7 @@ try {
           lossy: mode !== 'off' ? 1 : 0, aCount: stat?.a ?? 0, aFolded: stat?.folded ?? 0, aFallback: stat?.fallback ?? 0, aKeys: stat?.keys ?? 0,
           calls: stat?.calls ?? 0, ms: stat?.ms ?? 0, budgetHit: stat?.budgetHit === true, // v1.10.7 预算法统计（此处是第二个 persistLastFold 字面量，v1.10.5 的补丁只落在第一个）
           fallbackReasons: stat?.fallbackReasons, // v1.10.19 P5：本折回退原因分型（compact/short/empty/noShrink/llmErr/payloadGate/maxCalls/budgetMs）
-          salvaged: stat?.salvaged, condenseReasoningEffort: stat?.condenseReasoningEffort, // v1.10.20：截断抢救条数 + 生效推理档位
+          salvaged: stat?.salvaged, condenseReasoningEffort: stat?.condenseReasoningEffort, maxTokensSent: ioc.mtSeen || undefined, // v1.10.20：截断抢救条数 + 生效推理档位；v1.10.63 实际发出的 max_tokens
           keysDiag: stat?.keysDiag, // v1.10.21：K 通道归因（ok / noValues / callFailed[:原因]）
           // v1.10.23 经济性：与第一个 persist 字面量保持同源（历史上这里漏打过补丁，故两处都写）
           auxCalls: stat?.auxCalls, auxTokens: stat?.auxTokens, auxBilled: stat?.auxBilled,
