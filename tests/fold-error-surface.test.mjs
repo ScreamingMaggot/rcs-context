@@ -14,7 +14,12 @@ const plugin = readFileSync(join(root, 'web', 'contextinjector.mjs'), 'utf8')
 const client = readFileSync(join(root, 'contextinjector-webui', 'lib', 'client.js'), 'utf8')
 
 test('① 插件由最终结果判定"已恢复"：有错但每段都折叠成功才算', () => {
-  assert.match(plugin, /const condenseErrResolved = !!\(condenseErr && stat && stat\.a > 0 && stat\.fallback === 0\)/)
+  // 声明必须与 condenseErr 同级（写 last-fold 的代码在 if 块之外）；v1.10.61 把它写在块内，
+  // 每次折叠写记录时抛 "condenseErrResolved is not defined"，整折被判失败。
+  assert.doesNotMatch(plugin, /const condenseErrResolved/)
+  const decl = plugin.indexOf('let condenseErrResolved = false')
+  const assign = plugin.indexOf('condenseErrResolved = !!(condenseErr')
+  assert.ok(decl > 0 && assign > decl, '两处必须存在且先声明后赋值')
   assert.match(plugin, /condenseErrResolved: condenseErrResolved \|\| undefined/)
 })
 

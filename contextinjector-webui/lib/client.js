@@ -606,6 +606,19 @@ window.__ModuleLoader__.load({
 				setExpanded(n);
 			}
 			var lf = (data && data.lastFold) || null;
+			// 面板长期显示"上次折叠"：不给时间与版本，一条一天前的失败会被读成正在持续报错
+			// （真机 11-02：260e1607 的记录停在 11-01 22:43 / v1.10.58，该会话此后再没折叠过）。
+			var lfWhen = '';
+			var lfVer = '';
+			var lfStale = false;
+			if (lf && lf.t) {
+				var _d = new Date(lf.t), _p = function (n) { return (n < 10 ? '0' : '') + n; };
+				lfWhen = (_d.getMonth() + 1) + '-' + _p(_d.getDate()) + ' ' + _p(_d.getHours()) + ':' + _p(_d.getMinutes());
+				lfStale = (Date.now() - lf.t) > 6 * 3600 * 1000;
+				var _m = lf.plugin ? String(lf.plugin).match(/^v[0-9.]+/) : null;
+				lfVer = _m ? _m[0] : '';
+			}
+			var lfLabel = '上次折叠' + (lfWhen ? '(' + lfWhen + (lfVer ? ' · ' + lfVer : '') + ')' : '');
 			// 【在飞折叠】「上一轮输出压缩中…」：数据来自 /status.foldInflight（host 读插件写的在飞标记）。
 			// 为什么需要：turn-end 触发的是**后台**折叠（只排队、不阻塞本轮），浓缩模型要跑几秒~十几秒；
 			//   这段时间 lastFold 仍是上一轮的结果，面板看起来"什么都没发生"（用户实测困惑点）。
@@ -842,8 +855,8 @@ window.__ModuleLoader__.load({
 								(mdlErr ? e("div", { className: "ci-err" }, "\u26A0 " + mdlErr) : null),
 								(mdl && mdl.llmAvailable === false ? e("div", { className: "ci-err" }, "DSH \u672A\u63D0\u4F9B llm \u670D\u52A1\uFF1Asingle/double \u6863\u5C06\u81EA\u52A8\u56DE\u9000\u65E0\u635F") : null),
 								(lf && lf.condenseErr ? ((lf.condenseErrResolved === true || (lf.condenseErrResolved === undefined && lf.aFolded > 0 && !lf.aFallback))
-									? e("div", { className: "ci-note", title: (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr }, "\u4E0A\u6B21\u6298\u53E0\uFF1A\u8C03\u7528\u5148\u51FA\u9519\uFF08" + (lf.condenseErrKind || "llm") + "\uFF09\uFF0C\u5DF2\u81EA\u52A8\u6062\u590D\uFF0C\u6298\u53E0\u7ED3\u679C\u5B8C\u6574")
-									: e("div", { className: "ci-err" }, "\u4E0A\u6B21\u6298\u53E0\u538B\u7F29\u8C03\u7528\u9519\u8BEF\uFF1A" + (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr)) : null),
+									? e("div", { className: "ci-note", title: (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr }, lfLabel + "\uFF1A\u8C03\u7528\u5148\u51FA\u9519\uFF08" + (lf.condenseErrKind || "llm") + "\uFF09\uFF0C\u5DF2\u81EA\u52A8\u6062\u590D\uFF0C\u6298\u53E0\u7ED3\u679C\u5B8C\u6574" + (lfStale ? "\uFF08\u6B64\u540E\u672A\u518D\u6298\u53E0\uFF09" : ""))
+									: e("div", { className: "ci-err" }, lfLabel + "\u538B\u7F29\u8C03\u7528\u9519\u8BEF\uFF1A" + (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr + (lfStale ? " \u00B7 \u6B64\u540E\u672A\u518D\u6298\u53E0\uFF0C\u4EE5\u4E0A\u4E3A\u5386\u53F2\u8BB0\u5F55" : ""))) : null),
 								e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
 									e("select", { className: "ci-sel", value: selP, onChange: onProviderChange, title: "\u538B\u7F29\u5668\u7528 provider\uFF1B\u300C\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B\u300D = \u7528\u8BE5\u4F1A\u8BDD\u5F53\u524D\u6A21\u578B\uFF08\u6E05\u9664\u8986\u76D6\uFF09" },
 										e("option", { value: "" }, "\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B"),

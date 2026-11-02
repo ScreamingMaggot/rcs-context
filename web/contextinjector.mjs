@@ -2083,6 +2083,9 @@ export default {
       let condenseRoute = null // v1.8：本次折叠实际使用的浓缩模型路由（记入 last-fold 供核验）
       let condenseErr = null // v1.9：浓缩模型调用失败原因（上浮 last-fold → WebUI 展示；质量性回退不在此列）
       let condenseErrKind = null // #9：对 condenseErr 分型（enum），供 WebUI 如实展示错误类别
+      // 必须与 condenseErr 同级声明：写 last-fold 的代码在本 if 块之外，块内 const 出不去
+      // （v1.10.61 就踩了这个：每次折叠在写记录时抛 "condenseErrResolved is not defined" ⇒ 整折失败）。
+      let condenseErrResolved = false
       if (mode !== 'off') {
         // 【v1.10.19 · P3 修复】在**最早的时刻**固化 llm 句柄（此刻 ctx 一定还活着：本函数由 turn/end
         //   handler 起头，handler 返回后作用域才可能被回收）。后台折叠跑到一半时请求作用域可能已被
@@ -2135,7 +2138,7 @@ export default {
         // 出过错但每一段都折叠成功（实测：档位被拒 → 不传档位重试 → 输出撞 max-tokens →
         // 抢救成功，folded=1/1、fallback=0）。这不是失败，面板不能再按错误展示；
         // 原始文本仍留在 condenseErr 里供核验。
-        const condenseErrResolved = !!(condenseErr && stat && stat.a > 0 && stat.fallback === 0)
+        condenseErrResolved = !!(condenseErr && stat && stat.a > 0 && stat.fallback === 0)
         if (stat.a > 0) console.log(`[contextinjector] condense[${mode}] trigger=${trigger} round=${roundState.n}: [A] ${stat.folded}/${stat.a} folded, ${stat.fallback} fallback${Object.keys(stat.fallbackReasons ?? {}).length ? '(' + Object.entries(stat.fallbackReasons).map(([k, v]) => k + '=' + v).join(',') + ')' : ''}, keys=${stat.keys}${stat.keysDiag ? '(' + stat.keysDiag.join('|') + ')' : ''}${stat.salvaged ? ', salvaged=' + stat.salvaged : ''}, calls=${stat.calls}/${ioc.maxCalls ?? '?'} ms=${stat.ms}${stat.budgetHit ? ' BUDGET-HIT' : ''}, ${stat.rawBytes}B->${stat.outBytes}B via=${route ? route.provider + '/' + route.model + '(' + route.via + ')' : 'none'}${condenseErr ? ' err=' + condenseErr : ''}${condenseErrKind ? ' kind=' + condenseErrKind : ''}${condenseErrResolved ? ' (recovered)' : ''}`)
       }
       // head 行只可能在 foldText === '' 时非空（补录只做一次），且其节点 seq 更早 ⇒ 必须排在增量行**之前**；

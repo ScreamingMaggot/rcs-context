@@ -3265,6 +3265,10 @@ export function parseRouteSpec(spec) {
 
 export function auxFallbackRoutes(control = {}, env = process.env) {
   const raw = []
+  // 首选回退 = 你已经为压缩选定的那条路由（control.condenseProvider/Model）。同一 provider 下
+  // 另一个模型通常最先可用、也不需要额外配置；真机教训：记忆被钉在 minimax（上游下线），
+  // 而折叠用的 deepseek-v4.1-flash 一直是通的。
+  if (control?.condenseProvider && control?.condenseModel) raw.push(control.condenseProvider + '/' + control.condenseModel)
   if (Array.isArray(control?.auxFallbackRoutes)) raw.push(...control.auxFallbackRoutes)
   if (env.DSH_AUX_FALLBACK_MODELS) raw.push(...String(env.DSH_AUX_FALLBACK_MODELS).split(','))
   if (raw.length === 0) raw.push('ollama-local/qwen3.5:4b', 'ollama-local/qwen3-8b-q4:latest')
