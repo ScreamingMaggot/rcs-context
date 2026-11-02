@@ -163,7 +163,8 @@ store.ingest({ sid, seq: 1, kind: 'user_turn', key: 'u1', value: { text: TEXT },
   process.env.DSH_MEMORY_AUX_RETRY_MS = '0,0' // 退避读在调用时，测试里关掉真实等待
   const r = await c.compileSession({ sid: sid3, workspace: ws, llm, route: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } })
   delete process.env.DSH_MEMORY_AUX_RETRY_MS
-  check('⑤b 上游不可用按 [0,0] 重试两次后仍失败', r.ok === false && calls === 3, JSON.stringify({ ok: r.ok, calls }))
+  // 主路由 3 枪 + 两个本地回退路由各 3 枪：全部不可用时如实失败，不谎报成功。
+  check('⑤b 所有路由都不可用 ⇒ 逐条重试后如实失败', r.ok === false && calls === 9, JSON.stringify({ ok: r.ok, calls }))
   check('⑤b 原因如实上报', String(r.err ?? '').includes('Model is unavailable'), JSON.stringify(r))
 }
 

@@ -3251,6 +3251,40 @@ export function auxRetryWaits(env = process.env) {
   return w.length ? w : [2000, 6000]
 }
 
+// 路由级不可用（模型下线/改名）重试没有意义，只有换一条路由才有产出。回退清单：
+// control.auxFallbackRoutes（数组，热读） > env DSH_AUX_FALLBACK_MODELS（逗号分隔） > 本机 ollama。
+// 默认取本地两个模型：它们都声明了 off 档，不会为了压缩再额外付一份思考 token。
+const AUX_ROUTE_DEAD_RE = /Model is unavailable|model.{0,16}(not found|unavailable|does not exist)|unsupported model|no condense route|route missing/i
+
+export function parseRouteSpec(spec) {
+  const t = String(spec ?? '').trim()
+  const i = t.indexOf('/')
+  if (i <= 0 || i === t.length - 1) return null
+  return { provider: t.slice(0, i), model: t.slice(i + 1) }
+}
+
+export function auxFallbackRoutes(control = {}, env = process.env) {
+  const raw = []
+  if (Array.isArray(control?.auxFallbackRoutes)) raw.push(...control.auxFallbackRoutes)
+  if (env.DSH_AUX_FALLBACK_MODELS) raw.push(...String(env.DSH_AUX_FALLBACK_MODELS).split(','))
+  if (raw.length === 0) raw.push('ollama-local/qwen3.5:4b', 'ollama-local/qwen3-8b-q4:latest')
+  const out = []
+  const seen = new Set()
+  for (const s of raw) {
+    const r = parseRouteSpec(s)
+    if (!r) continue
+    const k = r.provider + '/' + r.model
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
+  }
+  return out
+}
+
+export function isRouteDead(res) {
+  return !!res && !res.text && !res.effortRejected && AUX_ROUTE_DEAD_RE.test(String(res.error ?? ''))
+}
+
 export async function retryTransient(fn, waits = [2000, 6000]) {
   let res = await fn(0)
   let i = 0
@@ -3277,8 +3311,29 @@ async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, 
     r = await retryTransient(() => compileCallOnce(llm, route, system, messages, maxTokens, effort, auxSid), waits)
     if (r.text) { if (meta && r.attempts > 1) meta.attempts = r.attempts; return r.text }
   }
+  // 主路由彻底失败（瞬时故障重试仍不通，或模型已下线）：换路由而不是直接放弃。
+  // 记忆编译在后台跑，本地模型慢一点也远好过这一轮什么也没学到。
+  if (r.error && (isTransientAuxError(r) || isRouteDead(r))) {
+    for (const alt of auxFallbackRoutes(controlNow())) {
+      if (alt.provider === route.provider && alt.model === route.model) continue
+      let rr = await retryTransient(() => compileCallOnce(llm, alt, system, messages, maxTokens, 'off', auxSid), waits)
+      if (!rr.text && rr.effortRejected) rr = await retryTransient(() => compileCallOnce(llm, alt, system, messages, maxTokens, '', auxSid), waits)
+      if (rr.text) {
+        if (meta) {
+          meta.error = r.error
+          meta.fallbackRoute = alt.provider + '/' + alt.model
+          meta.servedProvider = alt.provider
+          meta.servedModel = alt.model
+          if (rr.attempts > 1) meta.attempts = rr.attempts
+        }
+        console.log('[MEMORY] compile served by fallback ' + alt.provider + '/' + alt.model + ' (primary: ' + r.error + ')')
+        return rr.text
+      }
+      r = rr // 错误指向最后一条真实尝试，便于核验
+    }
+  }
   if (meta) { meta.error = r.error; if (r.attempts > 1) meta.attempts = r.attempts }
-  if (r.error) console.error('[MEMORY] compile call failed (' + r.attempts + ' attempts): ' + r.error)
+  if (r.error) console.error('[MEMORY] compile call failed (' + (r.attempts || 1) + ' attempts): ' + r.error)
   return null
 }
 
@@ -3521,6 +3576,7 @@ export class MemoryCompiler {
         this.store.setMetaRaw('llmLast:' + s, JSON.stringify({
           t: Date.now(), ok: false, reason: 'llm-failed',
           err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null,
+          attempts: callMeta.attempts ?? null, fallbackRoute: callMeta.fallbackRoute ?? null,
         }))
         recordCompile(false)
         return { ok: false, reason: 'llm-failed', err: callMeta.error ?? null, effortFallback: callMeta.effortFallback ?? null }
@@ -3575,9 +3631,9 @@ export class MemoryCompiler {
           value: {
             summary: it.summary, confidence: it.confidence,
             evidence,
-            model: route.provider + '/' + route.model, compiledAt: now,
+            model: callMeta.fallbackRoute ?? (route.provider + '/' + route.model), compiledAt: now,
           },
-          source: { sid: s, seq: lastSeq, extractor: 'llm', model: route.model },
+          source: { sid: s, seq: lastSeq, extractor: 'llm', model: callMeta.servedModel ?? route.model },
           extractor: 'llm', confidence: it.confidence, fact_type: factType, ts: now,
         })
       }
@@ -3586,12 +3642,14 @@ export class MemoryCompiler {
         t: now, ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
         through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
         effortFallback: callMeta.effortFallback ?? null,
+        attempts: callMeta.attempts ?? null, fallbackRoute: callMeta.fallbackRoute ?? null, model: callMeta.servedModel ?? route.model,
       }))
       recordCompile(true)
       return {
         ok: true, insights: accepted.length, dropped, merged, smallUnchecked,
         through: lastSeq, anchorSeq, skipped, secretRejected, typeAdjusted,
-        effortFallback: callMeta.effortFallback ?? null, model: route.model,
+        effortFallback: callMeta.effortFallback ?? null, fallbackRoute: callMeta.fallbackRoute ?? null,
+        model: callMeta.servedModel ?? route.model,
       }
     } finally {
       this.busy.delete(s)
