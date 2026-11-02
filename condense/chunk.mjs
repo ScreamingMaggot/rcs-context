@@ -216,3 +216,40 @@ export function resolveMaxTokenBudget({ hardOverride, ctxWindow, defaultMaxToken
   }
   return Math.max(floor, Math.floor(fallback))
 }
+
+// ============ 路由可用性（折叠与记忆共用） ============
+// 上游会整条下线模型（真机：minimax-m3.1-flash-free 从免费名单消失），宿主也可能根本没配
+// 某个 id（UNKNOWN_MODEL）。这两种都不是"重试能好"的错，只有换路由才有产出。
+const AUX_ROUTE_DEAD_RE = /Model is unavailable|no configured model|UNKNOWN_MODEL|model.{0,16}(not found|unavailable|does not exist)|unsupported model|no condense route|route missing/i
+
+export function parseRouteSpec(spec) {
+  const t = String(spec ?? '').trim()
+  const i = t.indexOf('/')
+  if (i <= 0 || i === t.length - 1) return null
+  return { provider: t.slice(0, i), model: t.slice(i + 1) }
+}
+
+export function auxFallbackRoutes(control = {}, env = process.env) {
+  const raw = []
+  // 首选回退：压缩路由（同一 provider 的另一个模型通常最先可用，也无需额外配置）
+  if (control?.condenseProvider && control?.condenseModel) raw.push(control.condenseProvider + '/' + control.condenseModel)
+  if (Array.isArray(control?.auxFallbackRoutes)) raw.push(...control.auxFallbackRoutes)
+  if (env.DSH_AUX_FALLBACK_MODELS) raw.push(...String(env.DSH_AUX_FALLBACK_MODELS).split(','))
+  // 本机模型恒列最后兜底：它由宿主配置直接可用，且不花外部额度。
+  raw.push('ollama-local/qwen3.5:4b', 'ollama-local/qwen3-8b-q4:latest')
+  const out = []
+  const seen = new Set()
+  for (const s of raw) {
+    const r = parseRouteSpec(s)
+    if (!r) continue
+    const k = r.provider + '/' + r.model
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
+  }
+  return out
+}
+
+export function isRouteDead(error) {
+  return AUX_ROUTE_DEAD_RE.test(String(error ?? ''))
+}

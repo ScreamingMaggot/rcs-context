@@ -3254,7 +3254,7 @@ export function auxRetryWaits(env = process.env) {
 // 路由级不可用（模型下线/改名）重试没有意义，只有换一条路由才有产出。回退清单：
 // control.auxFallbackRoutes（数组，热读） > env DSH_AUX_FALLBACK_MODELS（逗号分隔） > 本机 ollama。
 // 默认取本地两个模型：它们都声明了 off 档，不会为了压缩再额外付一份思考 token。
-const AUX_ROUTE_DEAD_RE = /Model is unavailable|model.{0,16}(not found|unavailable|does not exist)|unsupported model|no condense route|route missing/i
+const AUX_ROUTE_DEAD_RE = /Model is unavailable|no configured model|UNKNOWN_MODEL|model.{0,16}(not found|unavailable|does not exist)|unsupported model|no condense route|route missing/i
 
 export function parseRouteSpec(spec) {
   const t = String(spec ?? '').trim()

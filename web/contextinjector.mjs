@@ -38,7 +38,7 @@ import { foldOne as foldToolResult } from '../toolfold/toolfold.mjs'
 // §13 消息来源分型（condense/ 共享纯模块，仿 ../toolfold 顶层兄弟目录惯例）：
 //   注入器侧转录 ROUND 仅计真人轮（source.kind==='user'），subagent 回传等不再漏进 [U]。
 //   与 LOGcompiler §13 修复对仗。设计见 docs/v2-优化设计.md §13。
-import { classifyMessageSource, subagentIdOf, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES, pluginIdOf } from '../condense/chunk.mjs'
+import { classifyMessageSource, subagentIdOf, classifyCondenseError, chunkForCompressor, INJECTED_USER_PREFIXES, pluginIdOf, auxFallbackRoutes, isRouteDead } from '../condense/chunk.mjs'
 import { ivrLoad, ivrRecord } from '../condense/ivr.mjs' // #5 IVR 注入经济计量簿记（仅 node:fs）
 
 const ENABLED = process.env.DSH_CONTEXTINJECTOR_ENABLED === '1'
@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
+const PLUGIN_VERSION = 'v1.10.65 (折叠侧路由降级：上游摘掉模型或宿主没配该 id 时，按 压缩路由→配置回退→本机 ollama 换路重试，并把实际服务的路由写进 last-fold 的 condenseRoute(via=fallback)；此前折叠侧完全没有降级，模型一死整折无损回退而本机 ollama 明明在跑) 内嵌 v1.10.64 (折叠记录可写性根治：last-fold 字面量曾引用 if 块内的 ioc/condenseErrResolved，两次导致 ioc is not defined ⇒ 整折 append-failed；已改函数级 let，并有结构性测试禁止 last-fold 引用块内变量。显式 max_tokens 不再二次收敛（maxTokensSent 可核验）。面板：已恢复的折叠不显示红字，标记移到「实际使用」行尾) 内嵌 v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -1182,13 +1182,29 @@ function auxSessionId(sid) {
 async function llmText(ctx, route, system, user, maxTokens, sink, llmFixed, opts) {
   const eff = opts && opts.effort !== undefined ? String(opts.effort).trim().toLowerCase() : LOSSY_EFFORT
   const meta = (opts && opts.meta) || null
-  const first = await llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, opts, eff)
-  if (first.ok) return first.text
-  if (eff !== '' && first.effortRejected) {
+  const io = (opts && opts.io) || null
+  let r = await llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, opts, eff)
+  if (r.ok) return r.text
+  if (eff !== '' && r.effortRejected) {
     sink?.(`effort-unsupported(${eff}); retry without reasoningEffort`)
-    const again = await llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, opts, '')
+    r = await llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, opts, '')
     if (meta) meta.effortFallback = eff
-    if (again.ok) return again.text
+    if (r.ok) return r.text
+  }
+  // 路由级不可用（上游下线 / 宿主没配这个 id）重试同一条没有意义：换路由才有产出。
+  // 真机教训：折叠侧此前完全没有降级，模型一死整折就无损回退，而本机 ollama 明明在跑。
+  if (io && Array.isArray(io.fallbackRoutes) && isRouteDead(r.error)) {
+    for (const alt of io.fallbackRoutes) {
+      if (alt.provider === route.provider && alt.model === route.model) continue
+      sink?.(`route-dead(${route.provider}/${route.model}); trying ${alt.provider}/${alt.model}`)
+      let rr = await llmTextOnce(ctx, alt, system, user, maxTokens, sink, llmFixed, opts, eff)
+      if (!rr.ok && rr.effortRejected && eff !== '') rr = await llmTextOnce(ctx, alt, system, user, maxTokens, sink, llmFixed, opts, '')
+      if (rr.ok) {
+        io.fallbackRoute = alt
+        if (meta) meta.fallbackRoute = alt.provider + '/' + alt.model
+        return rr.text
+      }
+    }
   }
   return null
 }
@@ -1196,8 +1212,8 @@ async function llmText(ctx, route, system, user, maxTokens, sink, llmFixed, opts
 async function llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, opts, eff) {
   // 【v1.10.19 · P3】优先用调用方固化的句柄（折叠开始时取到的那一个），取不到才实时解析。
   const llm = llmFixed ?? llmOf(ctx)
-  if (!llm) { sink?.('llm service unavailable'); return { ok: false, effortRejected: false } }
-  if (!route?.provider || !route?.model) { sink?.('condense route missing'); return { ok: false, effortRejected: false } }
+  if (!llm) { sink?.('llm service unavailable'); return { ok: false, effortRejected: false, error: 'llm service unavailable' } }
+  if (!route?.provider || !route?.model) { sink?.('condense route missing'); return { ok: false, effortRejected: false, error: 'condense route missing' } }
   // 【v1.10.32 · 计量口径】真实**发起**的调用次数（含随后失败/被拒的）：记在 io.attempts 上。
   //   修的是"预约 ≠ 调用"：applyCondense 里 `foldCalls += 1` 是预算预约，短行/回本闸会在
   //   condenseText 内部**提前返回**、一次请求都没发，但 last-fold 的 `calls` 已经 +1 —— 于是
@@ -1257,10 +1273,10 @@ async function llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, 
     recordUsage()
     const msg = 'stream error: ' + String(err?.message ?? err)
     sink?.(msg)
-    return { ok: false, effortRejected: EFFORT_REJECTED_RE.test(msg) }
+    return { ok: false, effortRejected: EFFORT_REJECTED_RE.test(msg), error: msg }
   }
   recordUsage()
-  if (!finish) { sink?.('no finish chunk'); return { ok: false, effortRejected: false } }
+  if (!finish) { sink?.('no finish chunk'); return { ok: false, effortRejected: false, error: 'no finish chunk' } }
   const kind = String(finish.kind ?? '')
   if (meta) { meta.finishKind = kind; meta.truncated = kind !== 'stop' && /max.?tokens|length|truncat/i.test(kind) }
   // 【v1.10.20 · P2】截断抢救：仅当调用方显式开启 opts.salvage 且确为"额度用尽"型结束，
@@ -1273,10 +1289,10 @@ async function llmTextOnce(ctx, route, system, user, maxTokens, sink, llmFixed, 
     //   现在把 payload 一并带出（截断到 160 字符）。分型正则仍只看 `finish=<kind>` 前缀，语义不变。
     const pay = finish.failure ? ' ' + String(finish.failure.code ?? '') + ':' + String(finish.failure.message ?? '').slice(0, 160) : ''
     const rejected = EFFORT_REJECTED_RE.test(String(finish.failure?.code ?? '') + ' ' + String(finish.failure?.message ?? ''))
-    if (!salvageable) { sink?.('finish=' + kind + pay); return { ok: false, effortRejected: rejected } }
+    if (!salvageable) { sink?.('finish=' + kind + pay); return { ok: false, effortRejected: rejected, error: 'finish=' + kind + pay } }
     sink?.('salvage=' + kind)
   }
-  if (!text.trim()) { sink?.('empty output'); return { ok: false, effortRejected: false } } // P5：空输出过去是"静默回退"，连原因都不留
+  if (!text.trim()) { sink?.('empty output'); return { ok: false, effortRejected: false, error: 'empty output' } } // P5：空输出过去是"静默回退"，连原因都不留
   return { ok: true, text: text.trim() }
 }
 
@@ -2104,7 +2120,7 @@ export default {
         const route = await resolveCondenseRoute(ctx, session, ctrl, llmFixed)
         condenseRoute = route ? { provider: route.provider, model: route.model, via: route.via } : null
         if (!condenseRoute) condenseErr = 'no condense route (llm service absent / no session model / empty registry)'
-        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 }, mtSeen: 0, sessionId: sid } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量 / v1.10.60 sessionId=辅助调用会话身份
+        const ioc = { ctx, route, llm: llmFixed, errs: [], fb: {}, kd: [], aux: { calls: 0, in: 0, cacheRead: 0, out: 0 }, mtSeen: 0, sessionId: sid, fallbackRoutes: auxFallbackRoutes(ctrl || {}) } // v1.9 errs / v1.10.19 fb=回退原因分型 / v1.10.21 kd=K 通道归因 / v1.10.23 aux=辅助调用真实用量 / v1.10.60 sessionId=辅助调用会话身份
         // #7 maxtokens：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)
         //   实际每次调用还会按输入长度自适应收敛（effectiveMaxTokens），此处是**上限**。
         // #7 maxtokens **上限**：control.condenseMaxTokens（int）或 env 覆盖；无则内置 LOSSY_MAX_TOKENS(2048)。
@@ -2143,6 +2159,8 @@ export default {
         const res = await applyCondense(newRows, mode, ioc)
         finalRows = res.rows
         stat = res.stat
+        // 实际服务的是回退路由时，记录如实指向它（面板/日志都读 condenseRoute）
+        if (ioc.fallbackRoute) condenseRoute = { provider: ioc.fallbackRoute.provider, model: ioc.fallbackRoute.model, via: 'fallback' }
         if (!condenseErr && ioc.errs.length) condenseErr = ioc.errs.slice(0, 3).join(' | ')
         condenseErrKind = condenseErr ? classifyCondenseError(condenseErr) : null // #9 分型
         // 出过错但每一段都折叠成功（实测：档位被拒 → 不传档位重试 → 输出撞 max-tokens →
