@@ -136,14 +136,35 @@ store.ingest({ sid, seq: 1, kind: 'user_turn', key: 'u1', value: { text: TEXT },
     stream: () => {
       calls += 1
       return (async function* () {
-        yield { type: 'finish', reason: { kind: 'error', failure: { code: 'UPSTREAM_TIMEOUT', message: 'gateway timed out' } } }
+        yield { type: 'finish', reason: { kind: 'error', failure: { code: 'INVALID_REQUEST', message: '400: invalid api key or insufficient balance' } } }
       })()
     },
   }
   const c = new MemoryCompiler(store, { foldGraceMs: 0, maxEvents: 40 })
   const r = await c.compileSession({ sid: sid2, workspace: ws, llm, route: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } })
-  check('⑤ 非档位错误不重试', r.ok === false && r.reason === 'llm-failed' && calls === 1, JSON.stringify({ r, calls }))
-  check('⑤ 失败原因被记录', String(r.err ?? '').includes('UPSTREAM_TIMEOUT'), JSON.stringify(r))
+  check('⑤ 非档位、非瞬时错误不重试', r.ok === false && r.reason === 'llm-failed' && calls === 1, JSON.stringify({ r, calls }))
+  check('⑤ 失败原因被记录', String(r.err ?? '').includes('invalid api key'), JSON.stringify(r))
+}
+
+/* ── ⑤b 瞬时上游故障要退避重试（11-02 真机：Model is unavailable） ─────────── */
+{
+  const sid3 = 'eff3'
+  store.ingest({ sid: sid3, seq: 1, kind: 'user_turn', key: 'u1', value: { text: '导出统一走 encode_clip.py' }, source: { sid: sid3, seq: 1 } })
+  let calls = 0
+  const llm = {
+    stream: () => {
+      calls += 1
+      return (async function* () {
+        yield { type: 'finish', reason: { kind: 'error', failure: { code: 'INVALID_REQUEST', message: '400: {"type":"server_error","message":"Upstream request failed: Model is unavailable."}' } } }
+      })()
+    },
+  }
+  const c = new MemoryCompiler(store, { foldGraceMs: 0, maxEvents: 40 })
+  process.env.DSH_MEMORY_AUX_RETRY_MS = '0,0' // 退避读在调用时，测试里关掉真实等待
+  const r = await c.compileSession({ sid: sid3, workspace: ws, llm, route: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } })
+  delete process.env.DSH_MEMORY_AUX_RETRY_MS
+  check('⑤b 上游不可用按 [0,0] 重试两次后仍失败', r.ok === false && calls === 3, JSON.stringify({ ok: r.ok, calls }))
+  check('⑤b 原因如实上报', String(r.err ?? '').includes('Model is unavailable'), JSON.stringify(r))
 }
 
 /* ── ⑥ 会话身份：provider 要求 x-opencode-session 时，辅助调用必须带 sessionId ── */

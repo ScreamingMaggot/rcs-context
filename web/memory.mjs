@@ -3233,21 +3233,52 @@ async function compileCallOnce(llm, route, system, messages, maxTokens, effort, 
   return { text: text.trim(), error: null, effortRejected: false }
 }
 
+// 上游瞬时故障（免费档最常见的 "Model is unavailable"、5xx、限流、超时）不该让整次编译
+// 直接失败：这类请求没有产出，重试不额外计费，退避两轮通常就能赶上下一个可用窗口。
+// 反过来，鉴权/参数类错误重试只会白花钱，靠 effortRejected 与这个正则之外的条件挡掉。
+const AUX_TRANSIENT_RE = /Model is unavailable|server_error|rate.?limit|\b429\b|\b50[234]\b|timeout|timed out|ECONNRESET|socket hang up|fetch failed/i
+
+export function isTransientAuxError(res) {
+  if (!res || res.text || res.effortRejected) return false
+  return AUX_TRANSIENT_RE.test(String(res.error ?? ''))
+}
+
+export function auxRetryWaits(env = process.env) {
+  // 读在调用时而不是模块加载时：测试与现场都能用 DSH_MEMORY_AUX_RETRY_MS=0,0 立刻关掉退避。
+  const raw = env.DSH_MEMORY_AUX_RETRY_MS
+  if (raw === undefined || raw === '') return [2000, 6000]
+  const w = String(raw).split(',').map(Number).filter((n) => Number.isFinite(n) && n >= 0)
+  return w.length ? w : [2000, 6000]
+}
+
+export async function retryTransient(fn, waits = [2000, 6000]) {
+  let res = await fn(0)
+  let i = 0
+  while (isTransientAuxError(res) && i < waits.length) {
+    const wait = Number(waits[i]) || 0
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    i += 1
+    res = await fn(i)
+  }
+  return { ...(res || {}), attempts: i + 1 }
+}
+
 async function callCompileLlm(llm, route, system, user, maxTokens, meta = null, sid = null) {
   const messages = [await compileUserMessage(user)]
   const auxSid = auxSessionId(sid)
-  const first = await compileCallOnce(llm, route, system, messages, maxTokens, 'off', auxSid)
-  if (first.text) return first.text
-  if (first.effortRejected) {
+  const waits = auxRetryWaits()
+  let effort = 'off'
+  let r = await retryTransient(() => compileCallOnce(llm, route, system, messages, maxTokens, effort, auxSid), waits)
+  if (r.text) { if (meta && r.attempts > 1) meta.attempts = r.attempts; return r.text }
+  if (r.effortRejected) {
     console.warn('[MEMORY] reasoningEffort=off unsupported by ' + route.provider + '/' + route.model + '; retrying without it')
-    const again = await compileCallOnce(llm, route, system, messages, maxTokens, '', auxSid)
     if (meta) meta.effortFallback = 'off'
-    if (again.text) return again.text
-    if (meta) meta.error = again.error
-    return null
+    effort = ''
+    r = await retryTransient(() => compileCallOnce(llm, route, system, messages, maxTokens, effort, auxSid), waits)
+    if (r.text) { if (meta && r.attempts > 1) meta.attempts = r.attempts; return r.text }
   }
-  if (meta) meta.error = first.error
-  if (first.error) console.error('[MEMORY] compile call failed: ' + first.error)
+  if (meta) { meta.error = r.error; if (r.attempts > 1) meta.attempts = r.attempts }
+  if (r.error) console.error('[MEMORY] compile call failed (' + r.attempts + ' attempts): ' + r.error)
   return null
 }
 
