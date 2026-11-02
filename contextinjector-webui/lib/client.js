@@ -866,7 +866,7 @@ window.__ModuleLoader__.load({
 										((mdl && mdl.models) || []).map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
 								e("div", { className: "ci-sub", style: { marginTop: 6 } },
 									(lf && lf.condenseRoute
-										? "\u4E0A\u6B21\u6298\u53E0\u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")"
+										? (lfLabel + " \u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")" + (selP && selM && (selP !== lf.condenseRoute.provider || selM !== lf.condenseRoute.model) ? "\u3000\u00B7\u3000\u5F53\u524D\u8BBE\u7F6E\uFF1A" + selP + " / " + selM + "\uFF08\u4E0B\u4E00\u6B21\u6298\u53E0\u751F\u6548\uFF09" : ""))
 										: "\u5F53\u524D\uFF1A" + ((mdl && mdl.current && mdl.current.provider) ? mdl.current.provider + " / " + mdl.current.model : "\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B")))),
 							e("div", { className: "ci-sec" },
 								e("div", { className: "ci-sech" }, "\u538B\u7F29\u53C2\u6570\uFF08maxtokens / \u6700\u5C0F\u957F\u5EA6\uFF09"),
