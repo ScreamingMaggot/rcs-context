@@ -23,12 +23,25 @@ test('① 插件由最终结果判定"已恢复"：有错但每段都折叠成�
   assert.match(plugin, /condenseErrResolved: condenseErrResolved \|\| undefined/)
 })
 
-test('② 面板读到该字段：已恢复降级为提示，未恢复才用 .ci-err', () => {
+test('② 面板读到该字段：已恢复整行不渲染，未恢复才用 .ci-err', () => {
   assert.match(client, /lf\.condenseErrResolved/)
-  assert.match(client, /ci-note/) // 已恢复的分支
-  assert.match(client, /"ci-err"/) // 真失败的既有分支仍在
+  assert.match(client, /lf\.condenseErr && !\(/) // 已恢复 ⇒ 不出现红色错误行
+  assert.match(client, /"ci-err"/) // 真失败才出现
 })
 
-test('③ 提示样式存在且不是错误色', () => {
-  assert.match(client, /\.ci-note\{[^}]*color:#9aa4b2/)
+test('③ 恢复痕迹只出现在"实际使用"行尾', () => {
+  assert.match(client, /调用曾出错，已恢复/)
+  assert.doesNotMatch(client, /ci-note/)
+})
+
+test('④ 写 last-fold 的字面量不得引用 if 块内的变量', () => {
+  // 连续踩了两次同类坑：condenseErrResolved（v1.10.61）、ioc.mtSeen（v1.10.63）都声明在
+  // if (mode !== 'off') 块里，却在块外的 persistLastFold 字面量里使用 ⇒ 每次折叠抛
+  // ReferenceError，整折判 append-failed。这类错 node --check 查不出，只能钉住引用面。
+  const i = plugin.indexOf('persistLastFold({')
+  assert.ok(i > 0, 'persistLastFold 调用必须存在')
+  const block = plugin.slice(i, i + 4000)
+  assert.doesNotMatch(block, /\bioc\./, 'last-fold 字面量不得引用块内 ioc')
+  assert.match(block, /maxTokensSent: mtSent/)
+  assert.match(plugin, /let mtSent = 0/)
 })

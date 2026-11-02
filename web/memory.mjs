@@ -3271,7 +3271,10 @@ export function auxFallbackRoutes(control = {}, env = process.env) {
   if (control?.condenseProvider && control?.condenseModel) raw.push(control.condenseProvider + '/' + control.condenseModel)
   if (Array.isArray(control?.auxFallbackRoutes)) raw.push(...control.auxFallbackRoutes)
   if (env.DSH_AUX_FALLBACK_MODELS) raw.push(...String(env.DSH_AUX_FALLBACK_MODELS).split(','))
-  if (raw.length === 0) raw.push('ollama-local/qwen3.5:4b', 'ollama-local/qwen3-8b-q4:latest')
+  // 本机两个模型**永远排在最后兜底**：不能因为"配置里已经有路由"就把兜底砍掉——
+  // 真机踩过：首选回退恰好等于主路由（都被设成 minimax），候选表被去重后成了空表，
+  // 于是一次回退都没发生。兜底是否被用到由主路由是否失败决定，不由配置长度决定。
+  raw.push('ollama-local/qwen3.5:4b', 'ollama-local/qwen3-8b-q4:latest')
   const out = []
   const seen = new Set()
   for (const s of raw) {

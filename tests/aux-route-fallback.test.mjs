@@ -36,11 +36,11 @@ check('① 非法值返回 null', parseRouteSpec('') === null && parseRouteSpec(
 }
 {
   const fb = auxFallbackRoutes({ auxFallbackRoutes: ['a/x', 'b/y'] }, {})
-  check('① control 清单优先且不再叠加默认值', fb.length === 2 && fb[0].model === 'x' && fb[1].model === 'y', JSON.stringify(fb))
+  check('① control 清单排在最前、本机模型留在尾部兜底', fb[0].model === 'x' && fb[1].model === 'y' && fb.some((r) => r.provider === 'ollama-local'), JSON.stringify(fb))
 }
 {
   const fb = auxFallbackRoutes({}, { DSH_AUX_FALLBACK_MODELS: 'p/1, q/2 ,p/1' })
-  check('① 环境变量可覆盖并去重', fb.length === 2 && fb[1].provider === 'q', JSON.stringify(fb))
+  check('① 环境变量可覆盖并去重', fb[0].provider === 'p' && fb[1].provider === 'q' && fb.filter((r) => r.provider === 'p').length === 1, JSON.stringify(fb))
 }
 {
   // 真机：记忆钉在 minimax（上游下线），而压缩用的 deepseek 是通的 ⇒ 压缩路由必须是首选回退。

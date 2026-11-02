@@ -2092,6 +2092,8 @@ export default {
       // 必须与 condenseErr 同级声明：写 last-fold 的代码在本 if 块之外，块内 const 出不去
       // （v1.10.61 就踩了这个：每次折叠在写记录时抛 "condenseErrResolved is not defined" ⇒ 整折失败）。
       let condenseErrResolved = false
+      // 同理：last-fold 在 if 块之外写，实际发出的 max_tokens 必须先落到函数级变量。
+      let mtSent = 0
       if (mode !== 'off') {
         // 【v1.10.19 · P3 修复】在**最早的时刻**固化 llm 句柄（此刻 ctx 一定还活着：本函数由 turn/end
         //   handler 起头，handler 返回后作用域才可能被回收）。后台折叠跑到一半时请求作用域可能已被
@@ -2147,6 +2149,7 @@ export default {
         // 抢救成功，folded=1/1、fallback=0）。这不是失败，面板不能再按错误展示；
         // 原始文本仍留在 condenseErr 里供核验。
         condenseErrResolved = !!(condenseErr && stat && stat.a > 0 && stat.fallback === 0)
+        mtSent = ioc.mtSeen || 0
         if (stat.a > 0) console.log(`[contextinjector] condense[${mode}] trigger=${trigger} round=${roundState.n}: [A] ${stat.folded}/${stat.a} folded, ${stat.fallback} fallback${Object.keys(stat.fallbackReasons ?? {}).length ? '(' + Object.entries(stat.fallbackReasons).map(([k, v]) => k + '=' + v).join(',') + ')' : ''}, keys=${stat.keys}${stat.keysDiag ? '(' + stat.keysDiag.join('|') + ')' : ''}${stat.salvaged ? ', salvaged=' + stat.salvaged : ''}, calls=${stat.calls}/${ioc.maxCalls ?? '?'} ms=${stat.ms}${stat.budgetHit ? ' BUDGET-HIT' : ''}, ${stat.rawBytes}B->${stat.outBytes}B via=${route ? route.provider + '/' + route.model + '(' + route.via + ')' : 'none'}${condenseErr ? ' err=' + condenseErr : ''}${condenseErrKind ? ' kind=' + condenseErrKind : ''}${condenseErrResolved ? ' (recovered)' : ''}${ioc.mtSeen ? ' mt=' + ioc.mtSeen : ''}`)
       }
       // head 行只可能在 foldText === '' 时非空（补录只做一次），且其节点 seq 更早 ⇒ 必须排在增量行**之前**；
@@ -2396,7 +2399,7 @@ try {
           lossy: mode !== 'off' ? 1 : 0, aCount: stat?.a ?? 0, aFolded: stat?.folded ?? 0, aFallback: stat?.fallback ?? 0, aKeys: stat?.keys ?? 0,
           calls: stat?.calls ?? 0, ms: stat?.ms ?? 0, budgetHit: stat?.budgetHit === true, // v1.10.7 预算法统计（此处是第二个 persistLastFold 字面量，v1.10.5 的补丁只落在第一个）
           fallbackReasons: stat?.fallbackReasons, // v1.10.19 P5：本折回退原因分型（compact/short/empty/noShrink/llmErr/payloadGate/maxCalls/budgetMs）
-          salvaged: stat?.salvaged, condenseReasoningEffort: stat?.condenseReasoningEffort, maxTokensSent: ioc.mtSeen || undefined, // v1.10.20：截断抢救条数 + 生效推理档位；v1.10.63 实际发出的 max_tokens
+          salvaged: stat?.salvaged, condenseReasoningEffort: stat?.condenseReasoningEffort, maxTokensSent: mtSent || undefined, // v1.10.20：截断抢救条数 + 生效推理档位；v1.10.64 实际发出的 max_tokens
           keysDiag: stat?.keysDiag, // v1.10.21：K 通道归因（ok / noValues / callFailed[:原因]）
           // v1.10.23 经济性：与第一个 persist 字面量保持同源（历史上这里漏打过补丁，故两处都写）
           auxCalls: stat?.auxCalls, auxTokens: stat?.auxTokens, auxBilled: stat?.auxBilled,

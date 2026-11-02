@@ -85,7 +85,6 @@ window.__ModuleLoader__.load({
 			".ci-ctx button:disabled{opacity:.45;cursor:default}",
 			".ci-ctx button:disabled:hover{background:transparent}",
 			".ci-err{color:#ff6b6b;font-size:12px;margin:4px 0}",
-			".ci-note{color:#9aa4b2;font-size:12px;margin:4px 0}",
 			// v1.8/v1.9 压缩模型（面板）：provider/model 原生 select，直接从 DSH 已注册目录里选。
 			// 深色主题下原生 select 弹出层 option 文字默认继承浅色（未悬停不可见）→ option 显式配色兜底。
 			".ci-sel{font-family:inherit;font-size:11px;line-height:18px;color:inherit;background:transparent;border:1px solid var(--dsw-alias-border-l2,rgba(127,127,150,.35));border-radius:7px;padding:2px 6px;min-width:170px;max-width:250px}",
@@ -854,9 +853,9 @@ window.__ModuleLoader__.load({
 								e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "single/double \u6863\u538B\u7F29 AI \u6B63\u6587\u65F6\u7528\u7684\u6A21\u578B\uFF1B\u9ED8\u8BA4\u8DDF\u968F\u4F1A\u8BDD\u5F53\u524D\u6A21\u578B\uFF08\u65E0\u9700\u914D\u7F6E\uFF09"),
 								(mdlErr ? e("div", { className: "ci-err" }, "\u26A0 " + mdlErr) : null),
 								(mdl && mdl.llmAvailable === false ? e("div", { className: "ci-err" }, "DSH \u672A\u63D0\u4F9B llm \u670D\u52A1\uFF1Asingle/double \u6863\u5C06\u81EA\u52A8\u56DE\u9000\u65E0\u635F") : null),
-								(lf && lf.condenseErr ? ((lf.condenseErrResolved === true || (lf.condenseErrResolved === undefined && lf.aFolded > 0 && !lf.aFallback))
-									? e("div", { className: "ci-note", title: (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr }, lfLabel + "\uFF1A\u8C03\u7528\u5148\u51FA\u9519\uFF08" + (lf.condenseErrKind || "llm") + "\uFF09\uFF0C\u5DF2\u81EA\u52A8\u6062\u590D\uFF0C\u6298\u53E0\u7ED3\u679C\u5B8C\u6574" + (lfStale ? "\uFF08\u6B64\u540E\u672A\u518D\u6298\u53E0\uFF09" : ""))
-									: e("div", { className: "ci-err" }, lfLabel + "\u538B\u7F29\u8C03\u7528\u9519\u8BEF\uFF1A" + (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr + (lfStale ? " \u00B7 \u6B64\u540E\u672A\u518D\u6298\u53E0\uFF0C\u4EE5\u4E0A\u4E3A\u5386\u53F2\u8BB0\u5F55" : ""))) : null),
+								(lf && lf.condenseErr && !(lf.condenseErrResolved === true || (lf.condenseErrResolved === undefined && lf.aFolded > 0 && !lf.aFallback))
+									? e("div", { className: "ci-err" }, lfLabel + "压缩调用错误：" + (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr + (lfStale ? " · 此后未再折叠，以上为历史记录" : ""))
+									: null),
 								e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
 									e("select", { className: "ci-sel", value: selP, onChange: onProviderChange, title: "\u538B\u7F29\u5668\u7528 provider\uFF1B\u300C\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B\u300D = \u7528\u8BE5\u4F1A\u8BDD\u5F53\u524D\u6A21\u578B\uFF08\u6E05\u9664\u8986\u76D6\uFF09" },
 										e("option", { value: "" }, "\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B"),
@@ -866,7 +865,7 @@ window.__ModuleLoader__.load({
 										((mdl && mdl.models) || []).map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
 								e("div", { className: "ci-sub", style: { marginTop: 6 } },
 									(lf && lf.condenseRoute
-										? (lfLabel + " \u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")" + (selP && selM && (selP !== lf.condenseRoute.provider || selM !== lf.condenseRoute.model) ? "\u3000\u00B7\u3000\u5F53\u524D\u8BBE\u7F6E\uFF1A" + selP + " / " + selM + "\uFF08\u4E0B\u4E00\u6B21\u6298\u53E0\u751F\u6548\uFF09" : ""))
+										? (lfLabel + " \u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")" + (lf.condenseErr ? "　·　调用曾出错，已恢复" : "") + (selP && selM && (selP !== lf.condenseRoute.provider || selM !== lf.condenseRoute.model) ? "\u3000\u00B7\u3000\u5F53\u524D\u8BBE\u7F6E\uFF1A" + selP + " / " + selM + "\uFF08\u4E0B\u4E00\u6B21\u6298\u53E0\u751F\u6548\uFF09" : ""))
 										: "\u5F53\u524D\uFF1A" + ((mdl && mdl.current && mdl.current.provider) ? mdl.current.provider + " / " + mdl.current.model : "\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B")))),
 							e("div", { className: "ci-sec" },
 								e("div", { className: "ci-sech" }, "\u538B\u7F29\u53C2\u6570\uFF08maxtokens / \u6700\u5C0F\u957F\u5EA6\uFF09"),
