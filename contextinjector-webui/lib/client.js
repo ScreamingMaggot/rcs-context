@@ -853,7 +853,7 @@ window.__ModuleLoader__.load({
 								e("div", { className: "ci-sub", style: { marginBottom: 6 } }, "single/double \u6863\u538B\u7F29 AI \u6B63\u6587\u65F6\u7528\u7684\u6A21\u578B\uFF1B\u9ED8\u8BA4\u8DDF\u968F\u4F1A\u8BDD\u5F53\u524D\u6A21\u578B\uFF08\u65E0\u9700\u914D\u7F6E\uFF09"),
 								(mdlErr ? e("div", { className: "ci-err" }, "\u26A0 " + mdlErr) : null),
 								(mdl && mdl.llmAvailable === false ? e("div", { className: "ci-err" }, "DSH \u672A\u63D0\u4F9B llm \u670D\u52A1\uFF1Asingle/double \u6863\u5C06\u81EA\u52A8\u56DE\u9000\u65E0\u635F") : null),
-								(lf && lf.condenseErr && !(lf.condenseErrResolved === true || (lf.condenseErrResolved === undefined && lf.aFolded > 0 && !lf.aFallback))
+								(lf && lf.condenseErr && !(lf.condenseErrResolved === true || (lf.condenseErrResolved === undefined && lf.aFolded > 0 && !((lf.fallbackReasons && lf.fallbackReasons.llmErr) || 0)))
 									? e("div", { className: "ci-err" }, lfLabel + "压缩调用错误：" + (lf.condenseErrKind ? "[" + lf.condenseErrKind + "] " : "") + lf.condenseErr + (lfStale ? " · 此后未再折叠，以上为历史记录" : ""))
 									: null),
 								e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
@@ -865,7 +865,7 @@ window.__ModuleLoader__.load({
 										((mdl && mdl.models) || []).map(function (m) { return e("option", { key: m.id, value: m.id }, (m.name || m.id)); }))),
 								e("div", { className: "ci-sub", style: { marginTop: 6 } },
 									(lf && lf.condenseRoute
-										? (lfLabel + " \u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")" + (lf.condenseErr ? "　·　调用曾出错，已恢复" : "") + (selP && selM && (selP !== lf.condenseRoute.provider || selM !== lf.condenseRoute.model) ? "\u3000\u00B7\u3000\u5F53\u524D\u8BBE\u7F6E\uFF1A" + selP + " / " + selM + "\uFF08\u4E0B\u4E00\u6B21\u6298\u53E0\u751F\u6548\uFF09" : ""))
+										? (lfLabel + " \u5B9E\u9645\u4F7F\u7528\uFF1A" + lf.condenseRoute.provider + " / " + lf.condenseRoute.model + " (" + lf.condenseRoute.via + ")" + (lf.aCount && lf.aFolded < lf.aCount ? "　·　本折 " + lf.aFolded + "/" + lf.aCount + " 段成文，其余保留原文" : "") + (lf.condenseErr ? "　·　调用曾出错，已恢复" : "") + (selP && selM && (selP !== lf.condenseRoute.provider || selM !== lf.condenseRoute.model) ? "\u3000\u00B7\u3000\u5F53\u524D\u8BBE\u7F6E\uFF1A" + selP + " / " + selM + "\uFF08\u4E0B\u4E00\u6B21\u6298\u53E0\u751F\u6548\uFF09" : ""))
 										: "\u5F53\u524D\uFF1A" + ((mdl && mdl.current && mdl.current.provider) ? mdl.current.provider + " / " + mdl.current.model : "\u8DDF\u968F\u4F1A\u8BDD\u6A21\u578B")))),
 							e("div", { className: "ci-sec" },
 								e("div", { className: "ci-sech" }, "\u538B\u7F29\u53C2\u6570\uFF08maxtokens / \u6700\u5C0F\u957F\u5EA6\uFF09"),

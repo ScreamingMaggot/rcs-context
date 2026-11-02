@@ -19,6 +19,7 @@ test('① 插件由最终结果判定"已恢复"：有错但每段都折叠成�
   assert.doesNotMatch(plugin, /const condenseErrResolved/)
   const decl = plugin.indexOf('let condenseErrResolved = false')
   const assign = plugin.indexOf('condenseErrResolved = !!(condenseErr')
+  assert.match(plugin, /condenseErrResolved = !!\(condenseErr && stat && stat\.folded > 0 && \(\(stat\.fallbackReasons && stat\.fallbackReasons\.llmErr\) \|\| 0\) === 0\)/)
   assert.ok(decl > 0 && assign > decl, '两处必须存在且先声明后赋值')
   assert.match(plugin, /condenseErrResolved: condenseErrResolved \|\| undefined/)
 })

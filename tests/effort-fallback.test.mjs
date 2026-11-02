@@ -64,7 +64,8 @@ const rowsOf = (line) => ['[ROUND] 1', '[U] 用户指令', line, '[T] read | src
   check('① 恰好两次请求：第二次不带 reasoningEffort',
     box.reqs.length === 2 && box.reqs[0].reasoningEffort === 'off' && box.reqs[1].reasoningEffort === undefined,
     JSON.stringify(box.reqs.map((r) => r.reasoningEffort ?? '-')))
-  check('① 回退被记录（不是静默）', io.errs.some((e) => /effort-unsupported/.test(String(e))), JSON.stringify(io.errs))
+  // 档位探测成功不进 errs（否则成功折叠也挂红字）；降级次数单独记。
+  check('① 档位降级被记录但不冒充错误', io.downgrades === 1 && !io.errs.some((e) => /effort-unsupported|UNSUPPORTED/.test(String(e))), JSON.stringify({ d: io.downgrades, errs: io.errs }))
 }
 
 /* ── ② 非档位错误不得重试（否则等于给真故障加一次付费调用） ─────────── */
