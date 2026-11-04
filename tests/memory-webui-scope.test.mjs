@@ -2,10 +2,13 @@
 // 运行：node tests/memory-webui-scope.test.mjs
 import { mkdtempSync, mkdirSync, writeFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { Readable } from 'node:stream'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
+
+// 仓库根由本文件位置推导（原先硬编码 D:/RCS/src ⇒ 克隆/CI 上必断）
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const root = mkdtempSync(join(tmpdir(), 'rcs-webui-scope-'))
 const state = join(root, 'state')
@@ -35,7 +38,7 @@ writeFileSync(join(root, 'storages', 'session_projcache', 'sessions', 'session-s
   },
 }), 'utf8')
 
-const { MemoryStore } = await import(pathToFileURL('D:/RCS/src/web/memory.mjs').href)
+const { MemoryStore } = await import(pathToFileURL(join(ROOT, 'web', 'memory.mjs')).href)
 const store = new MemoryStore(new DatabaseSync(join(root, 'memory.sqlite')), { stateDir: state, rawDir: join(root, 'raw') })
 const put = (sid, seq, kind, key, scope, value) => store.ingest({
   sid, seq, kind, key, scope, value, source: { sid, seq },
@@ -58,7 +61,7 @@ store.setMetaRaw('armedPid', '0')
 store.setMetaRaw('armedAt', String(Date.now()))
 store.close()
 
-const mod = await import(pathToFileURL('D:/RCS/src/contextinjector-webui/lib/index.mjs').href)
+const mod = await import(pathToFileURL(join(ROOT, 'contextinjector-webui', 'lib', 'index.mjs')).href)
 const routes = []
 mod.default.apply({
   webServer: { register(h) { routes.push(h); return () => {} } },

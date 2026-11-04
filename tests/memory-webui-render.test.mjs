@@ -2,6 +2,10 @@
 // 运行：node tests/memory-webui-render.test.mjs
 import { pathToFileURL } from 'node:url'
 import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+// 仓库根由本文件位置推导（原先硬编码 D:/RCS/src ⇒ 克隆/CI 上必断）
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let seed = []
 let hook = 0
@@ -29,7 +33,7 @@ globalThis.window = {
     load({ factory }) { mod = factory((name) => (name === 'react' ? fakeReact : undefined)) },
   },
 }
-await import(pathToFileURL('D:/RCS/src/contextinjector-webui/lib/client.js').href + '?render-test=' + Date.now())
+await import(pathToFileURL(join(ROOT, 'contextinjector-webui', 'lib', 'client.js')).href + '?render-test=' + Date.now())
 
 const registered = []
 const ctx = {
@@ -248,7 +252,7 @@ seed[23] = { sig: '', facts: [], cursor: null, hasMore: false, pages: 0, loading
 
 // 交互契约（源码级）：首帧无数据时 svg 不存在，滚轮 effect 若只依赖 tab 会永远挂不上；
 // 拖拽位移必须按 viewBox 的 meet 缩放换算，否则 70px 拖拽只移动约 27px。
-const clientSrc = readFileSync('D:/RCS/src/contextinjector-webui/lib/client.js', 'utf8')
+const clientSrc = readFileSync(join(ROOT, 'contextinjector-webui', 'lib', 'client.js'), 'utf8')
 check('⑳ 滚轮监听随图谱数据就绪重新挂载', /var hasGraph = !!graphData/.test(clientSrc)
   && /\[tab, hasGraph\]/.test(clientSrc))
 check('㉑ 拖拽平移按 viewBox 缩放换算', /Math\.min\(r\.width \/ graphBox\.w, r\.height \/ graphBox\.h\)/.test(clientSrc)
