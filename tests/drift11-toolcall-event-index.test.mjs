@@ -93,7 +93,7 @@ const rows5 = transcribeIncremental(msgLevel, { n: 1 }, { structured: false })
 const T5 = rows5.filter((r) => r.startsWith('[T]'))
 check('⑤ 0.1.7 消息级结果 ⇒ 每条都产 [T]（旧实现为 0 条）', T5.length === 2, T5.join(' ;; '))
 check('⑤ 工具名与目标来自 pending 登记', /\[T\] pwsh \| - \| OK/.test(T5[0] || '') && /\[T\] read \| src\/x\.py \| ERR/.test(T5[1] || ''), T5.join(' ;; '))
-check('⑤ isError 从消息层生效', /\| ERR$/.test(T5[1] || ''), T5[1])
+check('⑤ isError 从消息层生效', /\| ERR(?: \||$)/.test(T5[1] || ''), T5[1])
 
 // —— ⑥ 覆盖守卫的判据：工具结果消息数 == [T] 行数（少一行即拒绝折叠）——
 const wantTool = msgLevel.filter((m) => isToolResultMsg(m)).length
@@ -108,13 +108,15 @@ check('⑦ callId 提取双形态', toolResultCallId({ toolCallId: 'a1' }) === '
   && toolResultCallId({ source: { kind: 'tool', callId: 'a3' } }) === 'a3')
 
 // —— ⑧ raw 指针：两种转录行都指回被遮蔽事件 ——
+//   这里考的是"指针接对了 seq 没有"，与体积门槛无关 ⇒ 显式 rawPtrMinBytes: 0（文档化的
+//   "退回旧行为：永远挂指针"），否则十几字节的 'ok' 按 v1.10.67 的门槛本来就不该挂指针。
 const seqMap = new Map([[results[0], 101], [results[1], 102]])
-const rawPlain = transcribeIncremental([asst, ...results], { n: 1 }, { structured: false, calls, seqOf: seqMap }).filter((r) => r.startsWith('[T]'))
+const rawPlain = transcribeIncremental([asst, ...results], { n: 1 }, { structured: false, calls, seqOf: seqMap, rawPtrMinBytes: 0 }).filter((r) => r.startsWith('[T]'))
 check('⑧ plain [T] 带 raw 指针', rawPlain[0].endsWith('raw=101') && rawPlain[1].endsWith('raw=102') && !rawPlain[2].includes('raw='), rawPlain.join(' ;; '))
-const rawStruct = transcribeIncremental([asst, ...results], { n: 1 }, { structured: true, calls, seqOf: seqMap }).filter((r) => r.startsWith('[T]'))
+const rawStruct = transcribeIncremental([asst, ...results], { n: 1 }, { structured: true, calls, seqOf: seqMap, rawPtrMinBytes: 0 }).filter((r) => r.startsWith('[T]'))
 check('⑧ structured [T] 带 raw 指针', /raw=101$/.test(rawStruct[0]) && /raw=102$/.test(rawStruct[1]) && !rawStruct[2].includes('raw='), rawStruct[0])
 const seqLegacy = new Map([[legacy[2], 8], [legacy[6], 203]])
-const legacyWithCall = transcribeIncremental(legacy, { n: 1 }, { structured: true, calls, seqOf: seqLegacy }).filter((r) => r.startsWith('[T]'))
+const legacyWithCall = transcribeIncremental(legacy, { n: 1 }, { structured: true, calls, seqOf: seqLegacy, rawPtrMinBytes: 0 }).filter((r) => r.startsWith('[T]'))
 const editRow = legacyWithCall.find((r) => r.includes('|edit|'))
 check('⑧ 写入类 [T] 同时带 raw 与 call 指针', !!editRow && /raw=203/.test(editRow) && /call=8/.test(editRow), editRow)
 

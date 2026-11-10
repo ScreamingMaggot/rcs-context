@@ -61,8 +61,10 @@ check('② 混合形态 25 次工具往返 ⇒ [T] 行数与工具结果数相�
   got === want, `want=${want} got=${got}`)
 check('② isToolResultMsg 对两形态都认得（want 的算法与守卫同源）',
   mixed.filter(isToolResultMsg).length === want, `counted=${mixed.filter(isToolResultMsg).length}`)
-check('② 错误结果标 ERR 且仍计数（6 条消息级 isError）', r3.filter((l) => /\| ERR$/.test(l)).length === 6,
-  r3.filter((l) => /\| ERR$/.test(l)).length)
+// v1.10.67 起，小结果的失败行会在同一行内联有界预览（`| ERR | file not found`），
+// 所以判定列后面可能还有内容：只认「判定列 = ERR」，不要求行尾。
+check('② 错误结果标 ERR 且仍计数（6 条消息级 isError）', r3.filter((l) => /^\[T\] .*\| ERR(?: \||$)/.test(l)).length === 6,
+  r3.filter((l) => /^\[T\] .*\| ERR(?: \||$)/.test(l)).length)
 
 /* ──  反证：拿不到事件索引时才会退化为 ?（证明索引确实在起作用） ───────── */
 const st4 = { n: 0 }

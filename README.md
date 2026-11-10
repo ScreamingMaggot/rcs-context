@@ -102,6 +102,23 @@ powershell -ExecutionPolicy Bypass -File ./install.ps1
 
 > 折叠在 `agent/pre-step` 阻塞 join（3 s 超时闸），保证每轮都吃到压缩收益；超时则放行、后台继续。
 
+## 转录行与回取（`[T]` / `transcript_expand`）
+
+折叠之后，模型看到的工具痕迹是**一行**一条：
+
+```
+[T] read | D:/proj/a.mjs | OK | raw=167
+[T] memory_correct | - | FAIL(need-explicit-user-intent) | {"ok":false,"error":"need-explicit-user-intent"}
+[T] transcript_expand | - | PENDING
+```
+
+- **判定列是业务语义，不是传输语义**：回执 `{"ok":false,"error":"x"}` 记 `FAIL(x)`（工具跑通了、业务拒绝了），传输层报错记 `ERR`，其余 `OK`。只看传输层会让"同一件事连错三次"在转录里全印成 OK——真机上就是这样连错三回合的。
+- **指针有体积门槛（缺省 1024 B）**：正文够大才挂 `raw=<seq>`；小结果把有界预览（≤160 字）内联在同一行。回取是一次工具往返，为几百字节换一次调用不划算。`control.rawPtrMinBytes` 可热调，`0` 退回"永远挂指针"的旧行为。
+- **未落盘 ≠ 失败**：raw 落盘是异步的，行渲染时该 seq 可能还没 flush，回执为 `seq-not-in-raw` 且带 `pending:true`；这类行记中性状态 `PENDING`，稍后重取即可，不该与业务失败同权重。
+- **回取**：`transcript_expand(seq)` 从 `raw/<sid>.jsonl` 取回该 seq 的原文（只读、按 session 隔离）。工具注册走 generator 持有器——`ctx.effect(() => dispose())` 会**立即执行**并当成 disposer，等于"注册完立刻注销"，这是"register 不抛错、工具却始终不在模型可见表里"的真正原因。
+
+`[T]` 行契约由 `tests/transcript-row-contract.test.mjs`、`tests/transcript-row-replay.test.mjs`（含"旧版 vs 新版"的同一份存证回放）、`tests/transcript-pending-row.test.mjs`、`tests/tool-registration-visible.test.mjs` 钉住。
+
 ## 外部记忆
 
 开启：`control.json` 写 `"memoryEnabled": true`（可再开 `"memoryLlmEnabled": true` 让轻模型把事件编译成事实），重启后看「记忆」tab。
@@ -138,7 +155,7 @@ web/                      插件本体（折叠 / 转录 / 外置推理 / 记忆
 condense/                 共享压缩器与分型
 toolfold/                 结构化工具折叠（A 档）
 contextinjector-webui/    WebUI 面板（注入 / 记忆两 tab）
-tests/                    回归测试（72 套 / 2214 断言）
+tests/                    回归测试（76 套 / 2257 断言）
 tools/                    辅助脚本（会话经济性复算 session-econ.mjs、成本标定、提示面测量）
 docs/                     机制说明、性能基线、面板差距
 install.ps1 uninstall.ps1 install.cmd   安装与卸载
