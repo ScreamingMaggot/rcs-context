@@ -34,7 +34,7 @@ webui/
   顶部「注入」tab 无「AI 输出压缩档」chips；composer dock 是唯一选档入口，tab 勾选会话即写无损 off（取消= none）。
 
 ## 同步约定
-- **本目录 = 源**；正式 `D:\JDC\AGENT\.dsh\...` 中的是装载副本；
+- **本目录 = 源**；`$DSH_HOME/profiles/web/` 下的是装载副本；
 - 改 host 端点（index.mjs）或面板（client.js）后：同步副本 + **重启 web**（client bundle sha1 rev 变化；
   装载器元数据按名缓存，重启前不失效）；
 - 回滚：删 cordis.patch 中 insert 与 node_modules 包目录即可。

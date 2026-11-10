@@ -16,6 +16,8 @@
   "dshTarget": "0.2.2-rc.1",
   "license": "MIT",
   "contents": [
+    "tools/session-econ.mjs",
+    "docs/MEMORY.md",
     "RCS-0.1.27-改进与保留项.txt",
     "RCS-0.1.26-改进与保留项.txt",
     "web/contextinjector.mjs",

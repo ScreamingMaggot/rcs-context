@@ -44,8 +44,8 @@
 
 ## 基线文件
 
-- **JSON 数据**: `C:\Users\Administrator\.dsh\state-compiler\.memory\performance-baseline.json`
-- **测试脚本**: `D:\RCS\src\performance-baseline.mjs`
+- **JSON 数据**: `$DSH_HOME/state-compiler/.memory/performance-baseline.json`
+- **测试脚本**: 仓库根目录 `performance-baseline.mjs`
 
 ## 后续监控建议
 

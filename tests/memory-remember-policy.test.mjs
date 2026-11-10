@@ -53,7 +53,7 @@ check('② 逐字相同 ⇒ 有据', statementSupportedBy('接口端口固定为
 check('② 换说法但关键词在 ⇒ 有据',
   statementSupportedBy('项目脚本统一使用 PowerShell 7', ['请记住：项目的所有脚本都用 PowerShell 7 跑']))
 check('② 路径/数字是最硬证据 ⇒ 有据',
-  statementSupportedBy('项目位于 D:\\JDC\\AIWORKSPACE', ['继续，项目在 D:\\JDC\\AIWORKSPACE 里做']))
+  statementSupportedBy('项目位于 D:\\Work\\proj', ['继续，项目在 D:\\Work\\proj 里做']))
 check('② 用户没提过的内容 ⇒ 无据', !statementSupportedBy('用户喜欢紫色', ['端口固定为 8848']))
 check('② 没有用户原话 ⇒ 无据', !statementSupportedBy('用户喜欢紫色', []))
 
