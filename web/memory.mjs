@@ -3437,20 +3437,68 @@ export function proseSupported(summary, evidenceText) {
 
 // 用户显式说"记住/写入记忆"时，不把小模型的"这是闲聊"判断当作最终裁决：
 // 原话逐字落成一条 insight（键由文本哈希保证稳定），模型返回的条目再与之归并。
-function memoryDirectiveText(text) {
+// 0.9.x 措辞放宽：口语说法（更新到记忆 / 记一下 / 别忘了）和"事实在前、指令在后"（这条要记住）
+// 都算指令——用户换个说法不该被判成"没说要记"。
+export function memoryDirectiveText(text) {
   const s = String(text ?? '').replace(/\s+/g, ' ').trim()
+  if (!s) return ''
+  // 疑问句里的 remember 是提问（Do you remember X?），不是指令。
+  const askOnly = /[?？]\s*$/.test(s) || /^(?:do|did|can|could|would|will)\s+you\b/i.test(s)
   const patterns = [
     /\b(?:add|put|store|save|keep)\b[^:：]{0,80}?\b(?:in|to|into)\s+(?:your\s+)?memory\b\s*(?:[:：\-—]\s*)?(.+)$/i,
-    /(?:^|[.!?]\s+|[,;]\s*|\b(?:now|please)\s+)remember\b\s+(?:that\s+)?(.+)$/i,
-    /(?:请)?(?:记住|记一下|记下来|帮我记住)[：:，,\s]*(.+)$/,
-    /(?:写入|加到|存到|加入)(?:你的)?记忆[：:，,\s]*(.+)$/,
+    // 英文：必须是句首/标点后的祈使句（"remember that X" / "please remember: X"），
+    // 陈述句里的 remember（"I don't remember what the port was"）不算指令。
+    /(?:^|[.!?;]\s+|[,，]\s*|\b(?:now|please|and)\s+)remember\b\s*(?:that|this)?\s*[:：\-—,]?\s*(.+)$/i,
+    /(?:请|麻烦)?(?:帮我|给我)?(?:记住|记一下|记下来|记下|别忘了|别忘记|要记住|需要记住)[：:，,、\s]*(.+)$/,
+    /(?:写入|写进|写到|加到|加进|加入|存到|存进|存入|放到|放进|更新到|更新进|保存到|记录到|记录进)(?:你的)?(?:长期)?记忆(?:里|中|库)?[：:，,、\s]*(.+)$/,
+    // 事实在前、指令在后（"SSD 装 D 盘，记住"）：只认单个分句，避免把整段话当成一条事实。
+    /^([^，,、\n]{4,160}?)[，,、\s]*(?:请|麻烦|顺便|并|也)?(?:记住|记一下|记下来|写进记忆|写到记忆里|更新到记忆|加入记忆|存进记忆)[。.!！~]*$/,
   ]
-  for (const re of patterns) {
-    const m = s.match(re)
-    const out = String(m?.[1] ?? '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+  for (let i = 0; i < patterns.length; i++) {
+    if (askOnly && i === 1) continue
+    const m = s.match(patterns[i])
+    if (!m) continue
+    const out = String(m[1] ?? '').replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
     if (out.length >= 4) return out
   }
   return ''
+}
+
+// 最近几轮用户原话：判"这条事实有没有用户的话撑着"的唯一语料。
+// 只看本会话的用户消息；模型与工具自己的输出不算证据。
+function recentUserTurnsOf(session, limit = 12) {
+  const out = []
+  const evs = allEvents(session)
+  for (let i = evs.length - 1; i >= 0 && out.length < limit; i--) {
+    const e = evs[i]
+    if (e?.type !== 'user/message') continue
+    const d = e.data ?? {}
+    if (d.source?.kind && d.source.kind !== 'user') continue
+    const t = textOfMessage(d.message ?? d).trim()
+    if (t) out.push(t)
+  }
+  return out
+}
+
+// 事实支撑（与措辞无关）：摘要不必逐字出现在用户原话里，只要用户原话撑得住它。
+// 三条判据任一成立即算有据：共享字符二元组够多 / 覆盖率够高 / 命中数字与英文标识符。
+// 这是"宽许"的底线——只有本会话用户从没提过的内容才会落到 need-user-grounding。
+export function statementSupportedBy(text, sources) {
+  const srcs = (sources ?? []).map((x) => String(x ?? '')).filter(Boolean)
+  if (!srcs.length) return false
+  const a = textBigrams(text)
+  if (!a.size) return false
+  const b = new Set()
+  for (const s of srcs) for (const g of textBigrams(s)) b.add(g)
+  let shared = 0
+  for (const g of a) if (b.has(g)) shared++
+  // 阈值随摘要长度走：短句要 3 个共享二元组，长句按 1/4 覆盖率折算，避免"用户/项目"这类泛词蒙混。
+  const need = Math.max(3, Math.ceil(a.size * 0.25))
+  if (shared >= need || shared / a.size >= 0.35) return true
+  const strong = String(text ?? '').match(/[A-Za-z][A-Za-z0-9_.\-]{3,}|\d{3,}/g) ?? []
+  if (!strong.length) return false
+  const hay = srcs.join('\n').toLowerCase()
+  return strong.some((t) => hay.includes(t.toLowerCase()))
 }
 
 export function explicitMemoryItems(rows) {
@@ -4954,7 +5002,7 @@ export function makeMemoryTools(store) {
   // —— 受控写入：只接受“用户明确说了”的记忆/忘记/更正；不开放自由写 ——
   const remember = {
     name: 'memory_remember',
-    description: 'Persist a fact ONLY when the current user message explicitly asks to remember it (记住/请记住/add to memory). The text must come from the user statement, not be invented. Writes kind=insight with key user-memo:*, confidence 0.95, provenance seq. Read-only otherwise.',
+    description: 'Persist a long-term fact: a preference, constraint, decision or setting worth keeping across sessions. Call it when the user asks (记住/请记住/更新到记忆/remember ...) OR when you yourself judge the fact worth keeping — the user does not need to use any particular wording. Quote the user\'s words where possible; a faithful summary is accepted when the user\'s messages in this session support it. Confidence: 0.95 explicit verbatim, 0.9 explicit summary, 0.8 your own judgement (origin=model_directive). Refused: credentials, prompt-injection text, and facts with no support in the user\'s messages (error need-user-grounding). Writes kind=insight with key user-memo:*, provenance seq. Read-only otherwise.',
     parameters: {
       type: 'object',
       properties: {
@@ -4976,11 +5024,28 @@ export function makeMemoryTools(store) {
       const user = lastUserInfoOf(session)
       const statement = memoryDirectiveText(user.text)
       const text = String(args?.text ?? '').replace(/\s+/g, ' ').trim()
-      if (!statement) return { ok: false, error: 'need-explicit-user-intent' }
       if (text.length < 4 || text.length > 500) return { ok: false, error: 'text-length' }
-      const nt = normForIntent(text)
-      const ns = normForIntent(statement)
-      if (!nt || !(ns.includes(nt) || nt.includes(ns))) return { ok: false, error: 'not-in-user-statement' }
+      // 措辞闸门（0.9.x 放宽）：主模型决定写入时就该收下，不再要求用户说出固定口令。
+      //   ① 用户明说"记住/更新到记忆"且原话对得上         → 0.95 / user_directive
+      //   ② 用户明说、事实是模型转述但有原话支撑           → 0.90 / user_directive
+      //   ③ 用户没说、主模型判断值得长期记住且有原话支撑   → 0.80 / model_directive
+      //   ④ 本会话用户从没提过的内容（凭空捏造）           → 仍然拒，并说明怎么补救
+      const userTexts = recentUserTurnsOf(session)
+      let origin = 'user_directive'
+      let confidence = 0.95
+      if (statement) {
+        const nt = normForIntent(text)
+        const ns = normForIntent(statement)
+        if (!(nt && (ns.includes(nt) || nt.includes(ns)))) {
+          if (!statementSupportedBy(text, userTexts)) return { ok: false, error: 'not-in-user-statement' }
+          confidence = 0.9
+        }
+      } else if (statementSupportedBy(text, userTexts)) {
+        origin = 'model_directive'
+        confidence = 0.8
+      } else {
+        return { ok: false, error: 'need-user-grounding', hint: { fix: '把用户原话里的关键词、数字或路径写进 text；确实没说过就先向用户确认' } }
+      }
       if (isQuarantinedSummary(text)) return { ok: false, error: 'injection-pattern' }
       // 凭据不进长期记忆：脱敏后存成"密码改成[REDACTED]"也是无用事实，直接拒写并说明原因。
       if (looksLikeCredential(text)) return { ok: false, error: 'credential-not-storable' }
@@ -4993,12 +5058,12 @@ export function makeMemoryTools(store) {
       const seq = user.seq || allEvents(session).reduce((m, e) => Math.max(m, Number(e?.seq) || 0), 0)
       store.ingest({
         sid, seq, kind: 'insight', key, scope,
-        value: { summary: safe, confidence: 0.95, origin: 'user_directive', pinned: true, userSeq: user.seq || null },
+        value: { summary: safe, confidence, origin, pinned: true, userSeq: user.seq || null },
         source: { sid, seq, kind: 'plugin:MEMORY', origin: 'memory_remember' },
       })
       const rec = store.get({ sid, scope, workspace, kind: 'insight', key })
-      auditRecord(store, { sid, seq, scope, action: 'remember', target: key, detail: { redacted: safe !== text } })
-      return { ok: true, sid, scope, key, rowid: rec?.rowid ?? null, uri: rec?.uri ?? null, summary: safe, confidence: 0.95, ...(safe !== text ? { redacted: true } : {}) }
+      auditRecord(store, { sid, seq, scope, action: 'remember', target: key, detail: { redacted: safe !== text, origin } })
+      return { ok: true, sid, scope, key, rowid: rec?.rowid ?? null, uri: rec?.uri ?? null, summary: safe, confidence, origin, ...(safe !== text ? { redacted: true } : {}) }
     },
   }
 

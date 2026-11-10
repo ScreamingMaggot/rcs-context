@@ -86,11 +86,11 @@ llm-pi-ai:
 - `memory_search` — 按文本/键/种类检索；可传 `uri` 把检索限定在一个 `rcs://` 目录（rootdir/kinddir/record），kind 目录为空时默认扩大到同一 root 一次并回传 `widenedFrom/scopeFallback/attempts`，`fallback=false` 则严格留在目录内；中文双索引：≥3 字先走 trigram 精确子串，自然问句与两字词走 2-gram + bm25（摘要/标题列权重 30×，正文 1×，完整 value 去重后只进正文列）；多词先 AND，唯一命中直接返回，多条命中用 bigram 分数重排；功能 bigram（能用/用来/什么/怎么等）不计入证据，最强候选只命中 1 个词元时不硬凑，查询点名了索引里不存在的 ASCII 标识符（代号/版本/函数名）时返回空；候选在可见性/状态过滤后再截断，结果按“已编译 insight 优先、再相关度、再时间”排序；insight 结果带 L0 `abstract` 与 `layers:{l0,l1,l2}` 元数据，内部 overview/layer_of/layer_ver 不外泄；`scope=session` 查空时按 `project` 重查一次并返回 `widenedScope:true`
 - `memory_get` — 取单条记录：`kind+key`、`rowid` 或 `uri`；`layer=auto|l0|l1|l2` 分层读取（l0/l1 只回 `view` + 定位元数据，不带 `value`；`includeRaw=true` 自动升级到 l2 并回解原文）
 - `memory_ls` — 以 `rcs://` URI 浏览记忆：默认直达当前工作区，支持 kind 目录分页、tree、字节预算与信任标记；叶子与目录条目带 L0 摘要和 `layers` 元数据，见下节
-- `memory_remember` — 仅在用户最后一条原话明确要求“记住/写入记忆”时可用；文本须逐字出自原话（4–500 字），注入型内容拒收、凭据脱敏
+- `memory_remember` — 用户要求记住时可用（`记住/记一下/更新到记忆/写进记忆/别忘了/remember…`，措辞不限，事实在前或在后都认），也允许主模型自行判断“值得长期保存”时写入；唯一的硬要求是这条事实能在本会话用户原话里找到支撑（逐字或转述皆可，只有 `need-user-grounding` 才拒）。置信度分档：明说且逐字 0.95、明说但转述 0.90、模型自主判断 0.80（`origin=model_directive`）；4–500 字，注入型内容拒收、凭据脱敏
 - `memory_forget` — 仅在用户明确要求忘记时可用；逻辑弃用（`resolved`），不物理删除
 - `memory_correct` — 仅在用户明确更正时可用；新条目带 `supersedes`，旧条目标 `superseded`
 
-每次写入追加 `audit` 记录；没有明确指令一律拒绝，并返回原因。
+每次写入追加 `audit` 记录（带 `origin`，可区分“用户明说”与“模型判断”）；忘记/更正仍要求明确指令，记住只要求事实有用户原话支撑，拒写时返回原因。
 
 **URI 寻址（Phase 0）**：每条记录都有确定性的 `rcs://` 地址，把 `(scope, kind, key)` 直接映射为虚拟文件系统路径，模型可以先“看目录”再取正文：
 
