@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.66 (错误面收口：档位探测失败（off 被拒→去掉档位重试成功）不再进 errs，改记 effortDowngraded；condenseErrResolved 改按 本折成文段>0 且 fallbackReasons.llmErr=0 判定 ⇒ noShrink/tooShort 这类质量性回退不再把成功折叠标成失败。真机 18:53：aCount=6、aFolded=4、noShrink=2、无 llmErr，面板却挂红字) 内嵌 v1.10.65 (折叠侧路由降级：上游摘掉模型或宿主没配该 id 时，按 压缩路由→配置回退→本机 ollama 换路重试，并把实际服务的路由写进 last-fold 的 condenseRoute(via=fallback)；此前折叠侧完全没有降级，模型一死整折无损回退而本机 ollama 明明在跑) 内嵌 v1.10.64 (折叠记录可写性根治：last-fold 字面量曾引用 if 块内的 ioc/condenseErrResolved，两次导致 ioc is not defined ⇒ 整折 append-failed；已改函数级 let，并有结构性测试禁止 last-fold 引用块内变量。显式 max_tokens 不再二次收敛（maxTokensSent 可核验）。面板：已恢复的折叠不显示红字，标记移到「实际使用」行尾) 内嵌 v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
+const PLUGIN_VERSION = 'v1.10.72 (未落盘的 seq 不再冒充业务失败：raw append 是异步的，[T] 行渲染时该 seq 可能还没 flush，回执里的 seq-not-in-raw 只是「稍后再取」。v1.10.67 把它当业务失败提成 FAIL(seq-not-in-raw)，真机上一条 probe 的正文带该回执，[T] 行就标成 FAIL，而同一个 seq 稍后展开实得 6662B ⇒ 模型据此判「工具坏了」。现在 RETRYABLE_CODES 里的码记中性状态 PENDING，行仍只挂 raw=<seq>，不与 FAIL 同权重；readRawEntry 的该回执补 pending:true + hint，工具描述里写明 PENDING 的语义；PENDING 行也不再内联小回执预览（判定列已是「稍后再取」，别复述回执）。方案 2（渲染前 await 一次 raw flush）未采纳：给每个 [T] 行加一次 flush 等待，收益只是省掉一次重试) 内嵌 v1.10.71 (注册即被回收根治：真机"register 不抛错、工具却始终不在可见表里"的根因不是时机、不是 allow 白名单——是每处注册后紧跟的 ctx.effect(() => { dispose?.() }) 把它当场注销了：cordis 的 effect(execute) 会立即执行 execute 并把返回值当 disposer，于是"持有"变成了"立即释放"。隔离实测（tests/probe-effect-dispose.mjs）：naive 写法 registered=false，generator 写法 registered=true。插件内三处（ctx.tools 直挂 / ctx.inject 延迟挂 / 补挂器）统一改走 holdToolRegistration 的 generator 持有形。v1.10.69 的 inject:["tools"]、v1.10.70 的补挂与落盘诊断全部保留，作为无害兜底。模型侧因此第一次真正拿到 transcript_expand 的定义，[T] 行的 raw=<seq> 才成为可点入口) 内嵌 v1.10.70 (工具可见性：注册调用与 memory.mjs 完全一致（插件级 inject:["tools"] + apply 内 ctx.tools.register），但隔离实例实测 register 不抛错、工具就是进不了可见表——apply 时 n=1、1s 后同一实例 n=92/99（含 memory_*/MCP）里却没有它，2s/5s/10s 补挂同样不落。已把"何时丢、丢时 table 里有什么"写进 state-compiler/tools/transcript-expand.json 供线上复查（probe 缺 photoshop 等 bundle，结论不能直接外推到 live）。期间先加三处兜底：pre-step 与工具表变化时补挂、每步检查一次；同时转录行内联 FAIL(错误码) 保证不依赖该工具也能判真伪) 内嵌 v1.10.69 (工具可见性根因探查：工具注册的结论不再只进 console——真机 v1.10.67 的 armed/visible= 只打在用户 cmd 窗口里，重启后无从判读"加载了但模型看不到"。现在 register 成功/失败/可见性探测结果连同 tools/change 复检写进 STATE_DIR/tools/transcript-expand.json，并优先走 ctx.tools 直挂（与 memory.mjs 等已证明可见的插件同路径），tools 未注入才退回 ctx.inject 延迟挂载) 内嵌 v1.10.67 (转录可逆面三修：①工具用法写进注册表——transcript_expand 此前无 description，模型不知道 raw=<seq> 可点、更不知道判定真伪该点它（真机连着三轮回执 ok:false 仍凭 [T] 行尾 OK 下结论）；②业务层判定——行尾 OK/ERR 只判传输层，回执里的 {"ok":false,"error":...} 现在提成 FAIL(错误码)，错误码与体积无关、永远显示；③注册后自检——register 没抛错≠模型看得见，armed 行现在回读可见定义表印 visible=yes/NO 并单列一条 error；体积门槛：只有被遮蔽正文 ≥ rawPtrMinBytes（缺省 1024，control/env 热调、0=永远挂指针退回旧行为）才挂 raw=<seq>，小结果里**失败行与提问答复**把有界预览（≤160 字）内联进同一行 [T]、成功的小回执保持精简 —— 真机回放 71 条：2670B→3382B（+27%），换来 4 条业务失败可见原因、且不再需要回取) 内嵌 v1.10.66 (错误面收口：档位探测失败（off 被拒→去掉档位重试成功）不再进 errs，改记 effortDowngraded；condenseErrResolved 改按 本折成文段>0 且 fallbackReasons.llmErr=0 判定 ⇒ noShrink/tooShort 这类质量性回退不再把成功折叠标成失败。真机 18:53：aCount=6、aFolded=4、noShrink=2、无 llmErr，面板却挂红字) 内嵌 v1.10.65 (折叠侧路由降级：上游摘掉模型或宿主没配该 id 时，按 压缩路由→配置回退→本机 ollama 换路重试，并把实际服务的路由写进 last-fold 的 condenseRoute(via=fallback)；此前折叠侧完全没有降级，模型一死整折无损回退而本机 ollama 明明在跑) 内嵌 v1.10.64 (折叠记录可写性根治：last-fold 字面量曾引用 if 块内的 ioc/condenseErrResolved，两次导致 ioc is not defined ⇒ 整折 append-failed；已改函数级 let，并有结构性测试禁止 last-fold 引用块内变量。显式 max_tokens 不再二次收敛（maxTokensSent 可核验）。面板：已恢复的折叠不显示红字，标记移到「实际使用」行尾) 内嵌 v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -331,6 +331,21 @@ function foldMinShadowBytesOf(ctrl) {
   const n = ctrl?.foldMinShadowBytes
   if (typeof n === 'number' && Number.isFinite(n) && n >= 0) return Math.floor(n)
   return FOLD_MIN_SHADOW_BYTES
+}
+// raw 指针门槛（v1.10.67）：[T] 行只在**被遮蔽结果正文 ≥ 此字节数**时才挂 raw=<seq>。
+// 动机（用户定档）：raw= 是回取入口，回取要一次工具往返；小结果（一次 ok 回执、一次 404、
+// 一份几百字的 grep 命中）用往返换回来不划算，且模型容易为一条 OK 去展开。故：
+//   · 正文 ≥ 门槛 ⇒ 只挂 raw=<seq>（可展开，正文不进转录）；
+//   · 正文 <  门槛 ⇒ 不挂指针，把有界预览（≤RAW_PREVIEW_CHARS 字）内联在**同一行** [T] 里，
+//     信息不丢、往返也省了。control.rawPtrMinBytes / env 可热调（0 = 永远挂指针，退回旧行为）。
+const RAW_PTR_MIN_BYTES = 1024
+const RAW_PREVIEW_CHARS = 160
+function rawPtrMinBytesOf(ctrl) {
+  const n = ctrl?.rawPtrMinBytes
+  if (typeof n === 'number' && Number.isFinite(n) && n >= 0) return Math.floor(n)
+  const e = Number(process.env.DSH_CONTEXTINJECTOR_RAW_PTR_MIN)
+  if (Number.isFinite(e) && e >= 0) return Math.floor(e)
+  return RAW_PTR_MIN_BYTES
 }
 // 折叠门控（env 为最高优先，与 keepInject 同款语义）：
 //   env=1 强制（无视白名单，供真机实验）> env=0 强制关 > gate !== 'off'（白名单/回归通道）
@@ -857,8 +872,39 @@ function toolResultText(m, resultBlock) {
 //   0.1.5 及更早：消息 content 内含 {type:'tool-result', toolCallId, isError} 块；
 //   0.1.7 起：结果消息是 {role:'tool', toolCallId, isError, source:{kind:'tool',callId}, content:[{type:'text'}]}
 //             —— **没有** tool-result 块。只认块级会让整类结果在转录里凭空消失。
-function isToolResultMsg(m) {
-  if (!m) return false
+// 【业务层判定 · v1.10.67】行尾 OK/ERR 只判**传输层**（工具进程有没有报错）。很多工具用
+//   JSON 回执表达**业务失败**：{"ok":false,"error":"need-explicit-user-intent"}、write 冲突、
+//   edit 未命中、web_fetch 拿不到正文……传输层全是成功 ⇒ 旧行写 `OK`，模型据此判定"成功了"
+//   （真机：memory_correct 连续三轮回执 ok:false，[T] 行却三次 OK，我照着 OK 往下走）。
+//   现在把回执里的业务失败提成 `FAIL(<错误码>)`：错误码只有十几个字节，与体积无关，永远显示。
+const BIZ_FAIL_RE = /"ok"\s*:\s*false|\{\s*"error"\s*:|^error:/i
+const BIZ_CODE_RE = /"error"\s*:\s*"([^"\n]{1,64})"/
+// 【v1.10.72】"还没落盘/不在 raw 里"不是业务失败。转录行里把这类回执写成 FAIL(seq-not-in-raw)
+//   等于告诉模型"工具坏了"，真机就是这样误判的：一条 probe 的正文里带该回执，[T] 行标 FAIL，
+//   而同一个 seq 稍后展开实得 6662B（只是 raw append 还没 flush）。这类行只保留 raw=<seq>
+//   指针，判定列写中性状态 PENDING，不与业务 FAIL 同权重。
+const RETRYABLE_CODES = new Set(['seq-not-in-raw'])
+function toolVerdictTag(isErr, text) {
+  if (isErr) return 'ERR'
+  const t = String(text ?? '')
+  if (!t || !BIZ_FAIL_RE.test(t)) return 'OK'
+  const m = t.match(BIZ_CODE_RE)
+  const code = m ? m[1].replace(/[\s|]+/g, '-').slice(0, 40) : ''
+  if (code && RETRYABLE_CODES.has(code)) return 'PENDING'
+  return code ? `FAIL(${code})` : 'FAIL'
+}
+// 小结果的内联预览：首行、压掉连续空白、截断到 RAW_PREVIEW_CHARS，避免把换行带进转录。
+function boundedPreview(text, cap = RAW_PREVIEW_CHARS) {
+  const s = String(text ?? '').replace(/\s+/g, ' ').trim()
+  if (!s) return ''
+  return s.length > cap ? s.slice(0, cap) + '…' : s
+}
+// 载荷必须留痕的工具：ask_user_question 的回执是**用户决定**（选项/自定义答复），
+//   它体积很小、成功态（OK）也不该被"小结果不内联"的省 token 规则吃掉——真机回放里
+//   正是这一行会退化成光秃秃的 `[T] ask_user_question | - | OK`，把用户选了什么抹掉。
+//   这类工具永远挂指针，够小的时候再加一行预览。
+const PAYLOAD_KEEP = new Set(['ask_user_question'])
+function isToolResultMsg(m) {  if (!m) return false
   if (m.role === 'tool' || m?.source?.kind === 'tool') return true
   return blocksOf(m).some((b) => b?.type === 'tool-result')
 }
@@ -908,16 +954,29 @@ function transcribeIncremental(msgs, roundState, opts = {}) {
       ?? { op: block?.name ?? m?.toolName ?? '?', path: '-', args: {} }
     const rawSeq = Number(seqOf(m))
     const callSq = callSeq.get(String(callId))
+    const text = toolResultText(m, block)
+    const payloadBytes = text.length
+    // v1.10.67 体积门槛：只有够大的结果才值得一次回取往返 ⇒ 只有它挂 raw=<seq>。
+    //   小结果不挂指针（省 token、免掉无谓展开）；其中**非 OK** 的把有界预览内联在同一行，
+    //   失败原因看得到，成功的小回执（ok:true / "No matches found"）正文没有信息量、不内联。
+    const pointerMin = Number.isFinite(opts?.rawPtrMinBytes) ? opts.rawPtrMinBytes : RAW_PTR_MIN_BYTES
+    const keepPayload = PAYLOAD_KEEP.has(String(rec.op))
+    const hasPointer = Number.isFinite(rawSeq) && (payloadBytes >= pointerMin || keepPayload)
     const extra = []
-    if (Number.isFinite(rawSeq)) extra.push('raw=' + rawSeq)
+    if (hasPointer) extra.push('raw=' + rawSeq)
     if (Number.isFinite(callSq) && /^(?:write|edit|str_replace|str_replace_editor)$/.test(rec.op)) extra.push('call=' + callSq)
+    const verdict = toolVerdictTag(isErr, text)
     if (structured) {
-      const text = toolResultText(m, block)
-      const { t, vs } = foldToolResult({ action: rec.op, args: rec.args || {}, text, isError: isErr, fs: { readFileSync }, tool: toolDomainOf(rec.op) })
+      const { t, vs } = foldToolResult({ action: rec.op, args: rec.args || {}, text, isError: verdict !== 'OK', fs: { readFileSync }, tool: toolDomainOf(rec.op) })
       for (const v of vs) rows.push(v)
       rows.push(t + extra.map((x) => '|' + x).join(''))
     } else {
-      rows.push(`[T] ${rec.op} | ${rec.path} | ${isErr ? 'ERR' : 'OK'}${extra.map((x) => ' | ' + x).join('')}`)
+      // 小结果把预览内联在**同一行**（不再新开 [V] 行）：转录里 [V] 的既有语义是 subagent 正文/
+      //   错误补充（memory.mjs 会按该语义解析），工具预览混进去会被误配到相邻记录上。
+      //   PENDING（未落盘/稍后再取）不算失败，也不内联：那一行只该留 raw=<seq>，别再复述回执。
+      const failish = verdict === 'ERR' || verdict.startsWith('FAIL')
+      const inline = payloadBytes > 0 && payloadBytes < pointerMin && (failish || keepPayload) ? boundedPreview(text) : ''
+      rows.push(`[T] ${rec.op} | ${rec.path} | ${verdict}${inline ? ' | ' + inline : ''}${extra.map((x) => ' | ' + x).join('')}`)
     }
   }
   for (const m of msgs) {
@@ -1717,8 +1776,10 @@ function rawAppend(sid, entries) {
 }
 
 // ================= raw 回取（折叠的可逆面） =================
-// [T] 只保留有界摘要；被遮蔽的原文全量在 raw/<sid>.jsonl。模型看到 raw=<seq> 时可按需展开，
-// 避免"规则折叠 = 静默丢正文"。路径用 sanitizeSid 清洗，只读、不写库。
+// [T] 只保留有界摘要；被遮蔽的原文全量在 raw/<sid>.jsonl。**够大的**结果（≥ rawPtrMinBytes，
+// 缺省 1024）才挂 raw=<seq> 供按需展开；小结果不挂指针，把有界预览内联在同一行 [T] 里
+// （回取一次工具往返的成本高于收益 —— 见 rawPtrMinBytesOf 与 v1.10.67 说明）。
+// 路径用 sanitizeSid 清洗，只读、不写库。
 function rawMessageText(m) {
   const parts = []
   for (const b of blocksOf(m)) {
@@ -1748,7 +1809,9 @@ export function readRawEntry(rawDir, sid, seq, maxChars = 4000) {
   } catch (err) {
     return { ok: false, error: 'read-failed', detail: String(err?.message ?? err) }
   }
-  if (!rec) return { ok: false, error: 'seq-not-in-raw', file }
+  // 中性状态，不是失败：该 seq 可能只是还没 flush 进 raw（折叠落盘是异步的），
+  //   或在 raw 覆盖范围之外（当前轮/未折叠的步骤）。行内记 PENDING，稍后重试即可。
+  if (!rec) return { ok: false, error: 'seq-not-in-raw', pending: true, file, hint: '尚未落盘或不在 raw 范围内；稍后重试（本轮回合结束后再展开）' }
   const text = rawMessageText(rec.msg)
   const capN = Math.max(200, Math.min(20000, Number(maxChars) || 4000))
   return {
@@ -1850,6 +1913,18 @@ export function appendFoldCheckpoint(session, {
 export function makeTranscriptExpandTool({ rawDir = RAW_DIR } = {}) {
   return {
     name: 'transcript_expand',
+    // 【工具用法 · v1.10.67】用法规约就该写在注册表里：模型看得到的是工具目录，
+    //   看不到插件源码与设计笔记。此前本工具无 description，模型即使拿到了 raw=<seq>
+    //   也不知道它可点、更不知道该在"判定真伪/需要精确载荷"时点它（真机：连续三轮
+    //   凭 [T] 行尾 OK 下结论，从未想到回取）。下面这些句子就是给模型的使用说明。
+    description:
+      '展开被折叠转录遮蔽的工具结果原文（只读）。' +
+      '[T] 行尾的 raw=<seq> 就是这里的 seq。' +
+      '何时用：要判定某一步是否真的成功（行尾 OK/ERR 只是传输层，业务失败记作 FAIL(错误码)）、' +
+      '需要精确的错误码/报错全文/文件内容/命令输出，或摘要太短不足以决策时，调它取原文，不要凭摘要猜。' +
+      '何时不必用：小结果（<rawPtrMinBytes）里，失败行与提问答复的预览已内联在 [T] 行、成功的小回执无需正文；' +
+      '当前轮与尚未折叠的步骤不在 raw 中，会返回 seq-not-in-raw（[T] 行里记作 PENDING，不是失败）——' +
+      '那些内容仍在你的上下文里，不必查询。',
     parameters: {
       type: 'object',
       properties: {
@@ -1880,32 +1955,171 @@ export function makeTranscriptExpandTool({ rawDir = RAW_DIR } = {}) {
   }
 }
 
+// 【注册诊断落盘 · v1.10.68】register 抛没抛错、进没进可见表，此前只进 console：
+//   用户从 cmd 窗口启动 web 实例时没人留存那几行，2026-11-10 就卡在"插件明明 armed、
+//   模型工具表里却没有 transcript_expand"上无从判断。状态同时写进
+//   STATE_DIR/tools/transcript-expand.json，重启后直接读文件即可（不必再问控制台）。
+// 【注册即被回收 · v1.10.71】cordis 的 ctx.effect(execute) 会**立即执行** execute，
+//   并把它的返回值当作 disposer。所以写成 ctx.effect(() => { dispose?.() }) 等于
+//   "注册完立刻注销"：register 不抛错、日志照打，工具却永远进不了可见表
+//   （真机：tools.get('transcript_expand') 恒 false，补挂 9 次都一样）。
+//   隔离实测（tests/probe-effect-dispose.mjs）：naive 写法 registered=false，
+//   generator 写法 registered=true。持有 disposer 只有一个正确形状：
+//   ctx.effect(function* () { yield () => dispose() })。
+function holdToolRegistration(effectCtx, disposer, label) {
+  if (typeof disposer !== 'function') return
+  try {
+    if (typeof effectCtx?.effect === 'function') {
+      effectCtx.effect(function* () { yield () => { try { disposer() } catch { /* ignore */ } } }, label)
+    } else if (typeof effectCtx?.on === 'function') {
+      effectCtx.on('dispose', () => { try { disposer() } catch { /* ignore */ } })
+    }
+  } catch { /* 持有失败不影响工具本身 */ }
+}
+
+const TOOL_STATUS_DIR = join(STATE_DIR, 'tools')
+const TOOL_STATUS_FILE = join(TOOL_STATUS_DIR, 'transcript-expand.json')
+let TRANSCRIPT_EXPAND_STATUS = {
+  tool: 'transcript_expand',
+  state: 'not-attempted',
+  at: null,
+}
+function recordTranscriptExpandStatus(patch) {
+  TRANSCRIPT_EXPAND_STATUS = {
+    ...TRANSCRIPT_EXPAND_STATUS,
+    ...patch,
+    pluginVersion: String(PLUGIN_VERSION).split(' ')[0],
+    at: new Date().toISOString(),
+  }
+  try {
+    mkdirSync(TOOL_STATUS_DIR, { recursive: true })
+    writeFileSync(TOOL_STATUS_FILE, JSON.stringify(TRANSCRIPT_EXPAND_STATUS, null, 2), 'utf8')
+  } catch { /* 诊断写不进去不影响工具本身 */ }
+}
+
 export default {
   name: 'CONTEXTinjector',
+  // 【根因 · v1.10.69】必须声明 inject: ['tools']，让插件在 tools 服务就绪后才 apply。
+  //   此前用 ctx.inject(['tools'], cb) 延迟挂载：cb 里 register 成功、日志也打了 armed，
+  //   但那个回调上下文是一次性的（fork），注册随其作用域结束被回收 —— 真机证据：
+  //   state-compiler/tools/transcript-expand.json 里 state=registered 而
+  //   tools/change 复检 visible=NO (registry n=92)。memory.mjs 的 memory_* 一直可见，
+  //   差别就在它写了 inject: ['tools'] 并在 apply 里同步 ctx.tools.register()。
+  inject: ['tools'],
   apply(ctx) {
     console.log(`[CONTEXTinjector] armed (${PLUGIN_VERSION}; threshold=${THRESHOLD}%; out=${OUT_FILE || '-'}; stateDir=${STATE_DIR})`)
     // raw 回取工具：让 [T] 的 raw=<seq> 可展开为被遮蔽原文（只读）。
     // tools 是可选宿主服务，必须走 ctx.inject 延迟挂载；直接 ctx.get('tools') 在服务尚未
     // 注入时会被 cordis 拒绝（实测 “cannot get property "tools" without inject”）。
+    const probeVisible = (tools) => {
+      // 只读回读：全局视图里在不在。注意"全局可见"≠"模型可见"（作用域限制/执行器选择
+      // 都能再遮一层），所以这是下限证据，不是结论。
+      try {
+        const defs = typeof tools.definitions === 'function' ? tools.definitions() : null
+        if (!Array.isArray(defs)) return { visible: 'unknown', registry: -1 }
+        const all = defs.map((d) => String(d?.name ?? '')).sort()
+        let resolved = null
+        try { resolved = typeof tools.get === 'function' ? !!tools.get('transcript_expand') : null } catch { resolved = 'get-failed' }
+        return {
+          visible: all.includes('transcript_expand') ? 'yes' : 'NO',
+          resolved,
+          registry: defs.length,
+          // 诊断：把当次可见名字写进状态文件，便于判断是"整类工具被换掉"还是"只丢我们一个"。
+          sample: all.filter((n) => /transcript|memory_|pwsh|read/.test(n)).slice(0, 12),
+          hasTranscript: all.some((n) => n.includes('transcript')),
+        }
+      } catch (err) {
+        return { visible: 'probe-failed:' + String(err?.message ?? err).slice(0, 80), registry: -1 }
+      }
+    }
     const armTranscriptExpand = (toolsCtx) => {
       try {
         const tools = toolsCtx?.tools ?? (typeof toolsCtx?.get === 'function' ? toolsCtx.get('tools') : null)
         if (tools && typeof tools.register === 'function') {
           const dispose = tools.register(makeTranscriptExpandTool())
-          console.log('[CONTEXTinjector] transcript_expand armed (raw seq lookup)')
-          try { if (typeof toolsCtx.effect === 'function') toolsCtx.effect(() => { try { dispose?.() } catch { /* ignore */ } }) } catch { /* ignore */ }
+          const probe = probeVisible(tools)
+          recordTranscriptExpandStatus({ state: 'registered', ...probe, via: 'ctx.inject' })
+          console.log(`[CONTEXTinjector] transcript_expand armed (raw seq lookup); visible=${probe.visible} (registry n=${probe.registry})`)
+          if (probe.visible === 'NO') console.error('[CONTEXTinjector] transcript_expand registered but NOT in the visible registry — models cannot call it')
+          // tools/change 后再回读一次：别的插件注册/限制可能改变可见性，落盘留痕。
+          try {
+            if (typeof toolsCtx.on === 'function') toolsCtx.on('tools/change', () => {
+              try { recordTranscriptExpandStatus({ state: 'registered', ...probeVisible(tools), via: 'tools/change' }) } catch { /* ignore */ }
+            })
+          } catch { /* 事件挂不上不影响工具 */ }
+          try { if (typeof toolsCtx.effect === 'function') holdToolRegistration(toolsCtx, dispose, 'ctx.inject') } catch { /* ignore */ }
         } else {
+          recordTranscriptExpandStatus({ state: 'tools-service-absent', via: 'ctx.inject' })
           console.log('[CONTEXTinjector] transcript_expand unavailable: tools service absent')
         }
       } catch (err) {
-        console.error('[CONTEXTinjector] transcript_expand registration failed:', err?.message ?? err)
+        const message = String(err?.message ?? err)
+        recordTranscriptExpandStatus({ state: 'register-failed', error: message, via: 'ctx.inject' })
+        console.error('[CONTEXTinjector] transcript_expand registration failed:', message)
       }
     }
+    // 补挂器（自愈）：在 apply 作用域里声明，供 tools/change 与 pre-step 共同调用。
+    let ensureTranscriptExpandRegistered = () => {}
+    // 【活取服务 · v1.10.71】不要把 tools 实例闭包住：宿主重启服务 fiber 后是新实例，
+    //   往旧实例上补挂多少次都不会出现在模型看到的表里（真机 rearmCount=21 次全 NO）。
+    const resolveTools = () => {
+      try { const t = ctx.tools; if (t && typeof t.register === 'function') return t } catch { /* 未注入 */ }
+      try { const t = typeof ctx.get === 'function' ? ctx.get('tools') : null; if (t && typeof t.register === 'function') return t } catch { /* ignore */ }
+      return null
+    }
     try {
-      if (typeof ctx.inject === 'function') ctx.inject(['tools'], armTranscriptExpand)
-      else armTranscriptExpand(ctx)
+      // 优先走 ctx.tools 直挂（与 memory.mjs 等已证明可见的插件同一条路径）；
+      // tools 尚未注入时 cordis 会拒绝 get，再退回 ctx.inject 延迟挂载。
+      let armedDirectly = false
+      try {
+        const tools = resolveTools()
+        if (tools) {
+          const dispose = tools.register(makeTranscriptExpandTool())
+          const probe = probeVisible(tools)
+          recordTranscriptExpandStatus({ state: 'registered', ...probe, via: 'ctx.tools' })
+          console.log(`[CONTEXTinjector] transcript_expand armed via ctx.tools; visible=${probe.visible} (registry n=${probe.registry})`)
+          if (probe.visible === 'NO') console.error('[CONTEXTinjector] transcript_expand registered but NOT in the visible registry — models cannot call it')
+          try {
+            if (typeof ctx.on === 'function') ctx.on('tools/change', () => {
+              try { recordTranscriptExpandStatus({ state: 'registered', ...probeVisible(resolveTools() ?? tools), via: 'tools/change' }) } catch { /* ignore */ }
+            })
+          } catch { /* 事件挂不上不影响工具 */ }
+          armedDirectly = true
+          // 【自愈重挂 · v1.10.69e / v1.10.71】每次补挂都**活取**服务实例，
+          //   并以"可见表里有没有"（而不是"register 有没有抛错"）为判据。
+          let rearmCount = 0
+          ensureTranscriptExpandRegistered = (why) => {
+            try {
+              if (rearmCount > 20) return
+              const live = resolveTools()
+              if (!live) return
+              const seen = typeof live.get === 'function' ? live.get('transcript_expand') : undefined
+              if (seen) return
+              rearmCount += 1
+              const d = live.register(makeTranscriptExpandTool())
+              holdToolRegistration(ctx, d, 'transcript_expand')
+              recordTranscriptExpandStatus({ state: 're-registered', ...probeVisible(live), via: why, rearmCount })
+              console.log(`[CONTEXTinjector] transcript_expand re-registered (${why}) #${rearmCount}`)
+            } catch (err) {
+              recordTranscriptExpandStatus({ state: 're-register-failed', error: String(err?.message ?? err), via: why, rearmCount })
+            }
+          }
+          // 【延时补挂 · v1.10.69f】启动早期注册可能被随后的层重建冲掉：启动后
+          //   2s/5s/10s 各复查一次（此时已是修好的持有形，正常情况下第一次就够）。
+          for (const delayMs of [2000, 5000, 10000]) {
+            try { const t = setTimeout(() => { try { ensureTranscriptExpandRegistered('timer+' + delayMs) } catch { /* ignore */ } }, delayMs); t.unref?.() } catch { /* ignore */ }
+          }
+          holdToolRegistration(ctx, dispose, 'ctx.tools')
+        }
+      } catch { /* tools 未注入：走下面的 inject 路径 */ }
+      if (!armedDirectly) {
+        if (typeof ctx.inject === 'function') ctx.inject(['tools'], armTranscriptExpand)
+        else armTranscriptExpand(ctx)
+      }
     } catch (err) {
-      console.error('[CONTEXTinjector] transcript_expand registration failed:', err?.message ?? err)
+      const message = String(err?.message ?? err)
+      recordTranscriptExpandStatus({ state: 'register-failed', error: message, via: 'ctx.inject-arm' })
+      console.error('[CONTEXTinjector] transcript_expand registration failed:', message)
     }
     // 诊断行显示**生效值**而非原始字段（2026-09-10 默认翻转后，旧文案会谎报 "default OFF"）
     const _kiCtrl = readControl()
@@ -2037,7 +2251,7 @@ export default {
         // 【v1.10.1 修复】被截掉的那段（注入**之前**的普通节点 = 首条 user）过去既不被遮蔽、也不被
         //   转录 ⇒ 转录从第 2 轮起（面板显示 ROUND 1 = 第二条消息）。现按 foldHeadTranscript 的契约
         //   在首次折叠时"只转录不遮蔽"补录一次；注入节点本身仍绝不进 head/tail（keepInject 不变）。
-        const ht = foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx })
+        const ht = foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, rawPtrMinBytes: rawPtrMinBytesOf(ctrl) })
         headRows = ht.rows
         headSeqs = ht.head.map((e) => e.seq)
         headEntries = ht.head
@@ -2087,7 +2301,7 @@ export default {
         }
       } catch { /* 守卫失败不阻断主链 */ }
 
-      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, seqOf: seqMapOf(incremental) })
+      const newRows = transcribeIncremental(incremental.map((e) => e.msg), roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, seqOf: seqMapOf(incremental), rawPtrMinBytes: rawPtrMinBytesOf(ctrl) })
       if (newRows.length === 0) return { folded: false, reason: 'no-rows' }
       // 【覆盖守卫 · 漂移 #11 的教训】增量里每一个工具结果消息都必须在转录里留下一行 [T]。
       //   少一行 ⇒ 某一类节点被整类跳过（形状漂移的典型症状，真机表现为 205 节点折成 0 行工具记录）。
@@ -2539,6 +2753,8 @@ try {
     // 轮末（turn/end）后台任务；这里只做两件事：join 在飞折叠（带超时）、原样放行请求。
     // next() 必须在**所有路径**上恰好调用一次（包括 join 抛错）——故放到 try 之外。
     ctx.on('agent/pre-step', async ({ agent, messages, turn, step: stepNo }, next) => {
+      // 每步开头补挂一次（无害：已存在即返回），躲开启动早期的层重建。
+      try { ensureTranscriptExpandRegistered('pre-step') } catch { /* ignore */ }
       const claimed = messages?.length ?? 0
       let testFold = null
       try {
@@ -2647,4 +2863,4 @@ try {
   },
 }
 // 测试/诊断句柄（named export 不影响 cordis 按 default 加载插件）
-export { writeFoldIndex, condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, foldMinShadowBytesOf, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
+export { writeFoldIndex, condenseMode, perSessionMode, condenseText, callIndexFromEvents, isToolResultMsg, toolResultCallId, toolVerdictTag, boundedPreview, rawPtrMinBytesOf, extractKeys, applyCondense, guardText, restoreText, verifyAgainstSource, occursWhole, rawAppend, sanitizeSid, llmOf, resolveCondenseRoute, llmText, minBytesOf, keepInjectOn, isDshInjected, isInjectedUser, foldAtTurnEndOn, foldGateOpen, foldJoinTimeoutMs, foldMinShadowBytesOf, transcribeIncremental, enterFoldInflight, exitFoldInflight, foldInflightFile, paybackOf, paybackMeasured, messageBytes, blockTextOf }
