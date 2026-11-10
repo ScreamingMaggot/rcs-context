@@ -3,7 +3,7 @@
 > 本文是 [README](../README.md) 中「外部记忆」一节的完整版：检索、URI 寻址、分层加载、事实生命周期、整理与巡检、向量基底、检索轨迹、面板。
 > 默认关闭（`control.json` 的 `memoryEnabled`），开启后所有数据只落在本机 `$DSH_HOME/state-compiler/memory/`。
 
-## 外部记忆
+## 总览
 
 订阅 `session/event`，抽取工具结果、用户轮、任务锚点存入 SQLite。
 
