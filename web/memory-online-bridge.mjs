@@ -285,6 +285,14 @@ export class LedgerOnlineBridge {
     return { known: true, mismatch: { sessionCwd, normalized, expected } }
   }
 
+  // Require-cwd predicate for the render path: an unknown cwd is a rejection too,
+  // matching the guard `_handleEvent` applies before archiving.
+  _cwdMismatchOf(session) {
+    const state = this._cwdStateOf(session)
+    if (!state.known) return true
+    return Boolean(state.mismatch)
+  }
+
   // The session cwd is evidence about the host's intent, not an instruction. It is
   // compared with the fixed workspace and recorded once per offending value.
   _checkCwd(session, sid) {

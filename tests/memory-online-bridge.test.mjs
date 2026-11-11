@@ -568,6 +568,32 @@ try {
   }
 
   // ---------------------------------------------------------------------------
+  // 12d. The render path honours require-cwd as well: a foreign or cwd-less
+  // session yields no injection, and neither case may record an error. The guard
+  // used to call `_cwdMismatchOf`, which never existed, so every pre-step threw
+  // and was swallowed by the catch: live injection was silently dead.
+  // ---------------------------------------------------------------------------
+  {
+    const model = fakeModel(emptyOutput)
+    const bridge = makeBridge(model, { requireWorkspaceCwd: true })
+    for (const event of writeEvents('c-r', 'required.txt',
+      { exists: true, size: 7, mtime: T0 + 1, sha256: SHA_A }, 1)) {
+      bridge.handleEvent({ id: 'in', cwd: WS }, 'in', event)
+    }
+    bridge.handleEvent({ id: 'in', cwd: WS }, 'in', userEvent(USER_TEXT, { seq: 3, t: T0 + 3 }))
+    await bridge.drain()
+    const decision = { kind: 'enter', messages: [{ role: 'user', content: [] }] }
+    const text = injectedText(bridge.preStep({ id: 'in', cwd: WS }, 'in', decision))
+    check('pre-step injects for a session inside the fixed workspace',
+      typeof text === 'string' && text.includes('required.txt') &&
+      bridge.status().errors.count === 0)
+    const foreign = bridge.preStep({ id: 'out', cwd: 'C:/somewhere/else' }, 'out', decision)
+    const unknown = bridge.preStep({ id: 'none' }, 'none', decision)
+    check('pre-step skips foreign and cwd-less sessions without recording an error',
+      foreign === null && unknown === null && bridge.status().errors.count === 0)
+  }
+
+  // ---------------------------------------------------------------------------
   // 13. Scope normalization is fixed by the constructor.
   // ---------------------------------------------------------------------------
   {
