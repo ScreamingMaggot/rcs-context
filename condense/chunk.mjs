@@ -126,6 +126,9 @@ const NOTICE_SUB_BY_PLUGIN = { 'tool-jobs': 'job', 'user-approval': 'approval' }
 //   此处提为唯一来源，两处均从此导入，杜绝再次漂移。
 export const INJECTED_USER_PREFIXES = [
   'Current runtime context',
+  // DSH 0.2.2-rc.2 wraps runtime-context in <system-reminder> and opens with this
+  // sentence instead of "Current runtime context:"; callers strip the wrapper first.
+  'The following information describes your current session',
   'Current DSH file policy',
   'Current DSH permission mode',
   'sandbox:',

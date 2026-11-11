@@ -76,14 +76,14 @@ if (-not [string]::IsNullOrWhiteSpace($DshInstall)) {
   if (Test-Path -LiteralPath $pkg) {
     try {
       $v = (Get-Content -LiteralPath $pkg -Raw | ConvertFrom-Json).version
-      $verifiedDsh = @('0.2.2-rc.1', '0.2.1-rc.3', '0.2.1-rc.2', '0.2.0-rc.2', '0.1.7-rc.2', '0.1.5-rc.2', '0.1.1-rc.2')
+      $verifiedDsh = @('0.2.2-rc.2', '0.2.2-rc.1', '0.2.1-rc.3', '0.2.1-rc.2', '0.2.0-rc.2', '0.1.7-rc.2', '0.1.5-rc.2', '0.1.1-rc.2')
       if ($verifiedDsh -notcontains $v) {
         Col Yellow ("警告：DSH 版本 {0}，本插件验证过的版本为 {1}（agent/pre-step、surfaceOp replace、ctx.llm、client 注入面）。若遇异常请先核对该版本。" -f $v, ($verifiedDsh -join ' / '))
       } else { Col Green "DSH 版本 ${v} 在已验证清单内。" }
     } catch { Col Yellow '无法读取 dsh package.json 做版本探测，跳过（请自行核对外部，本安装仍继续）。' }
   } else { Col Yellow '未在指定 DshInstall 找到 @deepseek-ai/dsh，跳过版本探测。' }
 } else {
-  Col Yellow '未提供 -DshInstall，跳过 DSH 版本探测。本插件已在 @deepseek-ai/dsh 0.1.5-rc.2 ~ 0.2.2-rc.1 上验证，装到其它版本前请先核实。'
+  Col Yellow '未提供 -DshInstall，跳过 DSH 版本探测。本插件已在 @deepseek-ai/dsh 0.1.5-rc.2 ~ 0.2.2-rc.2 上验证，装到其它版本前请先核实。'
 }
 
 # ---- 备份（到 <DSH_HOME>/.statecompiler-backup-<stamp>）-----------------------
@@ -243,7 +243,7 @@ if ($ok) {
   Col Yellow '     · 注入：在「当前会话」卡为会话选「工具折叠/单压缩/双压缩」即启用折叠；'
   Col Yellow '     · 日志：`logcompiler` 默认写 DSH_HOME/state-compiler/transcripts/<sid>.log，可在面板改目录/停用。'
   Col Yellow '     · 外置推理：EXTREASON 在主模型 reasoningEffort=off 时每轮自动跑只读子代理并注入 [R] 简报；关掉用 EXTREASON=0。'
-  Col Yellow '  3) 本插件已在 @deepseek-ai/dsh 0.1.5-rc.2 ~ 0.2.2-rc.1 上验证。'
+  Col Yellow '  3) 本插件已在 @deepseek-ai/dsh 0.1.5-rc.2 ~ 0.2.2-rc.2 上验证。'
   Col Yellow ("  备份: $bk（uninstall.ps1 会用它回滚）")
 } else {
   Col Red '安装校验未全通过，请检查上方输出；原文件已备份，可运行 uninstall.ps1 或从备份还原。'
