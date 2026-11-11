@@ -36,7 +36,14 @@ export function ivrEnsure(stateDir, sid, S) {
   try { st = existsSync(fp) ? JSON.parse(readFileSync(fp, 'utf8')) : null } catch { st = null }
   // 口径标记：旧文件（v1-role / v2-source）不与新口径混算 —— 旧轮次数据**整体重建丢弃**。
   //   ⚠ 破坏性行为（用户已知并接受）：旧 rounds 会被清空，老会话的历史 IO 数据不再保留、也不可比。
-  if (!st || st.roundSemantics !== 'io') st = { sessionId: sid, lastTranscriptBytes: 0, rounds: [], roundSemantics: 'io' }
+  // 口径 v3（io2）：旧行把**单折** shadowedBytes 当累计量去减上一轮转录，单折量小于累计时被钳成 0，
+  //   面板于是出现大量「输入 0B、比值 0」，累计比值也被带偏。旧行不再混算：保留一份备份后重建。
+  if (!st || st.roundSemantics !== 'io2') {
+    if (st && Array.isArray(st.rounds) && st.rounds.length) {
+      try { writeFileSync(fp + '.bak-' + (st.roundSemantics || 'io') + '-' + Date.now(), JSON.stringify(st, null, 2)) } catch { /* ignore */ }
+    }
+    st = { sessionId: sid, lastTranscriptBytes: 0, rounds: [], roundSemantics: 'io2' }
+  }
   if (!Array.isArray(st.rounds)) st.rounds = []
   void S // S（系统提示字节）在新口径中不再参与计算，仅为兼容旧调用签名而保留
   writeFileSync(fp, JSON.stringify(st, null, 2), 'utf8')
@@ -46,7 +53,10 @@ export function ivrEnsure(stateDir, sid, S) {
 export function ivrRecord(stateDir, sid, fold) {
   const st = ivrEnsure(stateDir, sid)
   const prev = st.lastTranscriptBytes || 0
-  const inBytes = Math.max(0, fold.shadowedBytes - prev)
+  // inBytes = 本折真正喂进压缩器的原始内容（单折量，不减去累计转录）。
+  //   fold.inBytes 由调用方给出（= incrementalRawBytes）；缺省回落到单折 shadowedBytes 以兼容旧调用。
+  const rawIn = Number.isFinite(fold.inBytes) ? fold.inBytes : (Number.isFinite(fold.incrementalRawBytes) ? fold.incrementalRawBytes : fold.shadowedBytes)
+  const inBytes = Math.max(0, Math.floor(Number(rawIn) || 0))
   const outBytes = Math.max(0, fold.transcriptBytes - prev)
   const last = st.rounds[st.rounds.length - 1] || { cumIn: 0, cumOut: 0 }
   const cumIn = last.cumIn + inBytes

@@ -2657,6 +2657,7 @@ try {
         try {
           ivrRecord(STATE_DIR, sid, {
             n: foldRound, step: stepNo, shadowedBytes, transcriptBytes, ts: Date.now(),
+            inBytes: incrementalRawBytes, // 本折真正喂进压缩器的原料（单折量；旧版用 shadowedBytes−累计转录，会钳成 0）
           })
         } catch (err) { console.error('[contextinjector] ivrRecord failed:', err?.message ?? err) }
       } catch (err) {
