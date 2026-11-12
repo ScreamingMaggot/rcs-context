@@ -53,7 +53,7 @@ const TRACE = process.env.DSH_CONTEXTINJECTOR_TRACE === '1'
 
 // v1.10.1 = v1.10 + keepInject 头部补录（foldHeadTranscript：注入节点之前的首条 user 不再从转录里消失）。
 // 注意：**不占用 v1.11–v1.14 号**——那些号已被 RCS 后继分支（v1.14.1，另一条 lineage）使用，避免版本号撞车。
-const PLUGIN_VERSION = 'v1.10.74 (原生压缩后不复活旧转录：①非自身 compaction/end ⇒ 清空折叠基线并允许重新 seed——此前 seedFoldState 只在 foldText 为空时跑，原生压缩把检查点总结掉后 st.foldText 仍是压缩前旧值，下一折按 transcript=foldText+新段把整份旧转录又拼回去 ⇒ 上下文立刻回到压缩前大小 ⇒ 下一轮再次越线、再次原生压缩（control.resetAfterNativeCompaction=false / env DSH_CONTEXTINJECTOR_NATIVE_RESET=0 可关，A/B 用）；②宿主原生压缩写的 compact-checkpoint 当压缩边界——转录分型把它记 opaque、不产行，折进遮蔽区等于把 summary 从模型视野里删掉，现在折叠从它之后开始、它始终留在表面；回归 tests/native-compaction-reset.test.mjs) 内嵌 v1.10.73 (DSH 0.2.2-rc.2 兼容：runtime-context 快照从裸文本改成 <system-reminder>The following information describes your current session: ...</system-reminder>，旧前缀（Current runtime context）整类失配 ⇒ 尾部快照不再被判为注入 ⇒ 被遮蔽后 DSH 逐轮补发；现在 source.kind 优先（runtime-context 进 DSH_INJECTED_KINDS），前缀匹配前剥 reminder 包裹；回归 tests/dsh-injected-rc2.test.mjs；rc.2 的 session 格式 v4 schema 与 compaction 协议逐字节未变，append 仅新增批量重载、单条形态保留) 内嵌 v1.10.72 (未落盘的 seq 不再冒充业务失败：raw append 是异步的，[T] 行渲染时该 seq 可能还没 flush，回执里的 seq-not-in-raw 只是「稍后再取」。v1.10.67 把它当业务失败提成 FAIL(seq-not-in-raw)，真机上一条 probe 的正文带该回执，[T] 行就标成 FAIL，而同一个 seq 稍后展开实得 6662B ⇒ 模型据此判「工具坏了」。现在 RETRYABLE_CODES 里的码记中性状态 PENDING，行仍只挂 raw=<seq>，不与 FAIL 同权重；readRawEntry 的该回执补 pending:true + hint，工具描述里写明 PENDING 的语义；PENDING 行也不再内联小回执预览（判定列已是「稍后再取」，别复述回执）。方案 2（渲染前 await 一次 raw flush）未采纳：给每个 [T] 行加一次 flush 等待，收益只是省掉一次重试) 内嵌 v1.10.71 (注册即被回收根治：真机"register 不抛错、工具却始终不在可见表里"的根因不是时机、不是 allow 白名单——是每处注册后紧跟的 ctx.effect(() => { dispose?.() }) 把它当场注销了：cordis 的 effect(execute) 会立即执行 execute 并把返回值当 disposer，于是"持有"变成了"立即释放"。隔离实测（tests/probe-effect-dispose.mjs）：naive 写法 registered=false，generator 写法 registered=true。插件内三处（ctx.tools 直挂 / ctx.inject 延迟挂 / 补挂器）统一改走 holdToolRegistration 的 generator 持有形。v1.10.69 的 inject:["tools"]、v1.10.70 的补挂与落盘诊断全部保留，作为无害兜底。模型侧因此第一次真正拿到 transcript_expand 的定义，[T] 行的 raw=<seq> 才成为可点入口) 内嵌 v1.10.70 (工具可见性：注册调用与 memory.mjs 完全一致（插件级 inject:["tools"] + apply 内 ctx.tools.register），但隔离实例实测 register 不抛错、工具就是进不了可见表——apply 时 n=1、1s 后同一实例 n=92/99（含 memory_*/MCP）里却没有它，2s/5s/10s 补挂同样不落。已把"何时丢、丢时 table 里有什么"写进 state-compiler/tools/transcript-expand.json 供线上复查（probe 缺 photoshop 等 bundle，结论不能直接外推到 live）。期间先加三处兜底：pre-step 与工具表变化时补挂、每步检查一次；同时转录行内联 FAIL(错误码) 保证不依赖该工具也能判真伪) 内嵌 v1.10.69 (工具可见性根因探查：工具注册的结论不再只进 console——真机 v1.10.67 的 armed/visible= 只打在用户 cmd 窗口里，重启后无从判读"加载了但模型看不到"。现在 register 成功/失败/可见性探测结果连同 tools/change 复检写进 STATE_DIR/tools/transcript-expand.json，并优先走 ctx.tools 直挂（与 memory.mjs 等已证明可见的插件同路径），tools 未注入才退回 ctx.inject 延迟挂载) 内嵌 v1.10.67 (转录可逆面三修：①工具用法写进注册表——transcript_expand 此前无 description，模型不知道 raw=<seq> 可点、更不知道判定真伪该点它（真机连着三轮回执 ok:false 仍凭 [T] 行尾 OK 下结论）；②业务层判定——行尾 OK/ERR 只判传输层，回执里的 {"ok":false,"error":...} 现在提成 FAIL(错误码)，错误码与体积无关、永远显示；③注册后自检——register 没抛错≠模型看得见，armed 行现在回读可见定义表印 visible=yes/NO 并单列一条 error；体积门槛：只有被遮蔽正文 ≥ rawPtrMinBytes（缺省 1024，control/env 热调、0=永远挂指针退回旧行为）才挂 raw=<seq>，小结果里**失败行与提问答复**把有界预览（≤160 字）内联进同一行 [T]、成功的小回执保持精简 —— 真机回放 71 条：2670B→3382B（+27%），换来 4 条业务失败可见原因、且不再需要回取) 内嵌 v1.10.66 (错误面收口：档位探测失败（off 被拒→去掉档位重试成功）不再进 errs，改记 effortDowngraded；condenseErrResolved 改按 本折成文段>0 且 fallbackReasons.llmErr=0 判定 ⇒ noShrink/tooShort 这类质量性回退不再把成功折叠标成失败。真机 18:53：aCount=6、aFolded=4、noShrink=2、无 llmErr，面板却挂红字) 内嵌 v1.10.65 (折叠侧路由降级：上游摘掉模型或宿主没配该 id 时，按 压缩路由→配置回退→本机 ollama 换路重试，并把实际服务的路由写进 last-fold 的 condenseRoute(via=fallback)；此前折叠侧完全没有降级，模型一死整折无损回退而本机 ollama 明明在跑) 内嵌 v1.10.64 (折叠记录可写性根治：last-fold 字面量曾引用 if 块内的 ioc/condenseErrResolved，两次导致 ioc is not defined ⇒ 整折 append-failed；已改函数级 let，并有结构性测试禁止 last-fold 引用块内变量。显式 max_tokens 不再二次收敛（maxTokensSent 可核验）。面板：已恢复的折叠不显示红字，标记移到「实际使用」行尾) 内嵌 v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
+const PLUGIN_VERSION = 'v1.10.75 (原生压缩 ⇒ 卷封存 + 轮次继承 + 边界缀增（用户定的最小改法）：①原生 compaction/end（非自身、无错误）时把当前卷的转录原文封存到 .ctxinjector/sealed/<sid>/v<N>.json，索引 <sid>.json 记 baseRound/resumeAfterSeq/volumes[]，进程重启后照样生效；封存卷不再被追加、不再进上下文。②轮次继承——新卷的 [ROUND] 从封存时的 foldRound 续号（不重头从 1 开始）。③从摘要边界缀增——新卷只缀增原生摘要覆盖范围（compaction/summary.shadowedSeqs 的最大 seq，回退 surface 上最后一条宿主检查点）之后的节点；仍留在表面的旧卷原地冻结（不遮蔽、不重转录）。④seedFoldState 跳过封存卷（seq ≤ resumeAfterSeq 或文本 hash 命中封存卷）——堵住"原生保留窗口正好落在旧卷上 ⇒ 重启 seed 把旧卷又灌回来"。⑤A/B：control.resetAfterNativeCompaction=false / env DSH_CONTEXTINJECTOR_NATIVE_RESET=0 回到旧行为。回归 tests/native-compaction-reset.test.mjs) 内嵌 v1.10.74 (原生压缩后不复活旧转录：①非自身 compaction/end ⇒ 清空折叠基线并允许重新 seed——此前 seedFoldState 只在 foldText 为空时跑，原生压缩把检查点总结掉后 st.foldText 仍是压缩前旧值，下一折按 transcript=foldText+新段把整份旧转录又拼回去 ⇒ 上下文立刻回到压缩前大小 ⇒ 下一轮再次越线、再次原生压缩（control.resetAfterNativeCompaction=false / env DSH_CONTEXTINJECTOR_NATIVE_RESET=0 可关，A/B 用）；②宿主原生压缩写的 compact-checkpoint 当压缩边界——转录分型把它记 opaque、不产行，折进遮蔽区等于把 summary 从模型视野里删掉，现在折叠从它之后开始、它始终留在表面；回归 tests/native-compaction-reset.test.mjs) 内嵌 v1.10.73 (DSH 0.2.2-rc.2 兼容：runtime-context 快照从裸文本改成 <system-reminder>The following information describes your current session: ...</system-reminder>，旧前缀（Current runtime context）整类失配 ⇒ 尾部快照不再被判为注入 ⇒ 被遮蔽后 DSH 逐轮补发；现在 source.kind 优先（runtime-context 进 DSH_INJECTED_KINDS），前缀匹配前剥 reminder 包裹；回归 tests/dsh-injected-rc2.test.mjs；rc.2 的 session 格式 v4 schema 与 compaction 协议逐字节未变，append 仅新增批量重载、单条形态保留) 内嵌 v1.10.72 (未落盘的 seq 不再冒充业务失败：raw append 是异步的，[T] 行渲染时该 seq 可能还没 flush，回执里的 seq-not-in-raw 只是「稍后再取」。v1.10.67 把它当业务失败提成 FAIL(seq-not-in-raw)，真机上一条 probe 的正文带该回执，[T] 行就标成 FAIL，而同一个 seq 稍后展开实得 6662B ⇒ 模型据此判「工具坏了」。现在 RETRYABLE_CODES 里的码记中性状态 PENDING，行仍只挂 raw=<seq>，不与 FAIL 同权重；readRawEntry 的该回执补 pending:true + hint，工具描述里写明 PENDING 的语义；PENDING 行也不再内联小回执预览（判定列已是「稍后再取」，别复述回执）。方案 2（渲染前 await 一次 raw flush）未采纳：给每个 [T] 行加一次 flush 等待，收益只是省掉一次重试) 内嵌 v1.10.71 (注册即被回收根治：真机"register 不抛错、工具却始终不在可见表里"的根因不是时机、不是 allow 白名单——是每处注册后紧跟的 ctx.effect(() => { dispose?.() }) 把它当场注销了：cordis 的 effect(execute) 会立即执行 execute 并把返回值当 disposer，于是"持有"变成了"立即释放"。隔离实测（tests/probe-effect-dispose.mjs）：naive 写法 registered=false，generator 写法 registered=true。插件内三处（ctx.tools 直挂 / ctx.inject 延迟挂 / 补挂器）统一改走 holdToolRegistration 的 generator 持有形。v1.10.69 的 inject:["tools"]、v1.10.70 的补挂与落盘诊断全部保留，作为无害兜底。模型侧因此第一次真正拿到 transcript_expand 的定义，[T] 行的 raw=<seq> 才成为可点入口) 内嵌 v1.10.70 (工具可见性：注册调用与 memory.mjs 完全一致（插件级 inject:["tools"] + apply 内 ctx.tools.register），但隔离实例实测 register 不抛错、工具就是进不了可见表——apply 时 n=1、1s 后同一实例 n=92/99（含 memory_*/MCP）里却没有它，2s/5s/10s 补挂同样不落。已把"何时丢、丢时 table 里有什么"写进 state-compiler/tools/transcript-expand.json 供线上复查（probe 缺 photoshop 等 bundle，结论不能直接外推到 live）。期间先加三处兜底：pre-step 与工具表变化时补挂、每步检查一次；同时转录行内联 FAIL(错误码) 保证不依赖该工具也能判真伪) 内嵌 v1.10.69 (工具可见性根因探查：工具注册的结论不再只进 console——真机 v1.10.67 的 armed/visible= 只打在用户 cmd 窗口里，重启后无从判读"加载了但模型看不到"。现在 register 成功/失败/可见性探测结果连同 tools/change 复检写进 STATE_DIR/tools/transcript-expand.json，并优先走 ctx.tools 直挂（与 memory.mjs 等已证明可见的插件同路径），tools 未注入才退回 ctx.inject 延迟挂载) 内嵌 v1.10.67 (转录可逆面三修：①工具用法写进注册表——transcript_expand 此前无 description，模型不知道 raw=<seq> 可点、更不知道判定真伪该点它（真机连着三轮回执 ok:false 仍凭 [T] 行尾 OK 下结论）；②业务层判定——行尾 OK/ERR 只判传输层，回执里的 {"ok":false,"error":...} 现在提成 FAIL(错误码)，错误码与体积无关、永远显示；③注册后自检——register 没抛错≠模型看得见，armed 行现在回读可见定义表印 visible=yes/NO 并单列一条 error；体积门槛：只有被遮蔽正文 ≥ rawPtrMinBytes（缺省 1024，control/env 热调、0=永远挂指针退回旧行为）才挂 raw=<seq>，小结果里**失败行与提问答复**把有界预览（≤160 字）内联进同一行 [T]、成功的小回执保持精简 —— 真机回放 71 条：2670B→3382B（+27%），换来 4 条业务失败可见原因、且不再需要回取) 内嵌 v1.10.66 (错误面收口：档位探测失败（off 被拒→去掉档位重试成功）不再进 errs，改记 effortDowngraded；condenseErrResolved 改按 本折成文段>0 且 fallbackReasons.llmErr=0 判定 ⇒ noShrink/tooShort 这类质量性回退不再把成功折叠标成失败。真机 18:53：aCount=6、aFolded=4、noShrink=2、无 llmErr，面板却挂红字) 内嵌 v1.10.65 (折叠侧路由降级：上游摘掉模型或宿主没配该 id 时，按 压缩路由→配置回退→本机 ollama 换路重试，并把实际服务的路由写进 last-fold 的 condenseRoute(via=fallback)；此前折叠侧完全没有降级，模型一死整折无损回退而本机 ollama 明明在跑) 内嵌 v1.10.64 (折叠记录可写性根治：last-fold 字面量曾引用 if 块内的 ioc/condenseErrResolved，两次导致 ioc is not defined ⇒ 整折 append-failed；已改函数级 let，并有结构性测试禁止 last-fold 引用块内变量。显式 max_tokens 不再二次收敛（maxTokensSent 可核验）。面板：已恢复的折叠不显示红字，标记移到「实际使用」行尾) 内嵌 v1.10.61 (错误回执分型：出过错但每一段都折叠成功时 last-fold 记 condenseErrResolved，WebUI 降级为灰字提示而非红字报错——真机 folded=1/1、fallback=0、salvaged=1 的面板仍显示 UNSUPPORTED_REASONING_EFFORT) 内嵌 v1.10.60 (辅助调用会话身份：折叠浓缩/记忆编译/整理三处 purpose=compaction 调用现在都带 sessionId（宿主 dsh-compaction-basic 与 dsh-session-title-llm 一直这么做，适配器靠它生成 x-opencode-session；缺失时 opencode-go 直接 400 MissingSessionID——这是档位回退之后撞到的第二层，实测被 v1.10.59 的档位回退救到的那次重试全部死在这里）) 内嵌 v1.10.59 (推理档位回退：宿主对没有 off 档的模型直接 finish=error UNSUPPORTED_REASONING_EFFORT（实测 opencode-go/deepseek-v4.1-flash），此前整条 [A] 无损回退、记忆编译静默失败；现在被拒时不传 reasoningEffort 再试一次，让正文以默认思考模式参与，并把原因记进 io.errs/llmLast；control.condenseReasoningEffort 置空时终于能表达「完全不传」(此前被真值判断当成未设置)) 内嵌 v1.10.58 (修复异步 turn-end fold 的 compaction turn 归属：调用方未显式给 turn 时，从当前会话事件回溯仍打开的 turn，避免落到下一轮时写 turn:null 触发 v4 日志 "compaction/start does not match the open turn"；内嵌 v1.10.40 (自绘折叠/记忆状态：隐藏宿主「上下文已压缩」行，输入框左侧状态胶囊显示「本折 x% · 累计 y%」，折叠/记忆编译/原生压缩各有琥珀脉冲；记忆编译与原生 compaction 的在飞标记落状态目录，结束即删。内嵌 v1.10.38 (检查点去重 + 微折门槛：同一会话复用同一 compactionId（聊天区只维护一行「上下文已压缩」，不再每轮追加）；摘要改为「本折 x.xx · 累计 y.yy」两个比值（<1 为省）；新原料不足 foldMinShadowBytes（缺省 2048，0=关）不折，等后续轮累积。内嵌 v1.10.37 (折叠触发减法：删除 agent/turn-stopping（本栈 0 次有效折叠），turn/end 成为唯一生产触发点并折掉刚结束的轮；pre-step 退回仅 join（foldJoinTimeoutMs 超时），next() 全路径恰好一次；移除 protectLatestRound 结构性死触发——实测一次 748B 浓缩 60.1s 挡在下一轮前的阻塞路径消失。内嵌 v1.10.36 (代码结构大纲升级为轻量词法抽取：多行签名拼接、箭头函数/IIFE 区分、类/impl 上下文前缀、按语言分规则、注释与单行函数体剔除；仍为 8 项/320 字上限，纯规则零模型。内嵌 v1.10.35 (read 折叠保留有界正文预览：首 24 行 + 末 8 行 + 代码结构大纲（≤320 字），完整原文仍由 raw=<seq> 承载；edit/write 增加 del/ins 行数统计；均不调用模型。内嵌 v1.10.34 (折叠可见性修复：提交改走宿主 compaction 协议 start→summary→compact-checkpoint 替换→end，UI 显示“上下文已压缩”标记且助手原文仍留在人类转录；turn-stopping/turn-end 触发保护最近一轮，不再当场遮掉刚流出的正文；[S] 快照行不再进折叠转录并在续传时清理旧残留；transcript_expand 改 ctx.inject 延迟挂载。内嵌 v1.10.33 (计量口径两处修正：①applyCondense 内部也认 off 档——此前只靠调用方判断，任何新调用点漏判就会在 off 档照样发起付费浓缩（实测真会调模型）；②`stat.calls` 改为**真实发起的调用次数**（llmText 里计数），预算预约数另存 callsReserved——旧口径把短行/回本闸提前返回的「预约」也算成调用，实测 tooShort 行 calls=1 而 auxCalls=0。内嵌 v1.10.32 (折叠账本幂等：同一区间被两个触发点各提交一次时不再重复记账（旧实现每笔写两行 ⇒ 按行求和的 raw/appended 总账翻倍）；monotonic 由硬编码 true 改为按 cumLines 与遮蔽 seq 实算；sanitizeSid 空串回退 unknown，杜绝 .jsonl 无名文件被多会话共用。内嵌 v1.10.31 (DSH session-format v4 兼容：④source.kind=plugin 属退役形态⇒写侧全部改 producer-owned kind=plugin:X（与官方 v3→v4 迁移同形态；v3 宿主对 kind 无枚举校验，单形态双宿主通吃）；读侧（防自转录/注入避让/分类器）统一走 pluginIdOf 双形态识别；⑤session.events 公开数组 rc.3+ 已移除，枚举改 ownEvents/snapshotEvents 兜底，杜绝空表静默降级。内嵌 v1.10.26 (DSH 0.1.5 兼容：①session.events[seq] → session.eventAt(seq)，0.1.5 已移除 events 公开数组，旧写法在 resume-seed/折叠时抛 "Cannot read properties of undefined (reading \'<seq>\')"；②surfaceOp replace 字段 start/end → startSeq/endSeq，0.1.5 按三键定长校验，旧字段名致 "carries an invalid replace surfaceOp"；③遮蔽集排除 role===\'system\' 节点，0.1.5 新增"seq 0 的 system prompt 只能被 system/message 且仅覆盖该节点"保护，旧行为使折叠范围从 0 起 ⇒ "node 0 holds the system prompt" 被拒。三处均保留旧版回退路径，同一文件可跑 0.1.1-rc.2 与 0.1.5-rc.2。含 v1.10.25 及此前全部修复；⑪漂移#11：0.1.7 把 tool-call 从"助手消息内容块"改为**独立 tool/call 事件**⇒ transcribeIncremental 的 pending 永不登记 ⇒ [T] 的工具名/目标整列退化为 ?（真机 118/118）；改以 callId→{name,arguments} 的**事件索引**（callIndexFromEvents）为权威源，块级缺失时回查；老宿主块内自带 name ⇒ 回查不命中、行为逐字不变；⑪b 主症状修复：0.1.7 的工具结果是 {role:tool, toolCallId, isError, content:[text]} **没有 tool-result 块** ⇒ 旧块级分支整类跳过 ⇒ 真机 205 节点折叠后 [T] 行数=0（模型看不到任何工具痕迹）。转录改双形态识别（isToolResultMsg/toolResultCallId，callId 与 isError 回落消息层），并新增**覆盖守卫**：增量内每个工具结果必须产出一行 [T]，少一行即拒绝本次折叠、本轮按原文发送)；⑫当前轮保护：折叠不得吃掉仍在飞的那一轮——closedPrefixEnd 在"所有 call 都已闭合"时返回表面末端，于是 pre-step 折发生在"本轮第 2 步"时会把本轮 user 消息与刚产出的助手回复一并折进转录，表面尾部变成 user 角色节点 ⇒ 宿主视其为未回答的用户轮 ⇒ 再跑一步 ⇒ 同一条用户消息被答两次（真机 session-de4959d2 回合 2 连续两条回答）。新增 openRoundClampEnd：轮起点之后无 turn/end ⇒ 遮蔽终点钳到该起点之前；已结束的轮不受影响；事件不可得则退回旧行为)；⑬压缩比口径修正：旧 shrink = transcriptBytes(累计转录)/shadowedBytes(本折遮蔽) 是**混合口径**，增量折叠上结构性 >1（真机 659%/917%/382400%）⇒ 抽出纯函数 foldShrinkOf 统一为**本折**口径（appendedBytes/incrementalRawBytes），三处引用与面板同步；累计量 transcriptBytes 原样保留；v1.10.40 首折 head 同口径：原样保留的 head 段不计入本折占比（真机 101%→18.5%）)'
 // 持久化门控与状态（供 WebUI 面板读写/展示；只写纯标量 JSON，无内部活体对象）
 // v1.8 可移植：不再硬编码本机绝对路径。DSH_HOME 由启动器注入（start-dsh-web.cmd）；
 // 缺省回落到 ~/.dsh，使插件在任何人的机器上开箱可用（显式 env 仍最高优先）。
@@ -158,6 +158,14 @@ const FOLD_INFLIGHT_DIR = join(STATE_DIR, '.ctxinjector', 'fold-inflight')
 mkdirSync(FOLD_INFLIGHT_DIR, { recursive: true })
 // v1.10.39：宿主原生 compaction 的在飞标记（WebUI 自绘「原生压缩中」脉冲；宿主自带的压缩行已被插件隐藏）。
 const NATIVE_COMPACTION_DIR = join(STATE_DIR, '.ctxinjector', 'native-compaction')
+// 【v1.10.75】封存卷（seal）。契约（用户定的最小改法，见 tests/native-compaction-reset.test.mjs）：
+//   原生压缩发生后，它写的 compact-checkpoint 就是**压缩前历史的权威总结**；我们那份覆盖同一区间的
+//   转录（LOG 表）如果继续被追加/重新拼进去，等于把宿主刚压掉的内容又灌回上下文（真机：压缩后
+//   请求立刻回到压缩前大小 ⇒ 下一轮再越线 ⇒ 再压缩，逐轮循环）。
+//   故：旧卷**封存**（原文落盘、不再进上下文、不再被追加），新卷①继承轮次②只从原生摘要边界之后缀增。
+//   目录布局：sealed/<sid>.json = 索引（baseRound / resumeAfterSeq / volumes[]）；
+//             sealed/<sid>/v<N>.json = 该卷全文 + 元数据（rounds 区间、seq 区间、bytes、sha256）。
+const SEALED_DIR = join(STATE_DIR, '.ctxinjector', 'sealed')
 // 【v1.10.5 ★必须-1（协作：TESTBRANCH 规格方 LogCompiler K）】折叠索引：seq 区间 ↔ 转录**累计行号**。
 //   为什么不用 last-fold.json：它会被后续折叠覆盖，不能做溯源锚点。本文件**只追加**（NDJSON）。
 //   为什么用累计行号而不是段内行号：转录是单调前缀（foldText 只追加），段内行号在 1MB 轮转下
@@ -674,6 +682,67 @@ function isOwnTranscript(m) {
 function isHostCheckpointMsg(m) {
   return m?.source?.kind === 'compact-checkpoint' && pluginIdOf(m.source) === null
 }
+// ── v1.10.75 · 封存卷索引（纯读；写侧在 apply 里，因为要改会话状态）────────────────
+//   sid 归一与 raw/fold-index 同款（去掉 session- 前缀 + 只留 [A-Za-z0-9._-]）。
+function sealedIndexPath(sid) {
+  return join(SEALED_DIR, sanitizeSid(String(sid ?? '').replace(/^session-?/i, '')) + '.json')
+}
+function sealedVolumePath(sid, v) {
+  return join(SEALED_DIR, sanitizeSid(String(sid ?? '').replace(/^session-?/i, '')), 'v' + v + '.json')
+}
+// 读不到 / 解析失败一律当"没有封存"（绝不因为索引坏了改变折叠语义）。
+export function readSealIndex(sid) {
+  try {
+    const f = sealedIndexPath(sid)
+    if (!existsSync(f)) return null
+    const j = JSON.parse(readFileSync(f, 'utf8'))
+    return (j && typeof j === 'object') ? j : null
+  } catch { return null }
+}
+// 写索引：失败返回 false（调用方据此决定"不清基线"，宁可重复注入一次也不静默丢历史）。
+function writeSealIndex(sid, idx) {
+  try {
+    mkdirSync(SEALED_DIR, { recursive: true })
+    writeFileSync(sealedIndexPath(sid), JSON.stringify(idx, null, 2) + '\n', 'utf8')
+    return true
+  } catch (err) {
+    console.error('[contextinjector] seal-index write failed:', err?.message ?? err)
+    return false
+  }
+}
+// 原生摘要的覆盖边界。返回 `{ seq, source }`：
+//   source='summary'    ⇒ seq = `compaction/summary.shadowedSeqs` 的最大 seq（或 shadowedRange.end）。
+//     这是**单调**边界：边界之后的节点 seq 都更大，可以直接拿它做 `seq > boundary` 的过滤。
+//   source='checkpoint' ⇒ seq = surface 上最后一条宿主检查点的 seq。它只是**位置**边界
+//     （检查点的事件 seq 在日志尾部，而它后面留在表面的节点 seq 更小）⇒ 调用方不得用它做 seq 过滤，
+//     只能按位置切。
+//   source='none'       ⇒ seq=-1（保守：不据它封存）。
+export function nativeBoundaryOf(session, compactionId = null) {
+  let best = -1
+  try {
+    for (const e of allEvents(session) ?? []) {
+      if (!e || e.type !== 'compaction/summary') continue
+      const d = e.data ?? {}
+      if (compactionId && d.compactionId && d.compactionId !== compactionId) continue
+      const seqs = Array.isArray(d.shadowedSeqs) ? d.shadowedSeqs.map(Number).filter((n) => Number.isFinite(n)) : []
+      const cand = Math.max(seqs.length ? Math.max(...seqs) : -1, Number.isFinite(d?.shadowedRange?.end) ? Number(d.shadowedRange.end) : -1)
+      if (cand > best) best = cand
+    }
+  } catch { /* 观测面 */ }
+  if (best >= 0) return { seq: best, source: 'summary' }
+  try {
+    const nodes = [...(session?.surface?.nodes ?? [])]
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (isHostCheckpointMsg(session.deriveEventMessage(evAt(session, nodes[i])))) return { seq: Number(nodes[i]), source: 'checkpoint' }
+    }
+  } catch { /* 观测面 */ }
+  return { seq: -1, source: 'none' }
+}
+// 转录文本里的轮号区间（封存卷元数据用；无 [ROUND] ⇒ [null, null]）。
+export function roundRangeOf(text) {
+  const ns = [...String(text ?? '').matchAll(/^\[ROUND\]\s*(\d+)/gm)].map((m) => Number(m[1])).filter((n) => Number.isFinite(n))
+  return ns.length ? [Math.min(...ns), Math.max(...ns)] : [null, null]
+}
 // 【取自 RCS-0.1.0】DSH 以非 plugin 形式注入的节点 kind 白名单（实测 skill 目录节点：
 //   kind==='skill-catalog'、文本以 <system-reminder> 开头）——不判为注入的话它会被折进遮蔽区，
 //   DSH 随即补发一份目录 ⇒ 遮蔽边界更保守地"视为注入、留在表面"。
@@ -848,25 +917,60 @@ function seedFoldState(session, surface, st, sid) {
   try {
     const nodes = [...(surface?.nodes ?? [])]
     const entries = nodes.map((seq) => ({ seq, msg: session.deriveEventMessage(evAt(session, seq)) }))
+    // 【v1.10.75】封存卷绝不复活：重启后 surface 上仍可能有已封存的旧卷（原生压缩的保留窗口
+    //   正好落在旧卷之后 ⇒ 旧卷没被总结掉、只是没被压进 summary）。判据两条：
+    //     ① 位置：seq ≤ resumeAfterSeq（在原生摘要覆盖范围之内）；
+    //     ② 内容：文本 hash 逐字等于某个封存卷（边界之后仍留在表面的旧卷）。
+    //   跳过 ≠ 丢弃：原文在 sealed/ 里，轮次由 baseRound 继承。
+    const idx = readSealIndex(sid)
+    const floorSeq = Number.isFinite(idx?.resumeAfterSeq) ? Number(idx.resumeAfterSeq) : -1
+    const sealedHashes = new Set((Array.isArray(idx?.volumes) ? idx.volumes : []).map((v) => v?.sha256).filter(Boolean))
+    const baseRound = Number(idx?.baseRound) || 0
     const own = []
+    const sealedSeqs = []
     let lastCompactionId = null
     for (const e of entries) {
       if (!e.msg || !isOwnTranscript(e.msg)) continue
       const text = blocksOf(e.msg).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('')
-      if (text) own.push({ seq: e.seq, text })
+      if (!text) continue
+      if ((floorSeq >= 0 && e.seq <= floorSeq) || sealedHashes.has(hash256(stripSnapshotRows(text)))) {
+        sealedSeqs.push(e.seq)
+        continue
+      }
+      own.push({ seq: e.seq, text })
       if (typeof e.msg.source?.compactionId === 'string' && e.msg.source.compactionId) lastCompactionId = e.msg.source.compactionId
     }
-    if (own.length === 0) return false
+    if (own.length === 0) {
+      // 表面上只剩封存卷（或什么都没有）：仍然把"轮次继承 + 起点边界"恢复出来，
+      // 新卷从边界之后缀增，绝不把封存内容重新灌回上下文。
+      if (baseRound > 0 || floorSeq >= 0 || sealedSeqs.length > 0) {
+        st.foldText = ''
+        st.foldSeq = floorSeq
+        st.lastSegSeq = floorSeq
+        st.segCount = 0
+        st.cumRawBytes = 0
+        st.compactionId = null // 新卷 → 新的 UI 检查点行
+        st.foldRound = Math.max(Number(st.foldRound) || 0, baseRound)
+        st.resumeAfterSeq = floorSeq
+        st.freshVolume = true
+        st.seeded = true
+        console.log(`[contextinjector] resume-seed: 自身转录节点全属已封存卷（seq=${sealedSeqs.join(',') || 'none'}）⇒ 新卷从 seq=${floorSeq} 之后缀增，轮次继承 ${st.foldRound}`)
+        return true
+      }
+      return false
+    }
     const merged = mergeOwnSegments(own) // v1.10.13：拼接全部段（旧版只取最后一个 ⇒ 多段会丢前面的段）
     st.foldText = stripSnapshotRows(merged.text)
     st.foldSeq = merged.seq
-    st.foldRound = merged.round
+    st.foldRound = Math.max(merged.round, baseRound) // 封存卷的轮次只作为下限：绝不倒退
     st.segCount = merged.segCount
     st.lastSegSeq = merged.seq
+    st.resumeAfterSeq = floorSeq
+    st.freshVolume = sealedSeqs.length > 0
     if (lastCompactionId) st.compactionId = lastCompactionId // 复用同一个 UI 标记（不每轮新增一行）
     st.cumRawBytes = seedCumulativeRaw(sid)
     st.seeded = true
-    console.log(`[contextinjector] resume-seed seq=${merged.seq} round=${st.foldRound} segments=${merged.segCount} foldBytes=${merged.text.length} cumRaw=${st.cumRawBytes} (process-restart resume)`)
+    console.log(`[contextinjector] resume-seed seq=${merged.seq} round=${st.foldRound} segments=${merged.segCount} foldBytes=${merged.text.length} cumRaw=${st.cumRawBytes} sealedSkipped=${sealedSeqs.length} (process-restart resume)`)
     return true
   } catch (err) {
     console.error('[contextinjector] resume-seed failed:', err?.message ?? err)
@@ -2178,7 +2282,7 @@ export default {
       const key = sid ?? '__unknown__'
       let s = sessionStates.get(key)
       // segCount/lastSegSeq（v1.10.13 多段转录）：段号与上一段起点 seq（段头据此编号、标明承接关系）
-      if (!s) { s = { foldSeq: -1, foldText: '', foldRound: 0, foldedOnce: false, segCount: 0, lastSegSeq: -1, compactionId: null, cumRawBytes: 0 }; sessionStates.set(key, s) }
+      if (!s) { s = { foldSeq: -1, foldText: '', foldRound: 0, foldedOnce: false, segCount: 0, lastSegSeq: -1, compactionId: null, cumRawBytes: 0, vol: 1, freshVolume: false, resumeAfterSeq: -1, sealEpoch: 0 }; sessionStates.set(key, s) }
       return s
     }
 
@@ -2231,6 +2335,9 @@ export default {
       const cumLinesBeforeEntry = st.foldText === '' ? 0 : st.foldText.split('\n').length
       // handler 局部副本：每次触发从该会话状态载入；折叠成功后写回（多会话不串扰）
       let foldSeq = st.foldSeq, foldText = stripSnapshotRows(st.foldText), foldRound = st.foldRound, foldedOnce = st.foldedOnce
+      // 【v1.10.75】在飞期间发生过原生压缩（封存/换卷）⇒ 本次折叠的遮蔽区间与基线都已过期：
+      //   提交会写出指向已被宿主总结掉的 seq 的 replace，或把旧卷拼回去。记下 epoch，提交前比对。
+      const sealEpochAtEntry = Number(st.sealEpoch) || 0
       if (TEST_ROUND && foldedOnce) return { folded: false, reason: 'test-once' } // 回归模式单次折叠（实证 P/S 同语义）
 
       // —— round 边界（或回归模式闭合前缀）：把已闭合前缀折叠为转录消息 ——
@@ -2267,16 +2374,34 @@ export default {
       //   它的正文就从模型视野里消失（实测：原生压缩后第一折把 summary 吞掉、上下文里只剩新一行的 [U]/[A]）。
       //   故折叠**从它之后**开始，它自己永远留在表面；紧随其后的新轮照常折叠。
       //   判据用**位置**（开头的连续段）而不是 seq：surface 顺序才是权威，seq 只用于记账。
+      //   【v1.10.75】边界不一定在开头：原生保留窗口若正好落在插件旧卷之后，检查点会出现在表面中段。
+      //     位置仍是权威 —— 取**最后一条**宿主检查点之后，它自己永不进遮蔽区。
       let leadCut = 0
       {
         let i = 0
         while (i < entries.length && (!entries[i].msg || isSystemNode(entries[i].msg))) i += 1
         while (i < entries.length && isHostCheckpointMsg(entries[i].msg)) i += 1
         leadCut = i
+        for (let j = entries.length - 1; j >= 0; j--) {
+          if (entries[j].msg && isHostCheckpointMsg(entries[j].msg)) { if (j + 1 > leadCut) leadCut = j + 1; break }
+        }
+      }
+      // 【v1.10.75 · 新卷】封存后的第一次折叠：边界之前的内容（宿主总结 + 已封存卷）一律不碰。
+      //   已封存卷若仍留在表面（它在摘要边界之后、没被总结掉），就**原地冻结**：不遮蔽、不重转录，
+      //   新卷从它之后缀增 —— 这正是"封存这之前的 LOG 表，从边界开始缀增"。
+      const freshVol = st.freshVolume === true
+      if (freshVol) {
+        let lastOwn = -1
+        for (let i = 0; i < entries.length; i++) if (entries[i].msg && isOwnTranscript(entries[i].msg)) lastOwn = i
+        if (lastOwn + 1 > leadCut) leadCut = lastOwn + 1
+        // 注入节点永不遮蔽：边界之后若还有 runtime/policy 快照，从最后一条之后开始
+        for (let i = leadCut; i < entries.length; i++) if (entries[i].msg && injTest(entries[i].msg)) leadCut = i + 1
+        if (leadCut > end) return { folded: false, reason: 'sealed-tail' } // 边界之后还没有可折的闭合前缀
       }
 
       let shadowed = entries.slice(leadCut, end + 1).filter((e) => e.msg !== null && !isSystemNode(e.msg))
       // 轮号状态必须在 head 转录**之前**建立：head（首轮 user）先占 [ROUND] 1，增量行随后续号。
+      // 【v1.10.75】新卷的 n = 继承来的 foldRound（封存时的最后轮号）⇒ 首条新行 = foldRound+1，不重头从 1。
       const roundState = { n: foldRound }
       let headRows = []
       let headSeqs = []
@@ -2289,7 +2414,11 @@ export default {
         // 【v1.10.1 修复】被截掉的那段（注入**之前**的普通节点 = 首条 user）过去既不被遮蔽、也不被
         //   转录 ⇒ 转录从第 2 轮起（面板显示 ROUND 1 = 第二条消息）。现按 foldHeadTranscript 的契约
         //   在首次折叠时"只转录不遮蔽"补录一次；注入节点本身仍绝不进 head/tail（keepInject 不变）。
-        const ht = foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, rawPtrMinBytes: rawPtrMinBytesOf(ctrl) })
+        //   【v1.10.75】新卷不做 head 补录：卷的起点是原生摘要边界，之前的内容已由宿主总结覆盖，
+        //   补录会把它再抄一遍（并且 head 的 tail 切法会把宿主检查点圈进遮蔽区）。
+        const ht = freshVol
+          ? { head: [], tail: shadowed, hadInject: false, rows: [] }
+          : foldHeadTranscript(shadowed, foldText !== '', roundState, { structured: ctrl?.toolfoldStructured === true, calls: callsIdx, rawPtrMinBytes: rawPtrMinBytesOf(ctrl) })
         headRows = ht.rows
         headSeqs = ht.head.map((e) => e.seq)
         headEntries = ht.head
@@ -2606,6 +2735,13 @@ export default {
         console.log(`[contextinjector] fold-skip trigger=${trigger} step=${stepNo} reason=compacting-at-commit（DSH 正在 compaction ⇒ 本次不提交，避免作废它的总结）`)
         return { folded: false, reason: 'compacting' }
       }
+      // 【v1.10.75】在飞期间被原生压缩换过卷 ⇒ 本次折叠作废（下一轮按新卷基线重新折）。
+      //   判据是 epoch 而不是 _compacting：压缩可能已经在本次折叠的 await 期间 start→end 走完。
+      if ((Number(st.sealEpoch) || 0) !== sealEpochAtEntry) {
+        try { log('fold-skip', { trigger, step: stepNo, turn, sid, reason: 'sealed-midflight' }) } catch { /* ignore */ }
+        console.log(`[contextinjector] fold-skip trigger=${trigger} step=${stepNo} reason=sealed-midflight（折叠在飞期间原生压缩换卷 ⇒ 本次不提交）`)
+        return { folded: false, reason: 'sealed-midflight' }
+      }
       try {
         // 【v1.10.13 多段转录】head 段**先**提交（seq 升序），再提交新段 —— 两段互不覆盖：
         //   head 段的区间只覆盖注入节点之前的节点（不含注入节点 ⇒ keepInject 分毫未动），
@@ -2646,6 +2782,8 @@ export default {
         }
         // 写回 per-session 状态（同一 web 进程多会话互不串扰）
         st.foldSeq = foldSeq; st.foldText = foldText; st.foldRound = foldRound; st.foldedOnce = foldedOnce
+        // 【v1.10.75】新卷已落第一条检查点 ⇒ 卷边界生效，后续折叠恢复"边界之后"的常规增量语义
+        if (freshVol) { st.freshVolume = false; st.vol = Number(st.vol) || 1 }
         const after = snapshotOf(session)
         // v1.10.25：liveBytes = 提交后**真实请求**里各条消息的实际字节合计（"上下文里到底有多大"）。
         //   它与"日志里历史事件体的总和"是两个完全不同的量：后者随折叠次数线性累加（每次重写整份转录
@@ -2665,6 +2803,8 @@ try {
 } catch (err) { console.error('[contextinjector] fold-index call failed:', err?.message ?? err) }
         persistLastFold({
           t: Date.now(), plugin: PLUGIN_VERSION, sessionId: sid, gate, keepInject: ki ? 1 : 0, mode, trigger, step: stepNo, round: foldRound,
+          // v1.10.75：卷号 / 本轮是否新卷的第一折 / 原生摘要边界（新卷起点的 seq）——面板与审计都据此区分"卷"
+          vol: Number(st.vol) || 1, resumedFromBoundary: freshVol ? 1 : undefined, resumeAfterSeq: Number.isFinite(st.resumeAfterSeq) ? st.resumeAfterSeq : undefined,
           condenseRoute, // v1.8：实际浓缩模型（provider/model/来源），便于核验"用了谁的模型"
           condenseErr, // v1.9：本次折叠浓缩模型调用失败原因（无则 undefined，JSON 省略）
           condenseErrKind, // #9：condenseErr 的分型 enum（供 WebUI 如实展示错误类别）
@@ -2844,6 +2984,73 @@ try {
     //   对策：跟踪每个会话的 compaction 在飞状态（DSH 会发 `compaction/start` / `compaction/end` 事件），
     //   在折叠**登记时**与**提交前**各查一次 ⇒ 让路给 DSH，等下一轮再折。折叠本身不丢内容，只是延后。
     const _compacting = new Set() // sid：DSH 正在对它会话做 compaction
+    // 【v1.10.75 · 封存当前卷】原生压缩结束后调用一次（非自身、非错误）。
+    //   做三件事，顺序不能反：
+    //     ① 先把**当前卷**的转录原文落盘（sealed/<sid>/v<N>.json + 索引），这是"封存"的实体；
+    //     ② 记 baseRound（继承轮次的下限）与 resumeAfterSeq（原生摘要覆盖到的最后 seq）；
+    //     ③ 再把会话基线切到新卷：foldText 清空、foldSeq = resumeAfterSeq、foldRound 保留（续号）。
+    //   失败语义：落盘失败 ⇒ 不封存、不清基线（宁可重复注入一次，也不丢历史且不知道丢在哪）。
+    function sealVolume(sid, st, session, compactionId) {
+      const b = nativeBoundaryOf(session, compactionId)
+      // 只有"摘要给出"的边界是单调的，才能拿来做 `seq > boundary` 过滤；检查点边界只用于位置切分。
+      const resumeAfterSeq = b.source === 'summary' ? b.seq : -1
+      const boundary = b.seq
+      const prev = readSealIndex(sid) ?? { sessionId: sid, baseRound: 0, resumeAfterSeq: -1, volumes: [] }
+      const vols = Array.isArray(prev.volumes) ? [...prev.volumes] : []
+      const v = vols.length + 1
+      const text = stripSnapshotRows(st.foldText)
+      let rec = null
+      if (text !== '') {
+        const fromSeq = Number.isFinite(st.foldSeq) && st.foldSeq >= 0 ? st.foldSeq : (Number.isFinite(prev.resumeAfterSeq) ? Number(prev.resumeAfterSeq) : -1)
+        const meta = {
+          v,
+          sealedAt: Date.now(),
+          nativeCompactionId: compactionId ?? null,
+          rounds: roundRangeOf(text),
+          seq: [fromSeq, boundary],
+          bytes: text.length,
+          sha256: hash256(text),
+        }
+        rec = meta
+        try {
+          mkdirSync(dirname(sealedVolumePath(sid, v)), { recursive: true })
+          writeFileSync(sealedVolumePath(sid, v), JSON.stringify({ ...meta, text }, null, 2) + '\n', 'utf8')
+          vols.push(meta)
+        } catch (err) {
+          console.error('[contextinjector] seal-volume write failed:', err?.message ?? err)
+          return { sealed: false, reason: 'write-failed', v, boundary, baseRound: Number(st.foldRound) || 0 }
+        }
+      }
+      const baseRound = Math.max(Number(prev.baseRound) || 0, Number(st.foldRound) || 0, Number(rec?.rounds?.[1]) || 0)
+      const wrote = writeSealIndex(sid, {
+        sessionId: sid,
+        baseRound,
+        resumeAfterSeq,
+        boundarySeq: boundary,
+        boundaryFrom: b.source,
+        volumes: vols.slice(-50),
+        updatedAt: Date.now(),
+      })
+      // 索引没落盘 ⇒ 不切基线：重启后会拿不到"哪些是封存卷"，那就会把旧卷再灌回来。
+      // 宁可这次重复注入，也不要进入"知道丢了但不知道丢在哪"的状态。
+      if (!wrote) return { sealed: false, reason: 'index-write-failed', v, boundary, boundaryFrom: b.source, resumeAfterSeq, baseRound }
+      // 新卷（顺序：先把落盘做成功，再动内存基线）
+      st.foldText = ''
+      st.foldSeq = resumeAfterSeq
+      st.lastSegSeq = resumeAfterSeq
+      st.segCount = 0
+      st.cumRawBytes = 0
+      st.compactionId = null // 新卷 = 新的 UI 检查点行（旧行已被宿主总结或因封存而失效）
+      st.seedChecked = false
+      st.seeded = false
+      st.freshVolume = true
+      st.vol = v
+      st.resumeAfterSeq = resumeAfterSeq
+      st.boundarySeq = boundary
+      st.sealEpoch = (Number(st.sealEpoch) || 0) + 1 // 让在飞折叠作废（见 foldBody 提交前的比对）
+      st.foldRound = baseRound // ① 轮次继承 ② 新卷起点
+      return { sealed: rec !== null, v, boundary, boundaryFrom: b.source, resumeAfterSeq, bytes: rec ? rec.bytes : 0, rounds: rec ? rec.rounds : null, baseRound }
+    }
     ctx.on('session/event', (a, b) => {
       try {
         const ev = (b && typeof b === 'object' && typeof b.type === 'string') ? b
@@ -2867,26 +3074,32 @@ try {
           _compacting.delete(sid)
           try { rmSync(nativeFile, { force: true }) } catch { /* 观测面 */ }
           console.log(`[contextinjector] DSH compaction 结束（sid=${sid}${ev?.data?.error ? ' err=' + String(ev.data.error).slice(0, 80) : ''}）`)
-          // 【v1.10.74 · 原生压缩后不复活旧转录】
+          // 【v1.10.75 · 卷封存（取代 v1.10.74 的"清基线"）】
           //   实测（2026-11-11，session-64963da1 / spark 131072 窗口）：DSH 原生压缩把插件的折叠
-          //   检查点一起总结掉之后，`st.foldText` 仍是压缩前的非空旧值（`seedFoldState` 只在
-          //   `foldText === ''` 时才跑），下一次折叠于是把**整份压缩前的转录**又拼进新检查点
-          //   （`transcript = foldText + '\n' + segNewText`）⇒ 上下文立刻回到压缩前大小 ⇒ 下一轮
-          //   再次越线、再次原生压缩，形成"每轮压一次"的死循环。这正是"注入依然是原样的"。
-          //   对策：原生压缩一结束就把基线清空并允许重新 seed —— 下一次折叠从**压缩后的表面**重建
-          //   （存活的自身段按 seq 拼接；全被总结掉就从宿主检查点之后重新开始），绝不把宿主已经
-          //   总结过的内容再灌回上下文。原生压缩失败（surface 未变）时重新 seed 得到同一份文本，幂等。
+          //   检查点一起总结掉之后，旧基线仍指向压缩前的整份转录，下一折不把宿主已总结的内容重新灌回
+          //   上下文（v1.10.74 修的问题），而且旧卷在原生摘要覆盖范围里已无信息增量。
+          //   现在把旧卷**封存**（原文落盘、不再进上下文），新卷继承轮次、只从原生摘要边界之后缀增。
+          //   原生压缩报错（surface 未变）时不动基线：没有新总结可以接管，封存只会白白切断连续转录。
           if (nativeCompactionResetOn(readControl())) {
-            const st = stateOf(sid)
-            const dropped = st.foldText.length
-            st.foldText = ''
-            st.foldSeq = -1
-            st.segCount = 0
-            st.lastSegSeq = -1
-            st.seedChecked = false
-            st.seeded = false
-            try { log('native-compaction-reset', { sid, dropped }) } catch { /* 观测面 */ }
-            if (dropped > 0) console.log(`[contextinjector] 原生压缩后清空折叠基线（丢弃 ${dropped}B 旧转录；下次折叠从压缩后的表面重新 seed）`)
+            if (ev?.data?.error) {
+              console.log('[contextinjector] 原生压缩失败 ⇒ 不封存（基线保持，等下一次成功压缩再交接）')
+            } else {
+              const st = stateOf(sid)
+              // 本插件在该会话还没有任何卷（从未折过）⇒ 无可封存、也无可继承：不落任何文件，
+              // 新卷语义由 foldBody 的 leadCut（最后一条宿主检查点之后）自然成立。
+              const hasLiveVolume = st.foldText !== '' || (Number.isFinite(st.foldSeq) && st.foldSeq >= 0) || (Number(st.segCount) || 0) > 0
+              if (!hasLiveVolume && !st.freshVolume) {
+                try { log('native-compaction-noop', { sid, reason: 'no-live-volume' }) } catch { /* 观测面 */ }
+              } else {
+                const r = sealVolume(sid, st, session, ev?.data?.compactionId ?? null)
+                try { log('native-compaction-seal', { sid, ...r }) } catch { /* 观测面 */ }
+                if (r.sealed) {
+                  console.log(`[contextinjector] 原生压缩 ⇒ 封存第 ${r.v} 卷（${r.bytes}B，轮次 ${r.rounds?.[0] ?? '?'}–${r.rounds?.[1] ?? '?'}，边界 seq=${r.boundary}/${r.boundaryFrom}）；新卷继承轮次 ${r.baseRound}、只从边界之后缀增`)
+                } else {
+                  console.log(`[contextinjector] 原生压缩 ⇒ 无旧卷可封存（基线为空 / 落盘失败 ${r.reason ?? ''}），边界 seq=${r.boundary}/${r.boundaryFrom}，新卷继承轮次 ${r.baseRound}`)
+                }
+              }
+            }
           }
         }
       } catch { /* 观测面永不抛 */ }
