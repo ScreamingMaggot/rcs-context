@@ -61,15 +61,25 @@ RCS 用三件事同时处理它们：**折叠**（省窗口）、**外置推理*
 
 ## 快速开始
 
-**方式一：插件包（推荐）**
+**方式一：npm 包（推荐）**
+
+已发布到 npm：[`rcs-context`](https://www.npmjs.com/package/rcs-context)。
 
 ```bash
-dsh plugin --profile web add github:ScreamingMaggot/rcs-context
+dsh plugin --profile web add rcs-context
 ```
 
 然后在 `<DSH_HOME>/profiles/web/package.json` 的 `dsh.profile.bundles` 里加入 `"rcs-context"`，重启 `dsh web`。
 
-**方式二：脚本直装**（离线 / 无 pnpm 时）
+**方式二：GitHub 源安装**（要装尚未发版的提交时用）
+
+```bash
+dsh plugin --profile web add github:ScreamingMaggot/rcs-context#<commit>
+```
+
+pnpm ≥ 10 首次安装会拒绝运行 git 依赖的 `prepare` 脚本，需要在 profile 的 `pnpm-workspace.yaml` 里写 `allowBuilds` 授权——那等于允许该包代码在本机执行，所以优先用方式一，并尽量带 `#commit` 锁版本。
+
+**方式三：脚本直装**（离线 / 无 pnpm 时）
 
 ```bash
 git clone https://github.com/ScreamingMaggot/rcs-context.git
