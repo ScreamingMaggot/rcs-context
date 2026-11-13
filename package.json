@@ -1,6 +1,6 @@
 {
   "name": "rcs-context",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "description": "RCS — fold repeated tool output without losing the original, give the model a read-only verifier, and externalize session facts into auditable memory. DeepSeek Harness plugin bundle: context folding, external reasoning, append-only transcript, and external memory with rcs:// addressing, L0/L1/L2 layers, directory-aware search, retrieval traces, a deterministic durability gate, host-verified semantic proposals, and a file-state janitor. Compatible with DSH 0.1.5-rc.2 through 0.2.2-rc.2. MIT.",
   "type": "module",
   "main": "./web/contextinjector.mjs",
@@ -17,6 +17,7 @@
     "condense",
     "toolfold",
     "contextinjector-webui",
+    "tools",
     "cordis.patch.yml",
     "README.md",
     "LICENSE.txt"

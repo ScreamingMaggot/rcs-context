@@ -34,7 +34,7 @@ RCS 用三件事同时处理它们：**折叠**（省窗口）、**外置推理*
 - **折叠后驻留** = 插件最后一份 `last-fold` 记录的 `transcriptBytes`，即模型真正携带的折叠版 transcript；
 - **上下文占用** = 每个模型步的 `inputTokens + cacheReadTokens` ÷ 1,048,576，取全部步的中位 / P90；**峰值**含原生压缩那次请求（它要读整段对话，所以偏高）。
 
-可自行复算：`node tools/session-econ.mjs --dsh-home "$DSH_HOME" --mode single`（读本机会话档案，不上传任何数据）。
+可自行复算：`node tools/session-econ.mjs --dsh-home "$DSH_HOME" --mode single`（读本机会话档案，不上传任何数据）。三个脚本随 npm 包一起发布，装在 `<profile>/node_modules/rcs-context/tools/` 下，只依赖 Node 内置模块。
 
 ## 四个插件
 
